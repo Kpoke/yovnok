@@ -1,1 +1,1 @@
-{ "lods": [], "materialOnly": true }
+{"lods": [], "materialOnly": true, "maxTexture": 1024, "dataCodec": "etc1s"}

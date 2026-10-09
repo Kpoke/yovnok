@@ -62,6 +62,13 @@ export type BuildOptions = {
   lods: number[];
   /** Longest texture edge, px. */
   maxTexture: number;
+  /**
+   * Codec for the non-normal DATA maps (occlusion / roughness / metal):
+   * `uastc` keeps fine detail; `etc1s` is several times smaller — right for
+   * surfaces seen tiled or from a distance (the arena ground). Normal maps are
+   * always UASTC.
+   */
+  dataCodec: 'uastc' | 'etc1s';
   /** Convert textures to KTX2. Off only for debugging a texture problem. */
   ktx2: boolean;
   /**
@@ -87,6 +94,7 @@ export type BuildOptions = {
 const DEFAULTS: BuildOptions = {
   lods: [0.35, 0.1],
   maxTexture: 2048,
+  dataCodec: 'uastc',
   ktx2: true,
   dropFarMaterials: [],
   materialOnly: false,
@@ -95,6 +103,10 @@ const DEFAULTS: BuildOptions = {
 
 /** Texture slots holding data rather than colour: compress with UASTC, linear. */
 const DATA_SLOTS = /normalTexture|occlusionTexture|metallicRoughnessTexture|clearcoat.*Texture|specular.*Texture/;
+/** Normal maps: always UASTC (ETC1S blocks them up badly), tuned for normals. */
+const NORMAL_SLOTS = /normalTexture|clearcoatNormalTexture/;
+/** The other data maps (occlusion, roughness/metal, …). */
+const ORM_SLOTS = /occlusionTexture|metallicRoughnessTexture|clearcoat(?!Normal).*Texture|specular.*Texture/;
 const COLOUR_SLOTS = /baseColorTexture|emissiveTexture|sheenColorTexture/;
 
 export async function createIO(): Promise<NodeIO> {
@@ -273,8 +285,13 @@ export async function buildDocument(doc: Document, options: BuildOptions): Promi
     );
     if (options.ktx2) {
       await doc.transform(
-        // UASTC keeps normal/ORM detail; zstd supercompression keeps the file sane.
-        ktx2({ slots: DATA_SLOTS, isUASTC: true, needSupercompression: true, generateMipmap: true, enableDebug: false, imageDecoder: decodeImage }),
+        // Normal maps: UASTC, tuned for normals. RDO (rate-distortion
+        // optimisation) spends quality where it cannot be seen so zstd can
+        // compress far better: the 2K arena materials went from ~10 MB each.
+        ktx2({ slots: NORMAL_SLOTS, isUASTC: true, isNormalMap: true, isPerceptual: false, enableRDO: true, rdoQualityLevel: 1.5, needSupercompression: true, generateMipmap: true, enableDebug: false, imageDecoder: decodeImage }),
+        options.dataCodec === 'etc1s'
+          ? ktx2({ slots: ORM_SLOTS, isUASTC: false, isPerceptual: false, qualityLevel: 200, generateMipmap: true, enableDebug: false, imageDecoder: decodeImage })
+          : ktx2({ slots: ORM_SLOTS, isUASTC: true, isPerceptual: false, enableRDO: true, rdoQualityLevel: 1.5, needSupercompression: true, generateMipmap: true, enableDebug: false, imageDecoder: decodeImage }),
         ktx2({ slots: COLOUR_SLOTS, isUASTC: false, qualityLevel: 230, generateMipmap: true, enableDebug: false, imageDecoder: decodeImage }),
       );
     }
