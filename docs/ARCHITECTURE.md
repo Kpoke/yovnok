@@ -7,9 +7,12 @@ game's WebSocket at `/ws`, `/healthz`, and `/stats`. The browser runs the
 renderer, input and audio; the server runs the game.
 
 ```
-browser ── HTTPS ──▶ static files (client, models, textures, audio)
-        ── WSS /ws ─▶ RoomManager ─▶ Room (one match) × up to MAX_ROOMS
+browser ── HTTPS (via the CDN) ──▶ static files, /config.json
+        ── WSS /ws (direct) ─────▶ RoomManager ─▶ Room (one match) × up to MAX_ROOMS
 ```
+
+On load the page fetches `/config.json`, which names the socket address
+(`PUBLIC_WS_URL`; the page's own origin when unset).
 
 The simulation, arena, weapons and match rules live in `src/shared/` and are
 compiled into both sides, so the client and the server run identical code.

@@ -12,10 +12,23 @@
 **Total: about $7/month, with no usage-based charges.** The limit is $10/month.
 
 ```
-player ──▶ Cloudflare (cache, TLS) ──▶ Droplet: Caddy (TLS) ──▶ game container
-                                                  └── systemd timer: installs new images
+page + files:  player ──▶ Cloudflare (cache, TLS) ──▶ Caddy ──▶ game container
+game socket:   player ──────────── direct (wss) ─────▶ Caddy ──▶ game container
 GitHub push ──▶ Actions builds the image ──▶ ghcr.io/kpoke/yovnok:latest
+                                     systemd timer on the Droplet installs it
 ```
+
+Two hostnames:
+
+| Host | DNS | Serves |
+|---|---|---|
+| `play.yovnok.com` | proxied by Cloudflare | the page, the game's files, `/healthz`, `/stats`, `/config.json` |
+| `ws.play.yovnok.com` | DNS-only, straight to the Droplet | the game WebSocket (`/ws`) only |
+
+The page learns the socket address from `/config.json` (`PUBLIC_WS_URL`). The
+direct route keeps the live connection's round trip at the network's own
+(~135 ms from Nigeria to London), with the CDN serving everything that can be
+cached. The origin is IPv4 only.
 
 ## Staying within budget
 
@@ -40,13 +53,17 @@ GitHub push ──▶ Actions builds the image ──▶ ghcr.io/kpoke/yovnok:la
 | `deploy/Caddyfile` | HTTPS with a Cloudflare origin certificate, proxying to the game |
 
 The Droplet keeps, outside the repository, a `.env` file (`DOMAIN`,
-`STATS_PASSWORD`, `STATS_SALT`) and the origin certificate (`origin.pem`,
-`origin.key`).
+`WS_DOMAIN`, `CF_RANGES`, `STATS_PASSWORD`, `STATS_SALT`) and the origin
+certificate (`origin.pem`, `origin.key`).
 
 ## Network and security
 
-- **Firewall:** ports 80 and 443 accept only Cloudflare's address ranges; SSH
-  (22) is key-only. Nothing reaches the game except through Cloudflare.
+- **Firewall:** port 80 accepts only Cloudflare's address ranges; 443 is open
+  (the game socket is reached directly); SSH (22) is key-only.
+- **Caddy:** `play.yovnok.com` uses a Cloudflare origin certificate and drops
+  any request not from Cloudflare's ranges (`CF_RANGES`); `ws.play.yovnok.com`
+  has a Let's Encrypt certificate, answers only `/ws`, and strips Cloudflare's
+  client headers so a direct client cannot fake its address or country.
 - **Cloudflare:** SSL mode *Full (strict)*; a cache rule caches `/assets/*`.
 - **In the game server:** an origin allowlist (`ALLOWED_ORIGINS`), 16 KB
   maximum messages, per-IP connection limits, a message-flood cut-off, and a
@@ -81,8 +98,9 @@ without credentials.
    automatic security updates, SSH password login off; `/opt/yovnok` holds the
    compose stack and its `.env`.
 3. Cloud firewall as above.
-4. Cloudflare: DNS record (proxied), origin certificate installed on the
-   Droplet, SSL *Full (strict)*, cache rule for `/assets/*`.
+4. Cloudflare: `play` A record (proxied) and `ws.play` A record (DNS-only),
+   origin certificate installed on the Droplet, SSL *Full (strict)*, always
+   HTTPS, cache rule for `/assets/*`.
 5. DigitalOcean uptime check on `https://<domain>/healthz` with an email alert.
 
 ## Operating it
@@ -103,6 +121,7 @@ Environment variables of the game container:
 |---|---|---|
 | `MODE` | `solo` | Game mode |
 | `ALLOWED_ORIGINS` | `https://<domain>` | Origins allowed to open game sockets |
+| `PUBLIC_WS_URL` | `wss://ws.<domain>/ws` | Where the page opens the game socket (served by `/config.json`) |
 | `TRUST_PROXY` | `1` | Take the client address from Cloudflare's header |
 | `MAX_ROOMS` | `8` | Simultaneous matches |
 | `SOLO_CARS` | `12` | Cars per match (bots fill free seats) |
