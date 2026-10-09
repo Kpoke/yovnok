@@ -1,0 +1,71 @@
+# DigitalOcean App Platform spec for CONVOY (see DEPLOY.md).
+#
+#   Create:  doctl apps create --spec .do/app.yaml
+#   Update:  doctl apps update <app-id> --spec .do/app.yaml
+#   (or paste it into the dashboard: Apps → Create → "Import from app spec")
+#
+# One service: the container serves the built client, the WebSocket (/ws) and
+# /healthz on one origin. Every push to main rebuilds and redeploys it.
+
+name: convoy
+# Pick the region nearest most players; changing it later means a new app.
+# Options include nyc, sfo, tor, ams, lon, fra, blr, sgp, syd.
+region: fra
+
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+
+services:
+  - name: game
+    github:
+      repo: Kpoke/convoy
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: Dockerfile
+    http_port: 8787
+
+    # EXACTLY ONE instance. Matches live in this process's memory: a second
+    # instance would split players between servers that cannot see each other
+    # and break rejoin (the load balancer does not route a player back to the
+    # instance holding their car). Scale UP (a bigger instance, more rooms),
+    # not OUT, until rooms are routed across machines (DEPLOY.md, Scaling).
+    instance_count: 1
+    # 1 vCPU / 1 GB: room for MAX_ROOMS simultaneous matches with headroom.
+    instance_size_slug: apps-s-1vcpu-1gb
+
+    health_check:
+      http_path: /healthz
+      initial_delay_seconds: 10
+      period_seconds: 15
+      timeout_seconds: 3
+      failure_threshold: 3
+
+    alerts:
+      - rule: CPU_UTILIZATION
+        operator: GREATER_THAN
+        value: 80
+        window: FIVE_MINUTES
+      - rule: MEM_UTILIZATION
+        operator: GREATER_THAN
+        value: 85
+        window: FIVE_MINUTES
+      - rule: RESTART_COUNT
+        operator: GREATER_THAN
+        value: 2
+        window: FIVE_MINUTES
+
+    envs:
+      - key: MODE
+        value: solo
+      # Behind App Platform's proxy: take the client IP from X-Forwarded-For,
+      # so the per-IP connection limits apply to players, not to the proxy.
+      - key: TRUST_PROXY
+        value: "1"
+      # Only this app's own pages may open game sockets. Add a custom domain
+      # here too when one is attached (comma-separated).
+      - key: ALLOWED_ORIGINS
+        value: ${APP_URL}
+      # Simultaneous matches in this one process.
+      - key: MAX_ROOMS
+        value: "8"

@@ -14,3 +14,7 @@ STATE.md
 DESIGN.md
 README.md
 ASSET_SPEC.md
+
+# Secrets never enter a build context, even a local one.
+.env
+.env.*

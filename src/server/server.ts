@@ -13,9 +13,10 @@
  *     `vite.config.ts`); in production this file serves `dist/` itself. Same
  *     single-origin shape either way.
  *
- * Deployment shape (see `DEPLOY.md`): one process is one ROOM. That is enough
- * for a first release — a solo room holds up to 30 players — and room sharding
- * is a later change to the transport layer, not to the simulation.
+ * Deployment shape (see `DEPLOY.md`): one process runs several ROOMS — one
+ * match each, opened as players arrive (`rooms.ts`, capped by MAX_ROOMS).
+ * Spreading rooms across machines is a later change to the transport layer
+ * (route a player to the machine hosting their room), not to the simulation.
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -24,7 +25,7 @@ import { extname, join, normalize, resolve, sep } from 'node:path';
 import { WebSocketServer } from 'ws';
 import { NET, TICK } from '../shared/config';
 import { WS_PATH } from '../shared/protocol';
-import { Room } from './room';
+import { RoomManager } from './rooms';
 
 /**
  * Default port. Deliberately not 8080 for LOCAL runs — that is a very common
@@ -45,8 +46,8 @@ const host = process.env.HOST ?? '0.0.0.0';
  */
 const DIST = resolve(process.env.CLIENT_DIR ?? resolve(process.cwd(), 'dist'));
 
-const room = new Room();
-room.start();
+// One match per room, as many rooms as there are groups of players (rooms.ts).
+const rooms = new RoomManager();
 
 /**
  * Origin allowlist for the WebSocket upgrade. Empty (the default) accepts any
@@ -70,14 +71,102 @@ const server = createServer((req, res) => {
   void handleRequest(req, res);
 });
 
+// ---- abuse limits (a public server; DEPLOY.md "Before going public") ----
+//
+// Generous for a real player, cheap to enforce, and enough to stop one machine
+// from filling the server with sockets or flooding a room with messages.
+/** Largest WebSocket message accepted. Real game messages are a few hundred bytes. */
+const MAX_MESSAGE_BYTES = 16 * 1024;
+// Per-IP limits default ON in production (the Docker image sets NODE_ENV) and
+// off in development, where tests and benches open dozens of local sockets.
+const PRODUCTION = process.env.NODE_ENV === 'production';
+/** Open sockets per client IP (a household or a few tabs, not a botnet). */
+const MAX_SOCKETS_PER_IP = Number(process.env.MAX_SOCKETS_PER_IP ?? (PRODUCTION ? 6 : 10_000));
+/** New sockets per client IP per minute. */
+const MAX_CONNECTS_PER_MINUTE = Number(process.env.MAX_CONNECTS_PER_MINUTE ?? (PRODUCTION ? 30 : 100_000));
+/** Messages per second per socket before it is cut off (a client sends < 100). */
+const MAX_MESSAGES_PER_SECOND = 240;
+/**
+ * Behind a proxy (App Platform, Caddy) every socket comes from the proxy's
+ * address; the client's is in X-Forwarded-For. Only trusted when told, or any
+ * client could claim to be anyone and walk round the per-IP limits.
+ */
+const TRUST_PROXY = process.env.TRUST_PROXY === '1';
+
+function clientIp(req: IncomingMessage): string {
+  if (TRUST_PROXY) {
+    const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',')[0]?.trim();
+    if (forwarded) return forwarded;
+  }
+  return req.socket.remoteAddress ?? 'unknown';
+}
+
+const socketsByIp = new Map<string, number>();
+const connectsByIp = new Map<string, number[]>();
+
+function admitConnection(ip: string): boolean {
+  const now = Date.now();
+  const recent = (connectsByIp.get(ip) ?? []).filter((t) => now - t < 60_000);
+  if (recent.length >= MAX_CONNECTS_PER_MINUTE) return false;
+  if ((socketsByIp.get(ip) ?? 0) >= MAX_SOCKETS_PER_IP) return false;
+  recent.push(now);
+  connectsByIp.set(ip, recent);
+  return true;
+}
+// Forget quiet IPs, so the maps do not grow without bound.
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, times] of connectsByIp) {
+    const recent = times.filter((t) => now - t < 60_000);
+    if (recent.length === 0) connectsByIp.delete(ip);
+    else connectsByIp.set(ip, recent);
+  }
+}, 60_000).unref();
+
 const wss = new WebSocketServer({
   server,
   path: WS_PATH,
-  verifyClient: (info: { origin?: string }) => originAllowed(info.origin),
+  maxPayload: MAX_MESSAGE_BYTES,
+  verifyClient: (info: { origin?: string; req: IncomingMessage }, done: (ok: boolean, code?: number) => void) => {
+    if (!originAllowed(info.origin)) return done(false, 403);
+    const ip = clientIp(info.req);
+    if (!admitConnection(ip)) {
+      console.log(`[convoy] refused a connection: per-IP limit (${ip})`);
+      return done(false, 429);
+    }
+    done(true);
+  },
 });
 
-wss.on('connection', (socket) => {
-  room.addClient(socket);
+wss.on('connection', (socket, req) => {
+  // FIRST, before anything else: a socket error (an oversized or malformed
+  // frame) is an 'error' event, and an unhandled one CRASHES THE PROCESS — every
+  // match on the server — from a single bad message. Rooms add their own
+  // handler on join; this covers the title screen and everything else.
+  socket.on('error', () => socket.terminate());
+  const ip = clientIp(req);
+  socketsByIp.set(ip, (socketsByIp.get(ip) ?? 0) + 1);
+  socket.on('close', () => {
+    const n = (socketsByIp.get(ip) ?? 1) - 1;
+    if (n <= 0) socketsByIp.delete(ip);
+    else socketsByIp.set(ip, n);
+  });
+  // Flood guard: count messages per second; a client far beyond what the game
+  // sends is closed. Runs alongside the room's own handler.
+  let windowStart = Date.now();
+  let count = 0;
+  socket.on('message', () => {
+    const now = Date.now();
+    if (now - windowStart > 1000) {
+      windowStart = now;
+      count = 0;
+    }
+    if (++count > MAX_MESSAGES_PER_SECOND) {
+      console.log(`[convoy] closed a socket: message flood (${ip})`);
+      socket.terminate();
+    }
+  });
+  rooms.accept(socket);
 });
 
 server.on('error', (error: NodeJS.ErrnoException) => {
@@ -145,7 +234,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   // Health check for the platform's load balancer and for `HEALTHCHECK` in the
   // Dockerfile. Answers 200 whenever the process is up; room stats are diagnostics.
   if (url === '/healthz' || url.startsWith('/healthz?')) {
-    const body = JSON.stringify({ ok: true, uptime: Math.round(process.uptime()), ...room.health() });
+    const body = JSON.stringify({ ok: true, uptime: Math.round(process.uptime()), ...rooms.health() });
     res.writeHead(200, {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
@@ -233,7 +322,7 @@ const shutdown = (): void => {
   if (closing) return;
   closing = true;
   console.log('\n[convoy] shutting down');
-  room.stop();
+  rooms.stop();
   // Stop accepting new connections, then let in-flight ones close.
   wss.close();
   server.close(() => process.exit(0));

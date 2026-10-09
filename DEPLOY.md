@@ -13,6 +13,41 @@ Nothing here has to be done until you are ready; the important part is that the
 
 ---
 
+## Launch checklist (App Platform, public)
+
+Decided 2026-10-09: DigitalOcean **App Platform**, a **public** launch, the
+whole project (code + all assets) in `github.com/Kpoke/convoy`.
+
+**Already in the code**
+- Several matches in one process (`src/server/rooms.ts`, `MAX_ROOMS`): nobody
+  pressing PLAY is ever turned away while a match is running.
+- Rejoin: a dropped player's car is held 30 s (`REJOIN_SECONDS`).
+- Abuse limits (`src/server/server.ts`): 16 KB max message, per-IP socket and
+  connection-rate limits (on when `NODE_ENV=production`, which the image sets),
+  a per-socket message-flood cut-off, origin allowlist (`ALLOWED_ORIGINS`), and
+  a socket-error handler from the first moment — a single oversized message used
+  to crash the process. `npm run roomstest` guards all of it.
+- A callsign filter (`callsignAllowed`, client and server).
+- `.do/app.yaml`: the app's whole configuration — build, port, health check,
+  alerts, environment. One instance, on purpose (see the comment in the file).
+
+**Your steps (one time)**
+1. Create a DigitalOcean account and add a payment method.
+2. Apps → Create App → **GitHub** → authorise DigitalOcean for `Kpoke/convoy`
+   only (not all repositories).
+3. Choose **"Import from app spec"** / edit the spec, and paste `.do/app.yaml`
+   (or with the CLI: `doctl apps create --spec .do/app.yaml`). Check the
+   **region** first: it is `fra`; pick the one nearest most players.
+4. Create. The first build takes several minutes (the repo is ~650 MB).
+5. Open the `https://…ondigitalocean.app` URL, play a match, and check
+   `https://…ondigitalocean.app/healthz` answers `{"ok":true,…}`.
+6. Uptime: in **Monitoring → Uptime**, add a check on `/healthz` with an email
+   alert, so you hear about an outage before players do.
+
+After that, every push to `main` redeploys automatically.
+
+---
+
 ## The shape of the thing
 
 The whole game is **one Node process**. It:

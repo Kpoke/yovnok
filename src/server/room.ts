@@ -105,7 +105,7 @@ import {
 } from '../shared/zone';
 import { botLook, DEFAULT_LOOK, packLook, unpackLook } from '../shared/cosmetics';
 import { createBotMemory, decideBot, type BotEnemy, type BotMemory } from './bot';
-import { botCallsign, sanitiseCallsign } from '../shared/callsign';
+import { botCallsign, callsignAllowed, sanitiseCallsign } from '../shared/callsign';
 import type {
   BoardRow,
   ClientMessage,
@@ -483,7 +483,11 @@ export class Room {
 
   // ------------------------------------------------------------------ clients
 
-  addClient(socket: WebSocket): void {
+  /**
+   * @param initial  messages that already arrived before the room was chosen
+   *   (the room manager routes on `hello`, so it hands that over with the socket)
+   */
+  addClient(socket: WebSocket, initial: ReadonlyArray<unknown> = []): void {
     const id = this.nextPlayerId++;
     const player: Player = {
       id,
@@ -526,6 +530,35 @@ export class Room {
     // Not admitted yet: `hello` says which crew and seat the client wants, and
     // the car it is given must match what it will render and predict with.
     console.log(`[room] connection ${id} awaiting hello`);
+    for (const data of initial) this.onMessage(player, data);
+  }
+
+  // ------------------------------------------------- for the room manager
+
+  /** Can a new player be placed here now? (Not mid-match, and a seat free.) */
+  get joinable(): boolean {
+    const phase = this.match.phase;
+    return (phase === 'lobby' || phase === 'countdown') && this.humanCount() < this.teamCount;
+  }
+
+  /** Lobby before countdown: used to prefer the room closest to starting. */
+  get startingSoon(): boolean {
+    return this.match.phase === 'countdown';
+  }
+
+  /** No human connected and no car held for one who left: safe to close. */
+  get idle(): boolean {
+    if (this.humanCount() > 0) return false;
+    const now = performance.now();
+    for (const p of this.players.values()) if (p.awayUntil > now && !p.socket) return false;
+    for (const p of this.players.values()) if (p.socket) return false;
+    return true;
+  }
+
+  /** Seconds a car is still held here for this browser token, or 0. */
+  heldSecondsFor(token: string): number {
+    const away = this.heldFor(token);
+    return away ? Math.max(0, (away.awayUntil - performance.now()) / 1000) : 0;
   }
 
   // ---------------------------------------------------------------- bots (M8)
@@ -1066,7 +1099,9 @@ export class Room {
     }
 
     if (msg.t === 'hello') {
-      player.name = sanitiseCallsign(msg.name) || botCallsign(player.id);
+      const name = sanitiseCallsign(msg.name);
+      // Not every callsign is shown: a blocked one becomes a generated name.
+      player.name = name && callsignAllowed(name) ? name : botCallsign(player.id);
       player.token = typeof msg.token === 'string' && msg.token.length >= 8 && msg.token.length <= 64 ? msg.token : null;
       if (this.resume(player)) return;
       this.admit(player, msg.cls, msg.crew, msg.seat, msg.look);

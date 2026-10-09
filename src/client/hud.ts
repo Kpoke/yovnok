@@ -245,6 +245,13 @@ export class Hud {
     if (document.activeElement !== this.callsignInput) this.callsignInput.value = name;
   }
 
+  /** A reason the typed callsign was refused, or '' to clear it. */
+  setCallsignError(text: string): void {
+    const el = document.getElementById('callsign-error');
+    if (el) el.textContent = text;
+    this.callsignInput.classList.toggle('bad', text !== '');
+  }
+
   onCallsign(callback: (name: string) => void): void {
     this.onCallsignCallback = callback;
   }

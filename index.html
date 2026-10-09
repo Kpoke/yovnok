@@ -601,7 +601,7 @@
         cursor: pointer;
         transition: opacity 120ms ease, color 120ms ease;
       }
-      .hero-source svg { width: 13px; height: 13px; }
+      .hero-source svg { width: 22px; height: 22px; }
       .hero-source:hover, .hero-source:focus { opacity: 1; color: var(--accent); outline: none; }
 
       /* Panels (garage, settings, credits, controls): beside a menu, one at a time. */
@@ -676,6 +676,8 @@
         pointer-events: auto;
       }
       #callsign-input:focus { outline: none; border-color: var(--accent); }
+      #callsign-input.bad { border-color: #ff6b6b; }
+      .set-error { min-height: 1em; margin-top: 4px; font-size: 10px; letter-spacing: 1px; color: #ff6b6b; }
       #credits-list { font-size: 11px; line-height: 1.7; }
       #credits-list a { color: inherit; }
       #credits .note a { color: var(--accent); }
@@ -982,6 +984,7 @@
             <div class="set-row">
               <span class="cos-label">CALLSIGN</span>
               <div class="set-line"><input id="callsign-input" maxlength="16" spellcheck="false" autocomplete="off" /><button id="callsign-random" class="chip" title="Random callsign">↻</button></div>
+              <div id="callsign-error" class="set-error"></div>
             </div>
             <div class="set-row"><span class="cos-label">SOUND</span><button id="join-sound" class="chip">SOUND OFF</button></div>
             <div class="set-row"><span class="cos-label">GRAPHICS</span><button id="join-quality" class="chip">QUALITY HIGH</button></div>
@@ -995,9 +998,9 @@
           </div>
         </div>
         <div class="hero-hint">drag to turn the car</div>
-        <a class="hero-source" href="https://github.com/Kpoke/convoy" target="_blank" rel="noopener">
+        <a class="hero-source" href="https://github.com/Kpoke/convoy" target="_blank" rel="noopener"
+          title="CONVOY on GitHub — open source, GPL-3.0" aria-label="CONVOY on GitHub">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          <span>open source · GPL-3.0 · on GitHub</span>
         </a>
       </div>
 

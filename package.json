@@ -28,10 +28,11 @@
     "cosmeticstest": "tsx scripts/cosmeticstest.ts",
     "solobench": "tsx scripts/solobench.ts",
     "scalebench": "tsx scripts/scalebench.ts",
-    "check": "npm run typecheck && npm run licensecheck -- --selftest && npm run assetcheck -- --selftest && npm run simcheck && npm run combattest && npm run weapontest && npm run matchtest && npm run bottest && npm run cosmeticstest && npm run netheadless && npm run build",
+    "check": "npm run typecheck && npm run licensecheck -- --selftest && npm run assetcheck -- --selftest && npm run simcheck && npm run combattest && npm run weapontest && npm run matchtest && npm run bottest && npm run cosmeticstest && npm run roomstest && npm run netheadless && npm run build",
     "licensecheck": "tsx scripts/licensecheck.ts",
     "assetbuild": "tsx scripts/assetbuild.ts",
-    "weapontest": "tsx scripts/weapontest.ts"
+    "weapontest": "tsx scripts/weapontest.ts",
+    "roomstest": "tsx scripts/roomstest.ts"
   },
   "dependencies": {
     "three": "^0.186.0",

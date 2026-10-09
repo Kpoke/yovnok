@@ -35,7 +35,7 @@ import { Explosions } from './explosions';
 import { DamageFx } from './damageFx';
 import { CarLights } from './carLights';
 import { DriveFx, groundAt } from './driveFx';
-import { randomCallsign, sanitiseCallsign } from '../shared/callsign';
+import { callsignAllowed, randomCallsign, sanitiseCallsign } from '../shared/callsign';
 import { buildProps } from './buildProps';
 import { FramePerf } from './perf';
 import { Lighting, loadQuality, QUALITIES, saveQuality } from './lighting';
@@ -214,7 +214,10 @@ const applyCallsign = (name: string): void => {
 applyCallsign(callsign);
 hud.onCallsign((raw) => {
   const clean = sanitiseCallsign(raw);
-  if (!clean) return;
+  // Same filter as the server, so a blocked name is refused here — with a
+  // reason — rather than silently swapped for a generated one in the match.
+  hud.setCallsignError(clean && !callsignAllowed(clean) ? "that callsign isn't allowed" : '');
+  if (!clean || !callsignAllowed(clean)) return;
   storage.set(CALLSIGN_KEY, clean);
   callsign = clean;
   net.callsign = clean;

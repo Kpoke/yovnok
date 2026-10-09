@@ -34,7 +34,7 @@ import {
   type Profile,
   type UnlockRule,
 } from '../src/shared/cosmetics';
-import { botCallsign, CALLSIGN_MAX, randomCallsign, sanitiseCallsign } from '../src/shared/callsign';
+import { botCallsign, CALLSIGN_MAX, callsignAllowed, randomCallsign, sanitiseCallsign } from '../src/shared/callsign';
 
 let failures = 0;
 
@@ -192,6 +192,11 @@ const profile = (overrides: Partial<Profile> = {}): Profile => ({
   check('a random callsign is already clean', sanitiseCallsign(r) === r && r.length > 0, r);
   check('a bot keeps its callsign', botCallsign(7) === botCallsign(7), botCallsign(7));
   check('bots get varied callsigns', new Set([1, 2, 3, 4, 5, 6, 7, 8].map(botCallsign)).size >= 6);
+  check('a slur is blocked, even spaced or disguised', !callsignAllowed('N1GG3R') && !callsignAllowed('F U C K'));
+  check('an ambiguous word is blocked on its own', !callsignAllowed('ASS') && !callsignAllowed('BIG ASS'));
+  check('but innocent names that contain it pass', ['BASS', 'SCUNTHORPE', 'GRAPEVINE', 'CLASSIC', 'COCKPIT-9', 'ESSEX', 'TORPEDO', 'SPICE', 'RACCOON', 'SHIITAKE'].every(callsignAllowed));
+  check('generated callsigns always pass', Array.from({ length: 200 }, () => randomCallsign()).every(callsignAllowed));
+  check('every bot name passes', Array.from({ length: 200 }, (_, i) => botCallsign(i)).every(callsignAllowed));
 }
 
 console.log(
