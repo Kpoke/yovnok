@@ -7,6 +7,10 @@ name: image
 on:
   push:
     branches: [main]
+    # Documentation does not change the image.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:
