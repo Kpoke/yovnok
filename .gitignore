@@ -11,3 +11,10 @@ public/libs/
 
 # Local secrets (API tokens)
 .env
+
+# Internal working notes: the decision log, original design and history.
+# Kept on the development machine, never published.
+internal/
+
+# Local statistics database and bandwidth ledger (DATA_DIR default).
+data/

@@ -1,13 +1,13 @@
-# CONVOY
+# YOVNOK
 
 **Armed cars, a floodlit stadium, a live broadcast — twelve cars, one survivor.**
 
-CONVOY is a vehicle-combat battle royale that runs in the browser. You drive and
+YOVNOK is a vehicle-combat battle royale that runs in the browser. You drive and
 shoot at the same time: twin machine guns in the headlights, an RPG on a roof
 turret, a closing ring of danger, and eleven other cars that want you gone.
-Every match goes out live on *YovNok TV*.
+Every match is broadcast live.
 
-![The CONVOY title screen: an armoured orange muscle car under stadium floodlights](docs/title.png)
+![The YOVNOK title screen: an armoured orange muscle car under stadium floodlights](docs/title.png)
 
 It is free software (GPL-3.0-or-later) and every third-party asset in it is
 free to share — see [Assets and licences](#assets-and-licences).
@@ -83,7 +83,7 @@ To try a bad connection, add `?lag=120&jitter=40&loss=0.05` to the page URL.
 
 **Production build:** `npm run build && npm start` serves the built client and
 the socket from one process on port 8787. Or with the container:
-`docker build -t convoy . && docker run -p 8787:8787 -e MODE=solo convoy`.
+`docker build -t yovnok . && docker run -p 8787:8787 -e MODE=solo yovnok`.
 
 ---
 
@@ -134,11 +134,9 @@ assets-src/ source models and textures, with their prep scripts
 public/     built assets served to the browser
 ```
 
-More depth: [DESIGN.md](DESIGN.md) (the game design),
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) (architecture, netcode and testing
-in detail), [STATE.md](STATE.md) (the running log of what was built and why),
-[ASSET_SPEC.md](ASSET_SPEC.md) (the asset pipeline) and
-[DEPLOY.md](DEPLOY.md) (hosting).
+More depth: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (how the server,
+client, rooms, netcode and statistics work), [ASSET_SPEC.md](ASSET_SPEC.md)
+(the asset pipeline) and [DEPLOY.md](DEPLOY.md) (hosting and operations).
 
 ---
 
@@ -160,6 +158,11 @@ Sponsor names in the arena are fictional.
 
 ## Contributing
 
-Issues and pull requests are welcome. Run `npm run check` before opening a pull
-request; new assets must be added to `assets.json` with their licence, or the
-build will refuse them.
+Issues and pull requests are welcome.
+
+- Run `npm run check` before opening a pull request.
+- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org):
+  `feat(bots): lead moving targets`, `fix: …`, `docs: …`, `chore: …`. A
+  `commit-msg` hook (installed by `npm install`) and a GitHub check enforce it.
+- New assets must be added to `assets.json` with their licence, or the build
+  refuses them.

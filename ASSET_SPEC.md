@@ -1,9 +1,7 @@
-# Vehicle Asset Spec
+# Asset Spec
 
-The contract any vehicle part must satisfy — procedural code, a parametric
-generator, an artist, or an AI 3D tool. **Enforced by `npm run assetcheck`, not
-by eye.** An asset that fails here will break collision, seats or cameras if it
-gets in, which is why this is a gate rather than a guideline.
+The contract every vehicle part satisfies, and how the game's models, arena
+materials and props are built. **Enforced by `npm run assetcheck`.**
 
 ---
 
@@ -38,15 +36,11 @@ rescaling on import is a part that will break hit-testing — do not ship one.
 
 ## Parts
 
-There are two tiers. **Standard** budgets are deliberately tiny — the original
-low-poly look, up to 8 vehicles on screen at 60fps with shadows. For scale, a
-typical AI text-to-3D mesh is **50k–200k triangles**, roughly 100× those budgets.
-
-The **hero** tier is for realistic art. It buys a much larger budget (measured on
-`lod0`, the closest detail level) by also shipping what keeps a field of realistic
-cars affordable: lower-detail copies for distance, compressed geometry, and
-textures that stay compressed in video memory. `npm run assetbuild` produces all
-of that from a source model (see [Hero tier](#hero-tier-realistic-art)).
+Two tiers. **Standard** is the procedural low-poly fallback. **Hero** is for
+realistic models: a larger triangle budget (measured on `lod0`, the closest
+detail level), with lower-detail copies for distance, compressed geometry and
+GPU-compressed textures, all produced by `npm run assetbuild` (see
+[Hero tier](#hero-tier-realistic-art)).
 
 | Part | Standard | Hero (lod0) |
 |---|---|---|
@@ -115,10 +109,10 @@ things:
 
 | Socket | Used by |
 |---|---|
-| `eye` | per-seat camera (M4) |
-| `firePort` | weapon origin and window arc (M5) |
-| `rim` | wheel cosmetics |
-| `exhaust.*` / `decal.*` / `roofRack` | cosmetic attachment points (M12) |
+| `eye` | per-seat camera |
+| `firePort` | weapon origin and window arc |
+| `rim` | wheel cosmetics (procedural parts) |
+| `exhaust.*` / `decal.*` / `roofRack` | attachment points (procedural parts) |
 
 A missing socket is a **warning, not an error** — the asset still renders, but the
 feature that depends on it is silently disabled. `assetcheck` names which ones.
@@ -175,11 +169,20 @@ What `assetbuild` does:
 |---|---|
 | clean-up | dedup, prune, weld — no visual change |
 | LODs | `lod0` (full), `lod1` (~35%), `lod2` (~10%, mesh permitting), as the scene's root nodes |
-| textures | resized to ≤ 2048 px, converted to **KTX2** (UASTC + zstd for normal/ORM maps, ETC1S for colour), with mipmaps |
+| textures | resized to ≤ `maxTexture` px and converted to **KTX2** with mipmaps: normal maps UASTC (normal-map mode, RDO, zstd); occlusion/roughness/metal maps UASTC or ETC1S (`dataCodec`); colour ETC1S |
 | geometry | quantised + `EXT_meshopt_compression` |
 
-Optional sidecar `assets-src/…/chassis.asset.json`:
-`{ "lods": [0.35, 0.1], "maxTexture": 2048, "ktx2": true }` (`"lods": []` skips LODs).
+Optional sidecar `assets-src/…/<name>.asset.json`:
+
+| Option | Default | |
+|---|---|---|
+| `lods` | `[0.35, 0.1]` | vertex ratio of each extra LOD; `[]` for none |
+| `maxTexture` | `2048` | longest texture edge, px |
+| `dataCodec` | `"uastc"` | `"etc1s"` for compact occlusion/roughness/metal maps |
+| `baseRatio` | `1` | simplify the whole model first (for scan-grade props) |
+| `dropFarMaterials` | `[]` | material names left out of the far LODs |
+| `materialOnly` | `false` | a material library: geometry replaced by a quad |
+| `ktx2` | `true` | KTX2 textures |
 
 **Hero rules** (`HERO_RULES` in `src/shared/assetSpec.ts`), enforced by
 `assetcheck --tier hero`: at least `lod0` + 2 LODs, `lod1` ≤ 50% and the farthest
@@ -192,17 +195,36 @@ the part files `assetbuild` reads — scaled, turned to face -Z, split into part
 with sockets added. `scripts/prep/armored.ts` is the worked example (the solo
 class's armoured truck and its roof turret). `assetbuild` skips `original/`.
 
-**Manifest options for realistic parts:** `"paint": ["exterior"]` tints those
-materials toward the livery (`paintStrength`, default 0.45); `"baseTint"` applies
-a fixed colour per material (e.g. to match a part taken from another model).
-A wheel entry keyed `<class>/wheel` serves every cosmetic wheel style; the rig
-mirrors the wheel on the right side, so author it with the hub facing -X.
+**Manifest options for realistic parts:** `"paint": ["exterior"]` paints those
+materials with the livery colour and finish (`paintStrength`, default 0.45);
+`"baseTint"` applies a fixed colour per material. One wheel model serves all
+four corners; the rig mirrors it on the right side, so author it with the hub
+facing -X.
 
 **In the game**, `GltfPartLibrary` turns `lod0/lod1/lod2` into a `THREE.LOD`
 (switching at 0 / 30 / 80 m; override per part with `"lodDistances"` in the
 manifest), and `src/client/assetLoaders.ts` registers the meshopt and KTX2
 decoders. Sockets are read from `lod0`; the build renames copies on other levels
 (`roofRack@lod1`) so they never shadow the real one.
+
+---
+
+## Arena materials and props
+
+**Materials** are Poly Haven PBR sets: `npx tsx scripts/fetch-polyhaven.ts <id>`
+downloads one into `assets-src/materials/` and records its licence; the build
+writes `public/assets/materials/<id>/<id>_2k.glb` (a material library,
+`materialOnly`, 1024 px textures, `dataCodec: "etc1s"`). The arena maps each
+surface role to a material in `src/client/arenaSurfaces.ts`, tiled in world
+space.
+
+**Props** (barriers, barrels, tyres, crates): `fetch-polyhaven.ts --model <id>`
+downloads into `assets-src/props/`; the sidecar sets `baseRatio` to bring each to
+~3,000 triangles. `src/client/buildProps.ts` places them, instanced, inside the
+arena's `prop` collision boxes.
+
+**Environment:** `fetch-polyhaven.ts --hdri <id>` fetches a 1K HDRI into
+`public/assets/hdri/`, named by the map's lighting preset.
 
 ---
 
@@ -243,20 +265,3 @@ near-miss assets and should be `1`/absent for conformant ones.
 
 Anything the manifest cannot satisfy **falls back to procedural geometry per
 part**, so a half-finished asset set never leaves a car missing a wheel.
-
----
-
-## Notes on AI-generated meshes
-
-Useful for **concept art and PBR textures** (`Firefly`, `Substance`). For the
-vehicles themselves, three problems recur:
-
-1. **Budget.** 50k–200k triangles versus a 2200 budget.
-2. **Structure.** They arrive as one welded mesh. This game needs swappable
-   wheels, kits and spoilers — a part library, not a statue.
-3. **Unbaked transforms and no named nodes**, so no sockets.
-
-If you do generate: ask for **low-poly / game-ready**, request **separate
-objects** per part, keep materials **named after slots**, and run everything
-through `assetcheck` before it goes near the game. Parametric generators
-(`Sloyd`) are a better fit than image-to-3D because they emit part hierarchies.
