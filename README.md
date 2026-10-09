@@ -7,6 +7,8 @@ shoot at the same time: twin machine guns in the headlights, an RPG on a roof
 turret, a closing ring of danger, and eleven other cars that want you gone.
 Every match is broadcast live.
 
+**Play now: [play.yovnok.com](https://play.yovnok.com)**
+
 ![The YOVNOK title screen: an armoured orange muscle car under stadium floodlights](docs/title.png)
 
 It is free software (GPL-3.0-or-later) and every third-party asset in it is
