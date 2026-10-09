@@ -21,6 +21,7 @@
 
 import type { WebSocket } from 'ws';
 import { Room } from './room';
+import { record } from './stats';
 
 /** Upper bound on rooms in one process (each is a simulation at 60 Hz). */
 const MAX_ROOMS = Number(process.env.MAX_ROOMS ?? 8);
@@ -42,12 +43,14 @@ export class RoomManager {
   }
 
   /** A new connection: held here until it says `hello`. */
-  accept(socket: WebSocket): void {
+  /** @param country two-letter country (Cloudflare), for anonymous statistics */
+  accept(socket: WebSocket, country: string | null = null): void {
     const entry: Pending = { socket, since: Date.now(), alive: true };
+    let visited = false;
     this.pending.add(entry);
 
     const onMessage = (data: unknown): void => {
-      let msg: { t?: unknown; token?: unknown };
+      let msg: { t?: unknown; token?: unknown; client?: { input?: unknown; quality?: unknown } };
       try {
         msg = JSON.parse(String(data)) as typeof msg;
       } catch {
@@ -57,6 +60,11 @@ export class RoomManager {
         const token = typeof msg.token === 'string' ? msg.token : '';
         const seconds = token ? Math.max(0, ...this.rooms.map((r) => r.heldSecondsFor(token))) : 0;
         if (socket.readyState === 1) socket.send(JSON.stringify({ t: 'held', seconds }));
+        // The page asks this once when it opens: that is a visit.
+        if (!visited) {
+          visited = true;
+          record('visit', token || null, country);
+        }
         return;
       }
       if (msg.t !== 'hello') return; // nothing else means anything before joining
@@ -69,6 +77,9 @@ export class RoomManager {
         console.log('[rooms] rejected a player: every room is mid-match and the room cap is reached');
         return;
       }
+      const input = ['mouse', 'gamepad', 'touch'].includes(String(msg.client?.input)) ? String(msg.client?.input) : null;
+      const quality = ['low', 'medium', 'high'].includes(String(msg.client?.quality)) ? String(msg.client?.quality) : null;
+      record('join', token || null, country, { input, quality });
       room.addClient(socket, [data]);
     };
     const onPong = (): void => {

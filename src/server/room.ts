@@ -106,6 +106,7 @@ import {
 import { botLook, DEFAULT_LOOK, packLook, unpackLook } from '../shared/cosmetics';
 import { createBotMemory, decideBot, type BotEnemy, type BotMemory } from './bot';
 import { botCallsign, callsignAllowed, sanitiseCallsign } from '../shared/callsign';
+import { record } from './stats';
 import type {
   BoardRow,
   ClientMessage,
@@ -987,8 +988,35 @@ export class Room {
       this.send(other.socket, { t: 'join', id: player.id, crew: player.crew, seat: player.seat });
     }
     console.log(`[room] player ${player.id} REJOINED crew ${crew.id} (was ${away.id})`);
+    record('rejoin', player.token, null);
     this.broadcastRoster();
     return true;
+  }
+
+  // ---- anonymous statistics (stats.ts) ----
+  private liveSince = 0;
+  private matchRecorded = true;
+
+  /** Once per match, at its end: the match, and each human's finish. */
+  private recordMatch(now: number): void {
+    this.matchRecorded = true;
+    let humans = 0;
+    let humanWon = false;
+    for (const player of this.players.values()) {
+      if (player.bot || !player.joined) continue;
+      const crew = this.crews.get(player.crew);
+      if (!crew) continue;
+      humans++;
+      const placement = crew.placement ?? (crew.dead ? null : 1);
+      if (placement === 1) humanWon = true;
+      record('result', player.token, null, { placement, kills: this.match.scores[crew.id] ?? 0 });
+    }
+    record('match', null, null, {
+      minutes: Math.round(((now - this.liveSince) / 60_000) * 10) / 10,
+      humans,
+      bots: this.crews.size - humans,
+      humanWon,
+    });
   }
 
   /** The left player whose car is still held for this token, if any. */
@@ -1063,10 +1091,14 @@ export class Room {
       player.botPhase = (id * 2.399) % (Math.PI * 2);
       player.awayUntil = performance.now() + REJOIN_SECONDS * 1000;
       this.ready.delete(id);
+      record('left', player.token, null, { held: true });
       console.log(`[room] player ${id} left mid-match; a bot holds crew ${crew.id} for ${REJOIN_SECONDS}s`);
       return;
     }
 
+    if (player.joined && !player.bot && this.match.phase === 'live' && crew && !crew.dead) {
+      record('left', player.token, null, { held: false });
+    }
     this.players.delete(id);
     this.ready.delete(id);
 
@@ -1909,6 +1941,8 @@ export class Room {
     // idle servers should wait, not play to an empty house.
     const readiness = this.humanCount() > 0 ? counts : counts.map(() => 0);
 
+    if (this.match.phase === 'results' && !this.matchRecorded && this.liveSince > 0) this.recordMatch(now);
+
     // A solo match usually ends from the elimination check, not here — so log
     // whenever the match is over and there is a tally waiting.
     if (BENCH_STATS && this.match.phase === 'results' && Object.keys(this.benchStats).length > 0) {
@@ -1919,6 +1953,10 @@ export class Room {
     const before = this.match.phase;
     tickMatch(this.match, now, this.rules, readiness, FORCE_LIVE);
     if (before !== this.match.phase) {
+      if (this.match.phase === 'live') {
+        this.liveSince = now;
+        this.matchRecorded = false;
+      }
       if (this.match.phase === 'countdown') this.resetForMatch();
       else this.ready.clear();
 

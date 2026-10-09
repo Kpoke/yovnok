@@ -283,6 +283,8 @@ export type ClientMessage =
        * them anew. Identifies a browser, not a person — there are no accounts.
        */
       token?: string;
+      /** For anonymous statistics only: how this player plays. */
+      client?: { input?: 'mouse' | 'gamepad' | 'touch'; quality?: string };
     }
   /** Leave the match on purpose (the in-game menu): forfeit, no rejoin window. */
   | { t: 'leave' }

@@ -20,12 +20,15 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { WebSocketServer } from 'ws';
 import { NET, TICK } from '../shared/config';
 import { WS_PATH } from '../shared/protocol';
 import { RoomManager } from './rooms';
+import { bandwidth } from './bandwidth';
+import { countryOf, openStats, record, serveStats } from './stats';
 
 /**
  * Default port. Deliberately not 8080 for LOCAL runs — that is a very common
@@ -48,6 +51,12 @@ const DIST = resolve(process.env.CLIENT_DIR ?? resolve(process.cwd(), 'dist'));
 
 // One match per room, as many rooms as there are groups of players (rooms.ts).
 const rooms = new RoomManager();
+// Anonymous statistics (stats.ts), and once a minute how busy the server is.
+void openStats();
+setInterval(() => {
+  const h = rooms.health();
+  if (h.players > 0 || h.waiting > 0) record('load', null, null, { players: h.players, rooms: h.rooms, waiting: h.waiting });
+}, 60_000).unref();
 
 /**
  * Origin allowlist for the WebSocket upgrade. Empty (the default) accepts any
@@ -95,6 +104,10 @@ const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 
 function clientIp(req: IncomingMessage): string {
   if (TRUST_PROXY) {
+    // Behind Cloudflare (the firewall only lets Cloudflare reach the server),
+    // the client's address is in CF-Connecting-IP.
+    const cf = req.headers['cf-connecting-ip'];
+    if (typeof cf === 'string' && cf) return cf;
     const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',')[0]?.trim();
     if (forwarded) return forwarded;
   }
@@ -129,9 +142,11 @@ const wss = new WebSocketServer({
   maxPayload: MAX_MESSAGE_BYTES,
   verifyClient: (info: { origin?: string; req: IncomingMessage }, done: (ok: boolean, code?: number) => void) => {
     if (!originAllowed(info.origin)) return done(false, 403);
+    // Over the month's bandwidth budget: no new players (bandwidth.ts).
+    if (bandwidth.over) return done(false, 503);
     const ip = clientIp(info.req);
     if (!admitConnection(ip)) {
-      console.log(`[convoy] refused a connection: per-IP limit (${ip})`);
+      console.log(`[yovnok] refused a connection: per-IP limit (${ip})`);
       return done(false, 429);
     }
     done(true);
@@ -162,32 +177,32 @@ wss.on('connection', (socket, req) => {
       count = 0;
     }
     if (++count > MAX_MESSAGES_PER_SECOND) {
-      console.log(`[convoy] closed a socket: message flood (${ip})`);
+      console.log(`[yovnok] closed a socket: message flood (${ip})`);
       socket.terminate();
     }
   });
-  rooms.accept(socket);
+  rooms.accept(socket, TRUST_PROXY ? countryOf(req) : null);
 });
 
 server.on('error', (error: NodeJS.ErrnoException) => {
   if (error.code === 'EADDRINUSE') {
-    console.error(`[convoy] port ${port} is already in use — is another server running?`);
+    console.error(`[yovnok] port ${port} is already in use — is another server running?`);
   } else {
-    console.error(`[convoy] server error:`, error);
+    console.error(`[yovnok] server error:`, error);
   }
   process.exit(1);
 });
 
 server.listen(port, host, () => {
   const where = host === '0.0.0.0' ? 'localhost' : host;
-  console.log(`[convoy] listening on ${host}:${port} (http://${where}:${port})`);
-  console.log(`[convoy] websocket  ws://${where}:${port}${WS_PATH}`);
+  console.log(`[yovnok] listening on ${host}:${port} (http://${where}:${port})`);
+  console.log(`[yovnok] websocket  ws://${where}:${port}${WS_PATH}`);
   console.log(
-    `[convoy] simulate ${TICK.rate}Hz · snapshot ${NET.snapshotRate}Hz · interp delay ${NET.interpDelayMs}ms`,
+    `[yovnok] simulate ${TICK.rate}Hz · snapshot ${NET.snapshotRate}Hz · interp delay ${NET.interpDelayMs}ms`,
   );
   void probeDist();
   if (ALLOWED_ORIGINS.length > 0) {
-    console.log(`[convoy] origins allowed: ${ALLOWED_ORIGINS.join(', ')}`);
+    console.log(`[yovnok] origins allowed: ${ALLOWED_ORIGINS.join(', ')}`);
   }
 });
 
@@ -195,10 +210,10 @@ server.listen(port, host, () => {
 async function probeDist(): Promise<void> {
   try {
     await stat(join(DIST, 'index.html'));
-    console.log(`[convoy] serving built client from ${DIST}`);
+    console.log(`[yovnok] serving built client from ${DIST}`);
   } catch {
     console.log(
-      '[convoy] no built client in dist/ — API-only. Run `npm run build`, or use `npm run dev` (Vite serves the client).',
+      '[yovnok] no built client in dist/ — API-only. Run `npm run build`, or use `npm run dev` (Vite serves the client).',
     );
   }
 }
@@ -234,7 +249,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   // Health check for the platform's load balancer and for `HEALTHCHECK` in the
   // Dockerfile. Answers 200 whenever the process is up; room stats are diagnostics.
   if (url === '/healthz' || url.startsWith('/healthz?')) {
-    const body = JSON.stringify({ ok: true, uptime: Math.round(process.uptime()), ...rooms.health() });
+    const body = JSON.stringify({
+      ok: true,
+      uptime: Math.round(process.uptime()),
+      ...rooms.health(),
+      bandwidth: bandwidth.status(),
+    });
     res.writeHead(200, {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
@@ -243,6 +263,8 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     res.end(req.method === 'HEAD' ? undefined : body);
     return;
   }
+
+  if (serveStats(req, res)) return;
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { allow: 'GET, HEAD' });
@@ -276,22 +298,50 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   }
 
   const ext = extname(target).toLowerCase();
-  const data = await readFile(target);
-  // Vite fingerprints everything under /assets, so it can be cached forever;
-  // index.html must not be, or a deploy would never be picked up.
+  // Over the month's bandwidth budget: new visitors get a short page instead of
+  // the game (tens of MB). Players already in a match are unaffected.
+  if (bandwidth.over && ext === '.html') {
+    const page = OVER_CAPACITY_PAGE;
+    res.writeHead(503, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'retry-after': '86400' });
+    res.end(req.method === 'HEAD' ? undefined : page);
+    return;
+  }
+  // Cache policy. Only FINGERPRINTED files (Vite's `name-[hash].js`) may be
+  // cached forever: their URL changes when their content does. The game's
+  // models and textures share the /assets prefix but keep their names across
+  // rebuilds — "immutable" on those meant a rebuilt asset never reached a
+  // returning player. They get a short life plus an ETag, so a check costs a
+  // 304 and a few bytes, and a CDN in front may keep serving them meanwhile.
+  // index.html must always be checked, or a deploy would never be picked up.
+  const fingerprinted = /-[A-Za-z0-9_-]{8,}\.(js|css|wasm)$/.test(target);
   const cacheControl =
     ext === '.html'
       ? 'no-cache'
-      : url.startsWith('/assets/')
+      : fingerprinted
         ? 'public, max-age=31536000, immutable'
-        : 'public, max-age=86400';
-  res.writeHead(200, {
+        : 'public, max-age=3600, stale-while-revalidate=604800';
+  const size = Number(info.size);
+  const etag = `"${size.toString(36)}-${Math.floor(Number(info.mtimeMs)).toString(36)}"`;
+  const headers = {
     'content-type': MIME[ext] ?? 'application/octet-stream',
-    'content-length': data.length,
     'cache-control': cacheControl,
+    etag,
+    'last-modified': info.mtime.toUTCString(),
     'x-content-type-options': 'nosniff',
-  });
-  res.end(req.method === 'HEAD' ? undefined : data);
+  };
+  if (req.headers['if-none-match'] === etag) {
+    res.writeHead(304, headers);
+    res.end();
+    return;
+  }
+  res.writeHead(200, { ...headers, 'content-length': size });
+  if (req.method === 'HEAD') {
+    res.end();
+    return;
+  }
+  // Streamed, not read whole: several players loading 10 MB files at once
+  // would otherwise all sit in memory on a 1 GB server.
+  createReadStream(target).on('error', () => res.destroy()).pipe(res);
 }
 
 /** Resolve a URL path inside `root`, refusing anything that escapes it. */
@@ -321,7 +371,7 @@ let closing = false;
 const shutdown = (): void => {
   if (closing) return;
   closing = true;
-  console.log('\n[convoy] shutting down');
+  console.log('\n[yovnok] shutting down');
   rooms.stop();
   // Stop accepting new connections, then let in-flight ones close.
   wss.close();
@@ -332,3 +382,12 @@ const shutdown = (): void => {
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+
+/** Shown instead of the game when the month's bandwidth budget is spent. */
+const OVER_CAPACITY_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>YOVNOK — back soon</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#050608;color:#e8edf2;
+font:14px ui-monospace,Menlo,monospace;text-align:center;padding:24px}h1{letter-spacing:.3em;font-size:22px}
+p{opacity:.65;line-height:1.7;max-width:420px}</style></head><body><div><h1>PLEASE STAND BY</h1>
+<p>So many people played YOVNOK this month that the broadcast has reached its limit.
+It will be back on the 1st — thank you for watching.</p></div></body></html>`;

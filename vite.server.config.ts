@@ -30,6 +30,8 @@ export default defineConfig({
     },
   },
   ssr: {
-    external: ['ws'],
+    // node:sqlite (statistics) is a Node builtin; listed so the bundler never
+    // tries to resolve it as a package.
+    external: ['ws', 'node:sqlite'],
   },
 });
