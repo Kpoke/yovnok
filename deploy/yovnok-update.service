@@ -1,0 +1,8 @@
+[Unit]
+Description=Install the latest YOVNOK image
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/yovnok/yovnok-update.sh

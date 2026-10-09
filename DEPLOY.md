@@ -13,7 +13,7 @@
 
 ```
 player ──▶ Cloudflare (cache, TLS) ──▶ Droplet: Caddy (TLS) ──▶ game container
-                                                  └── Watchtower: pulls new images
+                                                  └── systemd timer: installs new images
 GitHub push ──▶ Actions builds the image ──▶ ghcr.io/kpoke/yovnok:latest
 ```
 
@@ -35,7 +35,8 @@ GitHub push ──▶ Actions builds the image ──▶ ghcr.io/kpoke/yovnok:la
 |---|---|
 | `Dockerfile` | Builds the client and server; runs as a distroless, non-root container on port 8787 |
 | `.github/workflows/image.yml` | On every push to `main`, builds the `linux/amd64` image and publishes it to `ghcr.io/kpoke/yovnok` |
-| `deploy/docker-compose.yml` | On the Droplet: the game, Caddy and Watchtower; a volume for statistics and the bandwidth ledger |
+| `deploy/docker-compose.yml` | On the Droplet: the game and Caddy; a volume for statistics and the bandwidth ledger |
+| `deploy/yovnok-update.{sh,service,timer}` | A systemd timer that installs a newly published image within 5 minutes |
 | `deploy/Caddyfile` | HTTPS with a Cloudflare origin certificate, proxying to the game |
 
 The Droplet keeps, outside the repository, a `.env` file (`DOMAIN`,
@@ -88,7 +89,7 @@ without credentials.
 
 | Task | How |
 |---|---|
-| Deploy | Push to `main`. Actions builds the image; Watchtower installs it within ~5 minutes. Matches in progress end when the container restarts. |
+| Deploy | Push to `main`. Actions builds the image; the update timer installs it within ~5 minutes. Matches in progress end when the container restarts. |
 | Roll back | Pin the previous image in `deploy/docker-compose.yml` (`ghcr.io/kpoke/yovnok:<commit sha>`) and run `docker compose up -d` on the Droplet. |
 | Health | `https://<domain>/healthz` — rooms, players, bandwidth used this month. |
 | Statistics | `https://<domain>/stats` (any user name, `STATS_PASSWORD`). |
