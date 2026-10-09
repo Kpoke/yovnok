@@ -1,5 +1,5 @@
 {
-  "$comment": "Every third-party (and every non-code) file shipped by CONVOY. Checked by `npm run licensecheck`, which also generates ASSETS.md and public/credits.json from this file. Licences are SPDX ids. NC and ND licences are rejected.",
+  "$comment": "Every third-party (and every non-code) file shipped by YOVNOK. Checked by `npm run licensecheck`, which also generates ASSETS.md and public/credits.json from this file. Licences are SPDX ids. NC and ND licences are rejected.",
   "assets": [
     {
       "files": [

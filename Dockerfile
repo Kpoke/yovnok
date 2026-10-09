@@ -1,8 +1,8 @@
-# CONVOY — one container serves the built client AND the authoritative socket,
+# YOVNOK — one container serves the built client AND the authoritative socket,
 # on one origin (see DEPLOY.md).
 #
-#   docker build -t convoy .
-#   docker run --rm -p 8787:8787 convoy
+#   docker build -t yovnok .
+#   docker run --rm -p 8787:8787 yovnok
 #
 # The runtime is **distroless**: no shell, no package manager, no tsx. Production
 # therefore runs one pre-bundled JavaScript file (`dist-server/server.mjs`) whose

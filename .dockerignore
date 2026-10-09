@@ -18,3 +18,4 @@ ASSET_SPEC.md
 # Secrets never enter a build context, even a local one.
 .env
 .env.*
+data

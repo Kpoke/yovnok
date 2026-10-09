@@ -38,7 +38,7 @@ const SIDES: Array<[number, number]> = [
 ];
 
 /** Fictional sponsors only — no real brand appears in the arena. */
-const SPONSORS = ['YovNok TV', 'IRONHIDE TYRES', 'SCORCH FUEL', 'BULWARK ARMOUR', 'GRITLINE OIL', 'CONVOY LIVE'];
+const SPONSORS = ['IRONHIDE TYRES', 'SCORCH FUEL', 'BULWARK ARMOUR', 'GRITLINE OIL', 'YOVNOK LIVE'];
 
 export function buildStadium(): THREE.Group {
   const group = new THREE.Group();
