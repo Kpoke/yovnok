@@ -23,6 +23,11 @@ RUN npm run build
 RUN mkdir -p /prod && cp package.json package-lock.json /prod/ \
  && cd /prod && npm ci --omit=dev && npm cache clean --force
 
+# The data directory (statistics, bandwidth ledger), created here because the
+# runtime has no shell: copied in owned by the non-root user, so a new Docker
+# volume mounted at /data starts out writable by the server.
+RUN mkdir -p /data
+
 # Guard the distroless assumption: the bundle must import nothing but Node
 # builtins and `ws`. If someone adds a dependency to the server and forgets it
 # here, the build fails now instead of the container failing to start.
@@ -47,6 +52,8 @@ ENV NODE_OPTIONS=--enable-source-maps
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/dist-server ./dist-server
 COPY --from=build /prod/node_modules/ws ./node_modules/ws
+COPY --from=build --chown=nonroot:nonroot /data /data
+ENV DATA_DIR=/data
 
 EXPOSE 8787
 

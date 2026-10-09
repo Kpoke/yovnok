@@ -65,16 +65,20 @@ The Droplet keeps, outside the repository, a `.env` file (`DOMAIN`,
    monitoring (create, read), actions (read) — 90-day expiry, saved in the
    project's local `.env` as `DIGITALOCEAN_TOKEN`.
 3. Register the domain in Cloudflare, and save it in `.env` as `DOMAIN`.
-4. Cloudflare API token limited to that zone — DNS: Edit, Zone Settings: Edit,
-   SSL and Certificates: Edit, Cache Rules: Edit — saved as
+4. Cloudflare API token limited to that zone — Zone: Read, DNS: Edit, Zone
+   Settings: Edit, SSL and Certificates: Edit, Cache Rules: Edit — saved as
    `CLOUDFLARE_API_TOKEN`.
-5. After the first image build: GitHub → Packages → `yovnok` → Package settings
-   → visibility **Public**.
+
+The container image is public with the repository, so the server pulls it
+without credentials.
 
 **Provisioned from the project** (tokens read from `.env`, never printed)
 
-1. SSH key registered with DigitalOcean.
-2. Droplet `yovnok` in `lon1` with Docker, the compose stack and its `.env`.
+1. SSH key registered with DigitalOcean (the private key stays on the
+   deploying machine, `~/.ssh/yovnok_deploy`).
+2. Droplet `yovnok` in `lon1` (Ubuntu 24.04): Docker, a 1 GB swap file,
+   automatic security updates, SSH password login off; `/opt/yovnok` holds the
+   compose stack and its `.env`.
 3. Cloud firewall as above.
 4. Cloudflare: DNS record (proxied), origin certificate installed on the
    Droplet, SSL *Full (strict)*, cache rule for `/assets/*`.
