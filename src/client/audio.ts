@@ -232,7 +232,7 @@ export class GameAudio {
     speed: number,
     throttle: number,
     dt: number,
-    road: { slip: number; ground: 'dirt' | 'hard'; onGround: boolean; boosting: boolean } = {
+    road: { slip: number; ground: 'dirt' | 'hard'; onGround: boolean; boosting: boolean; active?: boolean } = {
       slip: 0,
       ground: 'hard',
       onGround: true,
@@ -244,7 +244,7 @@ export class GameAudio {
     if (!ctx || !engine) return;
     const now = ctx.currentTime;
     const v = Math.abs(speed);
-    const on = this.enabled ? 1 : 0;
+    const on = this.enabled && road.active !== false ? 1 : 0;
 
     // Which gear, and how far through it.
     const gears = FEEL.sound.gears;

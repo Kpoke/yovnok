@@ -112,6 +112,7 @@ export class DamageFx {
   private frame = 0;
   private time = 0;
   private readonly world = new THREE.Vector3();
+  private readonly rearWorld = new THREE.Vector3();
 
   constructor() {
     this.object.name = 'damage-fx';
@@ -193,7 +194,7 @@ export class DamageFx {
     const f = THREE.MathUtils.clamp((damage - critical) / (1 - critical), 0, 1);
     const fireRate = DAMAGE_FX.fireRate[0] + (DAMAGE_FX.fireRate[1] - DAMAGE_FX.fireRate[0]) * f;
     e.fire += fireRate * dt;
-    const rear = blaze ? new THREE.Vector3().copy(anchors.rear).applyMatrix4(root.matrixWorld) : null;
+    const rear = blaze ? this.rearWorld.copy(anchors.rear).applyMatrix4(root.matrixWorld) : null;
     let flip = false;
     while (e.fire >= 1) {
       e.fire -= 1;

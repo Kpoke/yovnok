@@ -53,6 +53,25 @@ export class FramePerf {
   private spikes: Spike[] = [];
   /** The display's refresh interval, learned from the fastest frames seen. */
   private refresh = 1000 / 60;
+  /** Smoothed GPU frame time (ms), or null where the browser has no timer. */
+  private gpuSmoothed: number | null = null;
+  /** Smoothed frame interval (ms). */
+  private intervalSmoothed = 1000 / 60;
+
+  /** For dynamic resolution: smoothed GPU ms (null if unmeasurable). */
+  get gpuMs(): number | null {
+    return this.gpuSmoothed;
+  }
+
+  /** For dynamic resolution: the display's frame budget, ms. */
+  get budgetMs(): number {
+    return this.refresh;
+  }
+
+  /** For dynamic resolution: smoothed time between frames, ms. */
+  get intervalMs(): number {
+    return this.intervalSmoothed;
+  }
 
   private report = '';
 
@@ -117,6 +136,10 @@ export class FramePerf {
     this.collectGpu();
     const cpu = SECTIONS.reduce((sum, s) => sum + this.current[s], 0);
     if (interval > 0) this.refresh = Math.min(this.refresh * 1.001, Math.max(interval, 1000 / 360));
+    if (interval > 0 && interval < 250) this.intervalSmoothed += (interval - this.intervalSmoothed) * 0.1;
+    if (this.lastGpu !== null) {
+      this.gpuSmoothed = this.gpuSmoothed === null ? this.lastGpu : this.gpuSmoothed + (this.lastGpu - this.gpuSmoothed) * 0.1;
+    }
     this.intervals.push(interval);
     this.cpuTotals.push(cpu);
     if (this.lastGpu !== null) this.gpuTotals.push(this.lastGpu);

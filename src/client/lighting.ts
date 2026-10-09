@@ -117,6 +117,16 @@ export class Lighting {
   private composer: EffectComposer | null = null;
   private bloom: UnrealBloomPass | null = null;
   private quality: Quality;
+  /**
+   * Dynamic resolution: a multiplier on the preset's pixel ratio, lowered when
+   * the GPU cannot finish a frame inside the display's budget and raised again
+   * when it can. Measured on a 131 Hz MacBook at HIGH: ~8.7 ms GPU against a
+   * 7.6 ms budget — 4% of frames missed and showed as hitches.
+   */
+  private resolutionScale = 1;
+  private overFor = 0;
+  private underFor = 0;
+  private resizeCooldown = 0;
 
   constructor(
     private readonly renderer: THREE.WebGLRenderer,
@@ -170,8 +180,9 @@ export class Lighting {
 
   applyQuality(quality: Quality): void {
     this.quality = quality;
+    this.resolutionScale = 1;
     const q = QUALITY[quality];
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pixelRatio));
+    this.renderer.setPixelRatio(this.pixelRatioFor(q.pixelRatio));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     if (this.key.shadow.mapSize.x !== q.shadow) {
       this.key.shadow.mapSize.set(q.shadow, q.shadow);
@@ -200,6 +211,39 @@ export class Lighting {
       this.composer.addPass(this.bloom);
       this.composer.addPass(new OutputPass());
     }
+  }
+
+  /** The preset's pixel ratio, capped by the display and scaled; never below 1. */
+  private pixelRatioFor(preset: number): number {
+    const max = Math.min(window.devicePixelRatio, preset);
+    return Math.max(Math.min(1, max), max * this.resolutionScale);
+  }
+
+  /**
+   * Once a frame: hold the GPU inside the display's frame budget by scaling the
+   * render resolution. Uses the GPU timer where the browser has one, else the
+   * frame interval. Steps down quickly, back up slowly, never below 1×.
+   */
+  adaptResolution(dt: number, gpuMs: number | null, intervalMs: number, budgetMs: number): void {
+    const max = Math.min(window.devicePixelRatio, QUALITY[this.quality].pixelRatio);
+    if (max <= 1) return; // nothing to scale
+    this.resizeCooldown -= dt;
+    const load = gpuMs ?? intervalMs;
+    const heavy = gpuMs !== null ? load > budgetMs * 0.9 : load > budgetMs * 1.15;
+    const light = gpuMs !== null ? load < budgetMs * 0.65 : load < budgetMs * 1.02;
+    this.overFor = heavy ? this.overFor + dt : 0;
+    this.underFor = light ? this.underFor + dt : 0;
+    let next = this.resolutionScale;
+    if (this.overFor > 0.5) next -= 0.08;
+    else if (this.underFor > 4) next += 0.05;
+    next = Math.min(1, Math.max(1 / max, next));
+    if (Math.abs(next - this.resolutionScale) < 0.01 || this.resizeCooldown > 0) return;
+    this.resolutionScale = next;
+    this.overFor = 0;
+    this.underFor = 0;
+    this.resizeCooldown = 1;
+    this.renderer.setPixelRatio(this.pixelRatioFor(QUALITY[this.quality].pixelRatio));
+    this.resize();
   }
 
   /** Keep the shadow camera on whatever the view is following. */

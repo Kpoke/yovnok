@@ -149,6 +149,8 @@ export class NetClient {
   look: number = packLook(DEFAULT_LOOK);
   /** Our callsign, sent with `hello` (set by the title screen). */
   callsign = '';
+  /** How this player plays, sent with `hello` for anonymous statistics. */
+  clientInfo: { input?: 'mouse' | 'gamepad' | 'touch'; quality?: string } = {};
   /** Per-browser token, so a car left mid-match can be taken back. */
   readonly sessionToken = loadSessionToken();
   /** Callsign per crew, from the server's roster. */
@@ -410,6 +412,11 @@ export class NetClient {
       this.remotes.clear();
       this.members.clear();
       this.buffers.length = 0;
+      // Back to the title: our car returns, parked, to the showroom spot it
+      // started on — not left mid-arena at whatever speed it was doing.
+      const spawn = SPAWNS[0];
+      resetVehicle(this.local, spawn.x, spawn.y, spawn.z, spawn.yaw);
+      resetVehicle(this.renderLocal, spawn.x, spawn.y, spawn.z, spawn.yaw);
       this.onStatus('disconnected');
     };
 
@@ -436,6 +443,7 @@ export class NetClient {
       look: this.look,
       name: this.callsign,
       token: this.sessionToken,
+      client: this.clientInfo,
     };
     socket.send(JSON.stringify(hello));
   }

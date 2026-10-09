@@ -251,6 +251,11 @@ window.addEventListener('gamepadconnected', () => {
 
 // Joining is explicit: the page opens a menu, and only PLAY places us.
 hud.onJoin(() => {
+  // Anonymous statistics: how people play (input device and quality preset).
+  net.clientInfo = {
+    input: inputs.padActive || inputs.padConnected ? 'gamepad' : touchOnly ? 'touch' : 'mouse',
+    quality: lighting.current,
+  };
   setSound(true); // carry the menu's music into the lobby
   loadingSince = performance.now();
   hud.setLoading(0, 'loading');
@@ -1000,6 +1005,10 @@ function frame(now: number): void {
     ground: driveFx.groundOf(net.crewId ?? -1),
     onGround: local.onGround,
     boosting: playing && lastInput.boost && local.boost > 0 && local.forwardSpeed > 5,
+    // Only while actually driving: on the title, spectating or after leaving
+    // a match, the engine and road layers fade out instead of holding the
+    // last car's note (they did, after LEAVE MATCH).
+    active: playing,
   });
   // Lobby playlist in menus; a quiet match bed while live, rising with the zone.
   music.setScene(net.match.phase === 'live' ? 'live' : 'lobby');
@@ -1131,6 +1140,8 @@ function frame(now: number): void {
   perf.gpuEnd();
   perf.mark('render');
   perf.end(interval);
+  // Dynamic resolution: keep the GPU inside the display's frame budget.
+  lighting.adaptResolution(realDt, perf.gpuMs, perf.intervalMs, perf.budgetMs);
 }
 
 // Seed the local car at a spawn so the view is sensible before the server

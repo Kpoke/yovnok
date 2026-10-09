@@ -125,8 +125,14 @@ export class CarLights {
 
   private push(p: THREE.Vector3, colour: THREE.Color, intensity: number, size: number): void {
     const i = this.count++;
-    this.positions.set([p.x, p.y, p.z], i * 3);
-    this.colours.set([colour.r * intensity, colour.g * intensity, colour.b * intensity], i * 3);
+    const o = i * 3;
+    // Element writes, not `.set([...])`: no array allocated per lamp per frame.
+    this.positions[o] = p.x;
+    this.positions[o + 1] = p.y;
+    this.positions[o + 2] = p.z;
+    this.colours[o] = colour.r * intensity;
+    this.colours[o + 1] = colour.g * intensity;
+    this.colours[o + 2] = colour.b * intensity;
     this.sizes[i] = size;
   }
 }
