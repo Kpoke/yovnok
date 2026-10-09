@@ -121,7 +121,23 @@ const net = new NetClient(
 const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
 // Crew/seat requests are dev-only: the server ignores them unless it is running
 // with DEV_ASSIGN=1, so they cannot be used to pick your own team.
-net.connect(`${wsProtocol}://${location.host}${WS_PATH}`, readCrewRequest(location.search));
+// The game socket's address comes from the server (/config.json): in
+// production it is a direct address that skips the CDN, which halves the round
+// trip; anywhere else (development, a missing or slow answer) it is this page's
+// own origin.
+{
+  const sameOrigin = `${wsProtocol}://${location.host}${WS_PATH}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
+  fetch(`/config.json?t=${encodeURIComponent(net.sessionToken)}`, { signal: controller.signal, cache: 'no-store' })
+    .then((r) => (r.ok ? (r.json() as Promise<{ wsUrl?: string | null }>) : null))
+    .catch(() => null)
+    .then((config) => {
+      clearTimeout(timeout);
+      const wsUrl = config?.wsUrl && /^wss?:\/\//.test(config.wsUrl) ? config.wsUrl : sameOrigin;
+      net.connect(wsUrl, readCrewRequest(location.search));
+    });
+}
 hud.onReady(() => net.sendReady());
 
 /**

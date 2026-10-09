@@ -266,6 +266,21 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
 
   if (serveStats(req, res)) return;
 
+  // Where the page should open the game socket. The page and its files go
+  // through Cloudflare (cached at its edge); the live game connection can go
+  // STRAIGHT to the server (PUBLIC_WS_URL), because Cloudflare's free-plan
+  // route doubled its round trip (Nigeria → London: ~130 ms direct, ~260 ms
+  // via Cloudflare). This request comes through Cloudflare, so it is also
+  // where a visit is counted, with Cloudflare's country.
+  if (url === '/config.json' || url.startsWith('/config.json?')) {
+    const token = new URL(url, 'http://x').searchParams.get('t');
+    record('visit', token && token.length >= 8 && token.length <= 64 ? token : null, TRUST_PROXY ? countryOf(req) : null);
+    const body = JSON.stringify({ wsUrl: process.env.PUBLIC_WS_URL || null });
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(req.method === 'HEAD' ? undefined : body);
+    return;
+  }
+
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { allow: 'GET, HEAD' });
     res.end('method not allowed');

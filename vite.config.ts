@@ -20,6 +20,7 @@ export default defineConfig({
      */
     proxy: {
       '/ws': { target: GAME_SERVER, ws: true, changeOrigin: true },
+      '/config.json': { target: GAME_SERVER, changeOrigin: true },
     },
   },
   build: {

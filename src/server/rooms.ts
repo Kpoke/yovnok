@@ -46,7 +46,6 @@ export class RoomManager {
   /** @param country two-letter country (Cloudflare), for anonymous statistics */
   accept(socket: WebSocket, country: string | null = null): void {
     const entry: Pending = { socket, since: Date.now(), alive: true };
-    let visited = false;
     this.pending.add(entry);
 
     const onMessage = (data: unknown): void => {
@@ -60,11 +59,8 @@ export class RoomManager {
         const token = typeof msg.token === 'string' ? msg.token : '';
         const seconds = token ? Math.max(0, ...this.rooms.map((r) => r.heldSecondsFor(token))) : 0;
         if (socket.readyState === 1) socket.send(JSON.stringify({ t: 'held', seconds }));
-        // The page asks this once when it opens: that is a visit.
-        if (!visited) {
-          visited = true;
-          record('visit', token || null, country);
-        }
+        // (Visits are counted by /config.json, which the page fetches through
+        // Cloudflare; the socket itself may come straight to the server.)
         return;
       }
       if (msg.t !== 'hello') return; // nothing else means anything before joining
