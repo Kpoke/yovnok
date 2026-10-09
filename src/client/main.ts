@@ -133,10 +133,22 @@ let markAssetsReady!: () => void;
 const assetsReady = new Promise<void>((resolve) => (markAssetsReady = resolve));
 /** When the loading screen went up, so a join that never lands can give up. */
 let loadingSince = 0;
-/** Had the mouse locked in this match — after that, losing it means the menu. */
-let lockedThisMatch = false;
-/** The in-game menu opened with the gamepad's Start button. */
-let padMenu = false;
+/** Seconds of continuous driving, for the dynamic-resolution warm-up. */
+let drivingFor = 0;
+/**
+ * The in-game menu is a plain toggle: Esc (or Start) opens and closes it,
+ * whether or not the mouse is locked. It used to be inferred from pointer-lock
+ * state ("had the lock, lost it"), which only worked if the lock happened to be
+ * held — Esc did nothing for a player whose lock the browser had refused.
+ */
+let menuOpen = false;
+/** When the menu last changed, so one Esc press cannot both open and close it. */
+let menuChangedAt = 0;
+function setMenu(open: boolean): void {
+  if (open === menuOpen) return;
+  menuOpen = open;
+  menuChangedAt = performance.now();
+}
 
 /**
  * Menus with a gamepad: D-pad up/down moves between the visible menu items, A
@@ -157,7 +169,7 @@ function padNavigate(events: Array<'up' | 'down' | 'confirm' | 'back'>): void {
     else if (event === 'down') items[at < 0 || at >= items.length - 1 ? 0 : at + 1].focus();
     else if (event === 'confirm') (at >= 0 ? items[at] : items[0]).click();
     else if (event === 'back') {
-      if (hud.paused) padMenu = false;
+      if (hud.paused) resumeFromMenu();
       else menu.querySelector<HTMLButtonElement>('.menu-item.open')?.click();
     }
   }
@@ -579,23 +591,23 @@ function frame(now: number): void {
   // Outside those windows we predict neutral input: the server is doing the
   // same, so the two stay in agreement instead of the client rolling early and
   // eating a correction when the whistle blows.
-  const playing = net.match.phase === 'live' && !net.localDead;
+  // Connected too: after leaving, the last match's state lingers until reset,
+  // and "live" there kept the engine sound on and the keys driving the title car.
+  const playing = net.connected && net.match.phase === 'live' && !net.localDead;
   // The in-game menu (Esc): the browser releases the mouse on Esc, so the menu
   // is "in a live match, had the mouse, and lost it". Before the first click
   // of a match the CLICK TO DRIVE prompt shows instead.
   const inMatch = net.connected && net.match.phase === 'live';
   // Gamepad: polled once a frame. The right stick aims only while driving.
   inputs.poll(realDt, playing && !hud.paused);
-  if (!inMatch) {
-    lockedThisMatch = false;
-    padMenu = false;
-  } else if (inputs.locked) {
-    lockedThisMatch = true;
-    padMenu = false;
+  if (!inMatch) setMenu(false);
+  else if (inputs.locked && menuOpen && performance.now() - menuChangedAt > 300) setMenu(false); // re-locked: playing
+  // Start opens and closes the menu.
+  if (inputs.consumeMenuButton() && inMatch) {
+    if (menuOpen) resumeFromMenu();
+    else setMenu(true);
   }
-  // Start opens and closes the menu (a pad player never holds the mouse lock).
-  if (inputs.consumeMenuButton() && inMatch) padMenu = !padMenu;
-  hud.setPauseVisible(inMatch && (padMenu || (lockedThisMatch && !inputs.locked && !inputs.padActive)));
+  hud.setPauseVisible(inMatch && menuOpen);
   padNavigate(inputs.drainNav());
 
   // Fixed-step PREDICTION. The server simulates at the same rate with the same
@@ -1114,7 +1126,7 @@ function frame(now: number): void {
   }
   inputs.enabled = net.connected;
   // No CLICK TO DRIVE for a pad player: they never need the mouse.
-  hud.setPromptVisible(!inputs.locked && playing && !lockedThisMatch && !inputs.padActive);
+  hud.setPromptVisible(!inputs.locked && playing && !menuOpen && !inputs.padActive);
   hud.setMatch(net.match, net.crewId, net.localRespawnIn, net.localPlacement, spectateCrew);
   hud.setBoard(net.match.phase === 'results' ? net.board : [], net.crewId);
 
@@ -1140,8 +1152,12 @@ function frame(now: number): void {
   perf.gpuEnd();
   perf.mark('render');
   perf.end(interval);
-  // Dynamic resolution: keep the GPU inside the display's frame budget.
-  lighting.adaptResolution(realDt, perf.gpuMs, perf.intervalMs, perf.budgetMs);
+  // Dynamic resolution: keep the GPU inside the display's frame budget — only
+  // while driving, after a warm-up. On the title, the first seconds compile
+  // shaders, which read as overload: it stepped down three times, and every
+  // step resizes the canvas, which flashed.
+  drivingFor = playing ? drivingFor + realDt : 0;
+  if (drivingFor > 5) lighting.adaptResolution(realDt, perf.gpuMs, perf.intervalMs, perf.budgetMs);
 }
 
 // Seed the local car at a spawn so the view is sensible before the server
@@ -1193,19 +1209,30 @@ const relock = (): void => {
     // Too soon after leaving the lock: RESUME again in a moment.
   }
 };
-hud.onResume(() => {
-  // A pad player resumes by closing the menu; a mouse player by re-locking.
-  if (padMenu || inputs.padActive) padMenu = false;
-  else relock();
-});
+/** Close the menu and go back to driving (re-taking the mouse for a mouse player). */
+function resumeFromMenu(): void {
+  setMenu(false);
+  if (!inputs.padActive) relock();
+}
+hud.onResume(resumeFromMenu);
 hud.onLeave(() => {
-  lockedThisMatch = false;
-  padMenu = false;
+  setMenu(false);
   hud.setPauseVisible(false);
   net.leave();
 });
+const inLiveMatch = (): boolean => net.connected && net.match.phase === 'live';
+// Esc toggles the menu, locked or not.
 window.addEventListener('keydown', (e) => {
-  // Esc again closes the menu (browsers may refuse an immediate re-lock; then
-  // RESUME is the way back).
-  if (e.code === 'Escape' && hud.paused) relock();
+  if (e.code !== 'Escape' || !inLiveMatch()) return;
+  if (performance.now() - menuChangedAt < 300) return; // the same press as the unlock below
+  if (menuOpen) resumeFromMenu();
+  else {
+    setMenu(true);
+    if (document.pointerLockElement) document.exitPointerLock();
+  }
+});
+// The browser's own Esc releases the mouse (and may not deliver the key to the
+// page): losing the lock mid-match opens the menu too.
+document.addEventListener('pointerlockchange', () => {
+  if (!document.pointerLockElement && inLiveMatch() && !menuOpen) setMenu(true);
 });

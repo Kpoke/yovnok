@@ -412,6 +412,9 @@ export class NetClient {
       this.remotes.clear();
       this.members.clear();
       this.buffers.length = 0;
+      // Forget the match we were in: its phase ("live") must not outlive the
+      // connection, or the title would still behave as if driving.
+      this.match = EMPTY_MATCH;
       // Back to the title: our car returns, parked, to the showroom spot it
       // started on — not left mid-arena at whatever speed it was doing.
       const spawn = SPAWNS[0];
