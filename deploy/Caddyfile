@@ -1,0 +1,17 @@
+# HTTPS for YOVNOK behind Cloudflare (SSL mode "Full (strict)").
+#
+# The certificate is a Cloudflare ORIGIN certificate (origin.pem / origin.key,
+# made once through Cloudflare's API and kept only on the server): trusted by
+# Cloudflare, valid for 15 years, no renewal. The firewall admits only
+# Cloudflare's addresses, so nobody reaches this server except through it.
+
+{
+	# No automatic certificates: the origin certificate is used.
+	auto_https disable_certs
+}
+
+{$DOMAIN} {
+	tls /etc/caddy/origin.pem /etc/caddy/origin.key
+	encode zstd gzip
+	reverse_proxy game:8787
+}

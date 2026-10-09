@@ -1,0 +1,55 @@
+# YOVNOK on one small server (DEPLOY.md): the game, Caddy for HTTPS in front of
+# it, and Watchtower to pick up each new image GitHub Actions publishes.
+#
+# Lives at /opt/yovnok on the Droplet with deploy/Caddyfile and a .env file
+# holding DOMAIN, STATS_PASSWORD and STATS_SALT (never committed).
+
+services:
+  game:
+    image: ghcr.io/kpoke/yovnok:latest
+    restart: unless-stopped
+    environment:
+      MODE: solo
+      # Cloudflare → Caddy → here: client IPs come from Cloudflare's header.
+      TRUST_PROXY: "1"
+      ALLOWED_ORIGINS: https://${DOMAIN}
+      MAX_ROOMS: "8"
+      # The hard edge of the $10/month budget: 1,000 GB is the Droplet's
+      # allowance; stop admitting new players well before it.
+      BANDWIDTH_BUDGET_GB: "850"
+      DATA_DIR: /data
+      STATS_PASSWORD: ${STATS_PASSWORD}
+      STATS_SALT: ${STATS_SALT}
+    volumes:
+      - gamedata:/data
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    # 1 GB server: leave room for Caddy and the OS.
+    mem_limit: 700m
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./origin.pem:/etc/caddy/origin.pem:ro
+      - ./origin.key:/etc/caddy/origin.key:ro
+      - caddydata:/data
+    depends_on: [game]
+
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Only containers that opt in (the game); check every 5 minutes.
+    command: --label-enable --cleanup --interval 300
+
+volumes:
+  gamedata:
+  caddydata:
