@@ -1,0 +1,48 @@
+{
+  "lobby": [
+    {
+      "src": "/audio/music/kevin-macleod-at-launch.mp3",
+      "title": "At Launch",
+      "artist": "Kevin MacLeod (incompetech.com)",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100539"
+    },
+    {
+      "src": "/audio/music/kevin-macleod-future-gladiator.mp3",
+      "title": "Future Gladiator",
+      "artist": "Kevin MacLeod (incompetech.com)",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200051"
+    },
+    {
+      "src": "/audio/music/kevin-macleod-movement-proposition.mp3",
+      "title": "Movement Proposition",
+      "artist": "Kevin MacLeod (incompetech.com)",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100778"
+    }
+  ],
+  "match": [
+    {
+      "src": "/audio/music/kevin-macleod-the-descent.mp3",
+      "title": "The Descent",
+      "artist": "Kevin MacLeod (incompetech.com)",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200094"
+    },
+    {
+      "src": "/audio/music/kevin-macleod-the-complex.mp3",
+      "title": "The Complex",
+      "artist": "Kevin MacLeod (incompetech.com)",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300025"
+    },
+    {
+      "src": "/audio/music/kevin-macleod-the-escalation.mp3",
+      "title": "The Escalation",
+      "artist": "Kevin MacLeod (incompetech.com)",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400041"
+    }
+  ]
+}

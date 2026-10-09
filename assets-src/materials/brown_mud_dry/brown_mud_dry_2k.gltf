@@ -1,0 +1,156 @@
+{
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v1.5.17",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "sphere_gltf"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "brown_mud_dry",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Sphere.001",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "brown_mud_dry_nor_gl_4k",
+      "uri": "textures/brown_mud_dry_nor_gl_2k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "brown_mud_dry_diff_4k",
+      "uri": "textures/brown_mud_dry_diff_2k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "brown_mud_dry_rough_4k",
+      "uri": "textures/brown_mud_dry_rough_2k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 53913,
+      "max": [
+        0.6595885753631592,
+        0.6712113618850708,
+        0.6509585380554199
+      ],
+      "min": [
+        -0.6595882773399353,
+        -0.6613869667053223,
+        -0.6509799957275391
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 53913,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 53913,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 322170,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 646956,
+      "byteOffset": 0
+    },
+    {
+      "buffer": 0,
+      "byteLength": 646956,
+      "byteOffset": 646956
+    },
+    {
+      "buffer": 0,
+      "byteLength": 431304,
+      "byteOffset": 1293912
+    },
+    {
+      "buffer": 0,
+      "byteLength": 644340,
+      "byteOffset": 1725216
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 2369556,
+      "uri": "brown_mud_dry.bin"
+    }
+  ]
+}

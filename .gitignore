@@ -1,0 +1,13 @@
+node_modules/
+dist/
+dist-server/
+shots/
+*.log
+.DS_Store
+.vite/
+
+# Copied from node_modules by scripts/vendor.mjs
+public/libs/
+
+# Local secrets (API tokens)
+.env

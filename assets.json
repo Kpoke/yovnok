@@ -1,0 +1,491 @@
+{
+  "$comment": "Every third-party (and every non-code) file shipped by CONVOY. Checked by `npm run licensecheck`, which also generates ASSETS.md and public/credits.json from this file. Licences are SPDX ids. NC and ND licences are rejected.",
+  "assets": [
+    {
+      "files": [
+        "public/audio/music/kevin-macleod-at-launch.mp3"
+      ],
+      "kind": "music",
+      "title": "At Launch",
+      "author": "Kevin MacLeod",
+      "authorUrl": "https://incompetech.com",
+      "source": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100539",
+      "license": "CC-BY-4.0",
+      "changes": "Renamed only; played unmodified in the lobby playlist."
+    },
+    {
+      "files": [
+        "public/audio/music/kevin-macleod-future-gladiator.mp3"
+      ],
+      "kind": "music",
+      "title": "Future Gladiator",
+      "author": "Kevin MacLeod",
+      "authorUrl": "https://incompetech.com",
+      "source": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200051",
+      "license": "CC-BY-4.0",
+      "changes": "Renamed only; played unmodified in the lobby playlist."
+    },
+    {
+      "files": [
+        "public/audio/music/kevin-macleod-movement-proposition.mp3"
+      ],
+      "kind": "music",
+      "title": "Movement Proposition",
+      "author": "Kevin MacLeod",
+      "authorUrl": "https://incompetech.com",
+      "source": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100778",
+      "license": "CC-BY-4.0",
+      "changes": "Renamed only; played unmodified in the lobby playlist."
+    },
+    {
+      "files": [
+        "public/audio/music/kevin-macleod-the-descent.mp3"
+      ],
+      "kind": "music",
+      "title": "The Descent",
+      "author": "Kevin MacLeod",
+      "authorUrl": "https://incompetech.com",
+      "source": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200094",
+      "license": "CC-BY-4.0",
+      "changes": "Renamed only; played unmodified in the match playlist."
+    },
+    {
+      "files": [
+        "public/audio/music/kevin-macleod-the-complex.mp3"
+      ],
+      "kind": "music",
+      "title": "The Complex",
+      "author": "Kevin MacLeod",
+      "authorUrl": "https://incompetech.com",
+      "source": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300025",
+      "license": "CC-BY-4.0",
+      "changes": "Renamed only; played unmodified in the match playlist."
+    },
+    {
+      "files": [
+        "public/audio/music/kevin-macleod-the-escalation.mp3"
+      ],
+      "kind": "music",
+      "title": "The Escalation",
+      "author": "Kevin MacLeod",
+      "authorUrl": "https://incompetech.com",
+      "source": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400041",
+      "license": "CC-BY-4.0",
+      "changes": "Renamed only; played unmodified in the match playlist."
+    },
+    {
+      "files": [
+        "assets-src/vehicles/armored/original/armored-police-vehicle.glb",
+        "assets-src/vehicles/armored/original/textures/exterior_ao.png",
+        "assets-src/vehicles/armored/original/textures/exterior_basecolor.png",
+        "assets-src/vehicles/armored/original/textures/exterior_normal.png",
+        "assets-src/vehicles/armored/original/textures/exterior_roughness.png",
+        "assets-src/vehicles/armored/original/textures/interior_ao.png",
+        "assets-src/vehicles/armored/original/textures/interior_basecolor.png",
+        "assets-src/vehicles/armored/original/textures/interior_normal.png",
+        "assets-src/vehicles/armored/original/textures/interior_roughnes.png",
+        "assets-src/vehicles/armored/original/textures/lights_basecolor.png",
+        "assets-src/vehicles/armored/original/textures/wheel_ao.png",
+        "assets-src/vehicles/armored/original/textures/wheel_basecolor.png",
+        "assets-src/vehicles/armored/original/textures/wheel_metallic.png",
+        "assets-src/vehicles/armored/original/textures/wheel_normal.png",
+        "assets-src/vehicles/armored/original/textures/wheel_roughness.png",
+        "assets-src/vehicles/armored/chassis.glb",
+        "assets-src/vehicles/armored/wheel.glb",
+        "public/assets/vehicles/armored/chassis.glb",
+        "public/assets/vehicles/armored/wheel.glb"
+      ],
+      "kind": "model",
+      "title": "[Free] Armored Police Vehicle",
+      "author": "Roam_Man",
+      "authorUrl": "https://sketchfab.com/Roam_Man",
+      "source": "https://sketchfab.com/3d-models/free-armored-police-vehicle-9aea4465dc974c728b6167eac5ffd22e",
+      "license": "CC-BY-4.0",
+      "changes": "Scaled to 80% and turned to face -Z; split into a chassis and one wheel (mirrored in game for the right side); roof antennas removed; the model's 2048 px source textures used, with AO/roughness/metalness packed into ORM maps; LODs generated; recompressed (KTX2 textures, meshopt geometry). Tinted with the player's livery colour in game. Built by scripts/prep/armored.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/vehicles/turret/original/oshkosh-matv.glb",
+        "assets-src/vehicles/armored/turret.glb",
+        "public/assets/vehicles/armored/turret.glb"
+      ],
+      "kind": "model",
+      "title": "Oshkosh M-ATV (roof turret only)",
+      "author": "42manako",
+      "authorUrl": "https://sketchfab.com/42manako",
+      "source": "https://sketchfab.com/3d-models/oshkosh-m-atv-291dc8f07a494751b318e623b89cf538",
+      "license": "CC-BY-4.0",
+      "changes": "Only the roof weapon station is used: its armoured ring and gun shield, extracted, scaled to 70% (from centimetres), turned to face -Z, its own machine gun removed and an RPG-7 mounted in its place; recompressed (KTX2, meshopt). Mounted on the armored truck's roof. Built by scripts/prep/armored.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/weapons/m2/original/m2-50cal.glb",
+        "assets-src/vehicles/armored/gun.glb",
+        "public/assets/vehicles/armored/gun.glb"
+      ],
+      "kind": "model",
+      "title": "M2 .50cal machinegun",
+      "author": "britdawgmasterfunk",
+      "authorUrl": "https://sketchfab.com/britdawgmasterfunk",
+      "source": "https://sketchfab.com/3d-models/m2-50cal-machinegun-cc0-cbd897c1e1554fae9a5302a79ed59640",
+      "license": "CC-BY-4.0",
+      "changes": "Scaled to 1.3 m, origin moved to the foot of its pintle mount, muzzle socket added, LODs generated, recompressed (KTX2, meshopt). Two are mounted on the armored truck's front bumper. Built by scripts/prep/armored.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/weapons/rpg7/original/rpg-7.glb"
+      ],
+      "kind": "model",
+      "title": "RPG 7 ( Free Model )",
+      "author": "javadbayat",
+      "authorUrl": "https://sketchfab.com/javadbayat",
+      "source": "https://sketchfab.com/3d-models/rpg-7-free-model-99c0af8a1803490a86edc48cd3bfc700",
+      "license": "CC-BY-4.0",
+      "changes": "The separate display rocket is seated in the launcher (warhead proud of the tube), scaled to 70% and mounted on the armored truck's roof weapon station; recompressed (KTX2, meshopt). Built into public/assets/vehicles/armored/turret.glb by scripts/prep/armored.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "public/audio/sfx/mg-shot.ogg",
+        "public/audio/sfx/rpg-launch.ogg",
+        "public/audio/sfx/explosion-body.ogg"
+      ],
+      "kind": "sound",
+      "title": "Q009's weapon sounds (minigun2, rlauncher, grenade2)",
+      "author": "Q009",
+      "source": "https://opengameart.org/content/q009s-weapon-sounds",
+      "license": "CC-BY-SA-3.0",
+      "changes": "Renamed only (minigun2.ogg → mg-shot.ogg, rlauncher.ogg → rpg-launch.ogg, grenade2.ogg → explosion-body.ogg). Layered in game with synthesised sub-bass and an echo tail."
+    },
+    {
+      "files": [
+        "public/audio/sfx/explosion-tail.ogg"
+      ],
+      "kind": "sound",
+      "title": "25 CC0 bang / firework SFX (cannon_01)",
+      "author": "rubberduck",
+      "source": "https://opengameart.org/content/25-cc0-bang-firework-sfx",
+      "license": "CC0-1.0",
+      "changes": "Peak-normalised to -1 dBFS and renamed; layered under explosions as the rolling tail."
+    },
+    {
+      "files": [
+        "public/audio/sfx/hit-metal-1.ogg",
+        "public/audio/sfx/hit-metal-2.ogg",
+        "public/audio/sfx/hit-metal-3.ogg",
+        "public/audio/sfx/hit-thud.ogg",
+        "public/audio/sfx/hull-clang.ogg"
+      ],
+      "kind": "sound",
+      "title": "Metal Impact Sounds (clink3, clink2, bing1, thud3, bong1)",
+      "author": "Brian MacIntosh (BMacZero)",
+      "source": "https://opengameart.org/content/metal-impact-sounds",
+      "license": "CC0-1.0",
+      "changes": "Converted from WAV to Ogg Vorbis, peak-normalised to -1 dBFS and renamed."
+    },
+    {
+      "files": [
+        "assets-src/vehicles/brawler/original/armored-car-death-race.glb",
+        "assets-src/vehicles/brawler/original/textures/Car01_Ao.png",
+        "assets-src/vehicles/brawler/original/textures/Car01_BaseColor.png",
+        "assets-src/vehicles/brawler/original/textures/Car01_Roughness.png",
+        "assets-src/vehicles/brawler/original/textures/Car01_metalness.png",
+        "assets-src/vehicles/brawler/original/textures/Car01_normal.png",
+        "assets-src/vehicles/brawler/chassis.glb",
+        "assets-src/vehicles/brawler/wheel.glb",
+        "public/assets/vehicles/brawler/chassis.glb",
+        "public/assets/vehicles/brawler/wheel.glb"
+      ],
+      "kind": "model",
+      "title": "Armored car (death race)",
+      "author": "jaack",
+      "authorUrl": "https://sketchfab.com/jaack",
+      "source": "https://sketchfab.com/3d-models/armored-car-death-race-ea76bac506f04676b8514951b67994f8",
+      "license": "CC-BY-4.0",
+      "changes": "Turned to face -Z and converted from centimetres to metres; split into a body and one wheel (mirrored in game for the right side); the modelled hood guns removed; the model's 4096 px source textures used (flipped to glTF's convention, AO/roughness/metalness packed into an ORM map); LODs generated; recompressed (KTX2, meshopt). Tinted with the player's livery colour in game. Built by scripts/prep/brawler.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/materials/asphalt_02/asphalt_02_2k.gltf",
+        "assets-src/materials/asphalt_02/textures/asphalt_02_rough_2k.jpg",
+        "assets-src/materials/asphalt_02/textures/asphalt_02_nor_gl_2k.jpg",
+        "assets-src/materials/asphalt_02/textures/asphalt_02_diff_2k.jpg",
+        "assets-src/materials/asphalt_02/asphalt_02.bin",
+        "public/assets/materials/asphalt_02/asphalt_02_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Asphalt 02",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/asphalt_02",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/concrete_floor_worn_001/concrete_floor_worn_001_2k.gltf",
+        "assets-src/materials/concrete_floor_worn_001/textures/concrete_floor_worn_001_nor_gl_2k.jpg",
+        "assets-src/materials/concrete_floor_worn_001/concrete_floor_worn_001.bin",
+        "assets-src/materials/concrete_floor_worn_001/textures/concrete_floor_worn_001_rough_2k.jpg",
+        "assets-src/materials/concrete_floor_worn_001/textures/concrete_floor_worn_001_diff_2k.jpg",
+        "public/assets/materials/concrete_floor_worn_001/concrete_floor_worn_001_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Concrete Floor Worn 001",
+      "author": "Dimitrios Savva, Rico Cilliers",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/concrete_floor_worn_001",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/brown_mud_dry/brown_mud_dry_2k.gltf",
+        "assets-src/materials/brown_mud_dry/textures/brown_mud_dry_diff_2k.jpg",
+        "assets-src/materials/brown_mud_dry/textures/brown_mud_dry_rough_2k.jpg",
+        "assets-src/materials/brown_mud_dry/brown_mud_dry.bin",
+        "assets-src/materials/brown_mud_dry/textures/brown_mud_dry_nor_gl_2k.jpg",
+        "public/assets/materials/brown_mud_dry/brown_mud_dry_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Brown Mud Dry",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/brown_mud_dry",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/gravelly_sand/gravelly_sand_2k.gltf",
+        "assets-src/materials/gravelly_sand/textures/gravelly_sand_diff_2k.jpg",
+        "assets-src/materials/gravelly_sand/textures/gravelly_sand_nor_gl_2k.jpg",
+        "assets-src/materials/gravelly_sand/textures/gravelly_sand_arm_2k.jpg",
+        "assets-src/materials/gravelly_sand/gravelly_sand.bin",
+        "public/assets/materials/gravelly_sand/gravelly_sand_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Gravelly Sand",
+      "author": "Dario Barresi",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/gravelly_sand",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/gravel_concrete/gravel_concrete_2k.gltf",
+        "assets-src/materials/gravel_concrete/textures/gravel_concrete_nor_gl_2k.jpg",
+        "assets-src/materials/gravel_concrete/textures/gravel_concrete_diff_2k.jpg",
+        "assets-src/materials/gravel_concrete/gravel_concrete.bin",
+        "assets-src/materials/gravel_concrete/textures/gravel_concrete_rough_2k.jpg",
+        "public/assets/materials/gravel_concrete/gravel_concrete_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Gravel Concrete",
+      "author": "Dario Barresi, Charlotte Baglioni",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/gravel_concrete",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/concrete_wall_008/concrete_wall_008_2k.gltf",
+        "assets-src/materials/concrete_wall_008/textures/concrete_wall_008_arm_2k.jpg",
+        "assets-src/materials/concrete_wall_008/concrete_wall_008.bin",
+        "assets-src/materials/concrete_wall_008/textures/concrete_wall_008_diff_2k.jpg",
+        "assets-src/materials/concrete_wall_008/textures/concrete_wall_008_nor_gl_2k.jpg",
+        "public/assets/materials/concrete_wall_008/concrete_wall_008_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Concrete Wall 008",
+      "author": "Dario Barresi, Charlotte Baglioni",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/concrete_wall_008",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/concrete_wall_007/concrete_wall_007_2k.gltf",
+        "assets-src/materials/concrete_wall_007/concrete_wall_007.bin",
+        "assets-src/materials/concrete_wall_007/textures/concrete_wall_007_nor_gl_2k.jpg",
+        "assets-src/materials/concrete_wall_007/textures/concrete_wall_007_diff_2k.jpg",
+        "assets-src/materials/concrete_wall_007/textures/concrete_wall_007_rough_2k.jpg",
+        "public/assets/materials/concrete_wall_007/concrete_wall_007_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Concrete Wall 007",
+      "author": "Dario Barresi, Rico Cilliers, Charlotte Baglioni",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/concrete_wall_007",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/metal_plate/metal_plate_2k.gltf",
+        "assets-src/materials/metal_plate/textures/metal_plate_nor_gl_2k.jpg",
+        "assets-src/materials/metal_plate/metal_plate.bin",
+        "assets-src/materials/metal_plate/textures/metal_plate_diff_2k.jpg",
+        "assets-src/materials/metal_plate/textures/metal_plate_rough_2k.jpg",
+        "public/assets/materials/metal_plate/metal_plate_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Metal Plate",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/metal_plate",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/rusty_metal_02/rusty_metal_02_2k.gltf",
+        "assets-src/materials/rusty_metal_02/textures/rusty_metal_02_diff_2k.jpg",
+        "assets-src/materials/rusty_metal_02/textures/rusty_metal_02_nor_gl_2k.jpg",
+        "assets-src/materials/rusty_metal_02/rusty_metal_02.bin",
+        "assets-src/materials/rusty_metal_02/textures/rusty_metal_02_rough_2k.jpg",
+        "public/assets/materials/rusty_metal_02/rusty_metal_02_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Rusty Metal 02",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/rusty_metal_02",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/concrete_floor_painted/concrete_floor_painted_2k.gltf",
+        "assets-src/materials/concrete_floor_painted/textures/concrete_floor_painted_rough_2k.jpg",
+        "assets-src/materials/concrete_floor_painted/concrete_floor_painted.bin",
+        "assets-src/materials/concrete_floor_painted/textures/concrete_floor_painted_diff_2k.jpg",
+        "assets-src/materials/concrete_floor_painted/textures/concrete_floor_painted_nor_gl_2k.jpg",
+        "public/assets/materials/concrete_floor_painted/concrete_floor_painted_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Concrete Floor Painted",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/concrete_floor_painted",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/brown_mud_03/brown_mud_03_2k.gltf",
+        "assets-src/materials/brown_mud_03/textures/brown_mud_03_spec_2k.jpg",
+        "assets-src/materials/brown_mud_03/brown_mud_03.bin",
+        "assets-src/materials/brown_mud_03/textures/brown_mud_03_nor_gl_2k.jpg",
+        "assets-src/materials/brown_mud_03/textures/brown_mud_03_diff_2k.jpg",
+        "public/assets/materials/brown_mud_03/brown_mud_03_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Brown Mud 03",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/brown_mud_03",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/corrugated_iron/corrugated_iron_2k.gltf",
+        "assets-src/materials/corrugated_iron/textures/corrugated_iron_arm_2k.jpg",
+        "assets-src/materials/corrugated_iron/textures/corrugated_iron_nor_gl_2k.jpg",
+        "assets-src/materials/corrugated_iron/corrugated_iron.bin",
+        "assets-src/materials/corrugated_iron/textures/corrugated_iron_diff_2k.jpg",
+        "public/assets/materials/corrugated_iron/corrugated_iron_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Corrugated Iron",
+      "author": "Jenelle van Heerden, Dimitrios Savva",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/corrugated_iron",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "public/assets/hdri/satara_night_1k.hdr"
+      ],
+      "kind": "hdri",
+      "title": "Satara Night",
+      "author": "Greg Zaal",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/satara_night",
+      "license": "CC0-1.0",
+      "changes": "Unmodified 1K HDR; used as the environment (image-based) lighting, not shown as the sky."
+    },
+    {
+      "files": [
+        "assets-src/props/concrete_road_barrier/concrete_road_barrier_1k.gltf",
+        "assets-src/props/concrete_road_barrier/textures/concrete_road_barrier_nor_gl_1k.jpg",
+        "assets-src/props/concrete_road_barrier/textures/concrete_road_barrier_arm_1k.jpg",
+        "assets-src/props/concrete_road_barrier/textures/concrete_road_barrier_diff_1k.jpg",
+        "assets-src/props/concrete_road_barrier/concrete_road_barrier.bin",
+        "public/assets/props/concrete_road_barrier/concrete_road_barrier_1k.glb"
+      ],
+      "kind": "model",
+      "title": "Concrete Road Barrier",
+      "author": "Amal Kumar",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/concrete_road_barrier",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 1K glTF, simplified with LODs and KTX2 textures by scripts/assetbuild.ts; arena set dressing."
+    },
+    {
+      "files": [
+        "assets-src/props/Barrel_01/Barrel_01_1k.gltf",
+        "assets-src/props/Barrel_01/Barrel_01.bin",
+        "assets-src/props/Barrel_01/textures/Barrel_01_explosive_diff_1k.jpg",
+        "assets-src/props/Barrel_01/textures/Barrel_01_explosive_nor_gl_1k.jpg",
+        "assets-src/props/Barrel_01/textures/Barrel_01_explosive_arm_1k.jpg",
+        "public/assets/props/Barrel_01/Barrel_01_1k.glb"
+      ],
+      "kind": "model",
+      "title": "Barrel_01",
+      "author": "Jorge Camacho",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/Barrel_01",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 1K glTF, simplified with LODs and KTX2 textures by scripts/assetbuild.ts; arena set dressing."
+    },
+    {
+      "files": [
+        "assets-src/props/old_tyre/old_tyre_1k.gltf",
+        "assets-src/props/old_tyre/textures/old_tyre_diff_1k.jpg",
+        "assets-src/props/old_tyre/textures/old_tyre_arm_1k.jpg",
+        "assets-src/props/old_tyre/old_tyre.bin",
+        "assets-src/props/old_tyre/textures/old_tyre_nor_gl_1k.jpg",
+        "public/assets/props/old_tyre/old_tyre_1k.glb"
+      ],
+      "kind": "model",
+      "title": "Old Tyre",
+      "author": "MP",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/old_tyre",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 1K glTF, simplified with LODs and KTX2 textures by scripts/assetbuild.ts; arena set dressing."
+    },
+    {
+      "files": [
+        "assets-src/props/wooden_crate_01/wooden_crate_01_1k.gltf",
+        "assets-src/props/wooden_crate_01/textures/wooden_crate_01_diff_1k.jpg",
+        "assets-src/props/wooden_crate_01/textures/wooden_crate_01_nor_gl_1k.jpg",
+        "assets-src/props/wooden_crate_01/wooden_crate_01.bin",
+        "assets-src/props/wooden_crate_01/textures/wooden_crate_01_arm_1k.jpg",
+        "public/assets/props/wooden_crate_01/wooden_crate_01_1k.glb"
+      ],
+      "kind": "model",
+      "title": "Wooden Crate 01",
+      "author": "James Ray Cock",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/wooden_crate_01",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 1K glTF, simplified with LODs and KTX2 textures by scripts/assetbuild.ts; arena set dressing."
+    }
+  ]
+}

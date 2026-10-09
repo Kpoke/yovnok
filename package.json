@@ -1,0 +1,62 @@
+{
+  "name": "convoy",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Crewed vehicular battle royale \u2014 M1 driving prototype",
+  "scripts": {
+    "predev": "node scripts/vendor.mjs",
+    "dev": "concurrently -k -n server,client -c magenta,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "tsx watch src/server/server.ts",
+    "dev:client": "vite",
+    "start": "node dist-server/server.mjs",
+    "start:source": "tsx src/server/server.ts",
+    "prebuild": "node scripts/vendor.mjs",
+    "build": "npm run licensecheck && tsc --noEmit && vite build && npm run build:server",
+    "build:server": "vite build --config vite.server.config.ts",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "simcheck": "tsx scripts/simcheck.ts",
+    "driftbench": "tsx scripts/driftbench.ts",
+    "shot": "node scripts/shot.mjs",
+    "nettest": "node scripts/nettest.mjs",
+    "assetcheck": "tsx scripts/assetcheck.ts",
+    "netheadless": "tsx scripts/netheadless.ts",
+    "combattest": "tsx scripts/combattest.ts",
+    "matchtest": "tsx scripts/matchtest.ts",
+    "bottest": "tsx scripts/bottest.ts",
+    "cosmeticstest": "tsx scripts/cosmeticstest.ts",
+    "solobench": "tsx scripts/solobench.ts",
+    "scalebench": "tsx scripts/scalebench.ts",
+    "check": "npm run typecheck && npm run licensecheck -- --selftest && npm run assetcheck -- --selftest && npm run simcheck && npm run combattest && npm run weapontest && npm run matchtest && npm run bottest && npm run cosmeticstest && npm run netheadless && npm run build",
+    "licensecheck": "tsx scripts/licensecheck.ts",
+    "assetbuild": "tsx scripts/assetbuild.ts",
+    "weapontest": "tsx scripts/weapontest.ts"
+  },
+  "dependencies": {
+    "three": "^0.186.0",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "@types/node": "^26.6.2",
+    "@types/three": "^0.186.0",
+    "@types/ws": "^8.18.1",
+    "concurrently": "^10.0.5",
+    "ktx2-encoder": "^0.6.0",
+    "meshoptimizer": "^1.3.0",
+    "playwright": "^1.63.0",
+    "sharp": "^0.35.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  },
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kpoke/convoy.git"
+  },
+  "homepage": "https://github.com/Kpoke/convoy"
+}

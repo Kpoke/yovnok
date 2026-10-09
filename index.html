@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CONVOY</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --accent: #ff8a3d;
+        --panel: rgba(10, 12, 16, 0.55);
+        --edge: rgba(255, 255, 255, 0.1);
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0a0b0e;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        color: #e8edf2;
+      }
+
+      /* Pinned to the viewport like the HUD: in the page flow it could be pushed
+         down (a 38 px band of page background showed above the scene). */
+      #game { display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; }
+
+      .hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .panel {
+        position: absolute;
+        background: var(--panel);
+        border: 1px solid var(--edge);
+        border-radius: 10px;
+        padding: 10px 14px;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+      }
+
+      /* ---- bottom-left: speed ---- */
+      #speed {
+        left: 22px;
+        bottom: 22px;
+        min-width: 190px;
+      }
+      #speed .value {
+        font-size: 40px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+      #speed .unit {
+        font-size: 13px;
+        opacity: 0.55;
+        margin-left: 6px;
+      }
+      #speed .label {
+        font-size: 10px;
+        letter-spacing: 2px;
+        opacity: 0.5;
+        margin-bottom: 2px;
+      }
+
+      /* ---- bottom-centre: combat ---- */
+      #combat {
+        left: 50%;
+        bottom: 22px;
+        transform: translateX(-50%);
+        width: 220px;
+      }
+      #combat .label { display: flex; justify-content: space-between; }
+      #combat .row { display: flex; justify-content: space-between; gap: 12px; margin-top: 5px; font-size: 11px; }
+      #combat .row b { color: var(--accent); font-weight: 600; }
+      #combat .bar { margin-top: 5px; }
+      #combat .bar > i { background: linear-gradient(90deg, #ffd27a, #ff8a3d); }
+
+      /*
+       * Component pips (DESIGN.md §4.2). Health is drawn as a filled track that
+       * shortens and reddens as the part dies, so "my engine is nearly gone" is
+       * readable at a glance rather than needing a number read.
+       */
+      /*
+       * Repair is a commitment the player must not miss — it is the most
+       * exposed thing a crew can do, so it says so loudly (DESIGN.md §4.3).
+       */
+      #combat .repairing {
+        display: none;
+        justify-content: center;
+        color: #6fd08c;
+        letter-spacing: 2px;
+        font-weight: 700;
+      }
+      #combat .repairing.on { display: flex; animation: repair-pulse 900ms ease-in-out infinite; }
+      @keyframes repair-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+      }
+
+      #combat .parts { align-items: center; gap: 6px; }
+      #combat .parts span { flex: 0 0 auto; }
+      #combat .pip {
+        flex: 1 1 auto;
+        height: 5px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.12);
+        position: relative;
+        overflow: hidden;
+      }
+      #combat .pip::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        width: var(--health, 100%);
+        background: var(--pip-colour, var(--accent));
+        transition: width 140ms linear, background-color 140ms linear;
+      }
+
+      /* ---- bottom-left: boost, folded into the speed panel ---- */
+      #speed .boost-label {
+        margin-top: 10px;
+        font-size: 10px;
+        letter-spacing: 2px;
+        opacity: 0.5;
+        margin-bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .bar {
+        height: 8px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.09);
+        overflow: hidden;
+      }
+      .bar > i {
+        display: block;
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #ffb347, var(--accent));
+        transition: width 60ms linear;
+      }
+
+      /* ---- top-left: telemetry ---- */
+      #telemetry {
+        left: 22px;
+        top: 22px;
+        font-size: 11px;
+        line-height: 1.7;
+        opacity: 0.75;
+        min-width: 190px;
+      }
+      #telemetry b { color: var(--accent); font-weight: 600; }
+      #telemetry .row { display: flex; justify-content: space-between; gap: 14px; }
+
+      /* ---- frame-time breakdown (perf.ts); click to copy ---- */
+      #perf {
+        left: 22px;
+        top: 92px;
+        margin: 0;
+        font-size: 10.5px;
+        line-height: 1.5;
+        white-space: pre;
+        opacity: 0.85;
+        cursor: copy;
+        pointer-events: auto;
+      }
+      #perf.copied { outline: 1px solid var(--accent); }
+
+      /* ---- top-right: networking ---- */
+      #net {
+        right: 22px;
+        top: 22px;
+        font-size: 11px;
+        line-height: 1.7;
+        min-width: 170px;
+        opacity: 0.8;
+      }
+      #net .row { display: flex; justify-content: space-between; gap: 14px; }
+      #net b { color: var(--accent); font-weight: 600; }
+      #net b.ok { color: #74d680; }
+      #net b.bad { color: #ff6b6b; }
+
+      /* ---- damage numbers: a hit you landed, where you landed it ---- */
+      #damage {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      #damage .dmg {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        font-size: 15px;
+        font-weight: 700;
+        color: #ffd27a;
+        text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+        animation: dmg-float 850ms ease-out forwards;
+      }
+      #damage .dmg.kill { color: #ff5a5a; font-size: 19px; }
+      @keyframes dmg-float {
+        0% { opacity: 1; transform: translate(-50%, -50%); }
+        100% { opacity: 0; transform: translate(-50%, -150%); }
+      }
+
+      /* ---- results board ---- */
+      #board {
+        position: absolute;
+        left: 50%;
+        top: 66%;
+        transform: translateX(-50%);
+        min-width: 280px;
+        font-size: 11px;
+        line-height: 1.8;
+        letter-spacing: 1px;
+      }
+      #board.hidden { display: none; }
+      #board .row { display: flex; justify-content: space-between; gap: 18px; opacity: 0.75; }
+      #board .row.mine { opacity: 1; color: var(--accent); }
+      #board .row .kills { min-width: 60px; text-align: right; }
+
+      /* ---- first-match tips ---- */
+      #tip {
+        position: absolute;
+        left: 50%;
+        top: 64%;
+        transform: translate(-50%, -50%);
+        padding: 7px 16px;
+        border-radius: 8px;
+        background: rgba(10, 12, 16, 0.6);
+        border: 1px solid var(--edge);
+        font-size: 12px;
+        letter-spacing: 2px;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 200ms ease;
+      }
+      #tip.on { opacity: 1; }
+
+      /* ---- right: kill feed ---- */
+      #killfeed {
+        position: absolute;
+        right: 22px;
+        top: 214px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        align-items: flex-end;
+        pointer-events: none;
+        font-size: 11px;
+        letter-spacing: 1px;
+      }
+      #killfeed .kill {
+        background: rgba(10, 12, 16, 0.55);
+        border: 1px solid var(--edge);
+        border-radius: 5px;
+        padding: 2px 8px;
+        opacity: 0.92;
+        animation: kill-in 150ms ease-out;
+      }
+      @keyframes kill-in {
+        from { opacity: 0; transform: translateX(10px); }
+        to { opacity: 0.92; transform: none; }
+      }
+
+      /* ---- bottom-right: controls ---- */
+      #controls {
+        right: 22px;
+        bottom: 22px;
+        font-size: 11px;
+        line-height: 1.9;
+        opacity: 0.7;
+      }
+      #controls .key {
+        display: inline-block;
+        min-width: 54px;
+        padding: 1px 6px;
+        margin-right: 6px;
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.05);
+        font-size: 10px;
+      }
+
+      /* ---- top-centre: scoreboard + match clock ---- */
+      #scoreboard {
+        left: 50%;
+        top: 18px;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 8px 18px;
+        font-variant-numeric: tabular-nums;
+      }
+      #scoreboard .team {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        opacity: 0.55;
+        transition: opacity 160ms ease, color 160ms ease;
+      }
+      #scoreboard .team .tag {
+        font-size: 10px;
+        letter-spacing: 2px;
+      }
+      #scoreboard .team .score {
+        font-size: 26px;
+        font-weight: 700;
+        line-height: 1;
+        min-width: 30px;
+        text-align: center;
+      }
+      /* Our own side is the one you glance at, so it is the bright one. */
+      #scoreboard .team.mine { opacity: 1; color: var(--accent); }
+      #scoreboard .clock {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        min-width: 62px;
+        text-align: center;
+      }
+      #scoreboard .clock.sudden { color: #ff5a5a; animation: repair-pulse 900ms ease-in-out infinite; }
+      #scoreboard.hidden { display: none; }
+
+      /* ---- centre: lobby / countdown / results / respawn ---- */
+      #banner {
+        position: absolute;
+        left: 50%;
+        top: 42%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        padding: 18px 30px;
+        border-radius: 12px;
+        background: rgba(10, 12, 16, 0.55);
+        border: 1px solid var(--edge);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        transition: opacity 160ms ease;
+        min-width: 260px;
+      }
+      #banner.hidden { opacity: 0; visibility: hidden; }
+      #banner .title {
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: 3px;
+        line-height: 1.1;
+      }
+      #banner .title.win { color: #74d680; }
+      #banner .title.loss { color: #ff6b6b; }
+      #banner .sub {
+        margin-top: 8px;
+        font-size: 12px;
+        letter-spacing: 2px;
+        opacity: 0.7;
+      }
+      #banner button {
+        margin-top: 16px;
+        pointer-events: auto;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        letter-spacing: 3px;
+        color: #0a0b0e;
+        background: var(--accent);
+        border: 0;
+        border-radius: 7px;
+        padding: 10px 22px;
+      }
+      #banner button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #banner button.hidden { display: none; }
+
+      /* ---- top-centre: the closing zone readout ---- */
+      #zone {
+        left: 50%;
+        top: 68px;
+        transform: translateX(-50%);
+        padding: 6px 16px;
+        font-size: 11px;
+        letter-spacing: 2px;
+        white-space: nowrap;
+      }
+      #zone.hidden { display: none; }
+      #zone.danger {
+        color: #ff5a5a;
+        border-color: rgba(255, 90, 90, 0.65);
+        animation: repair-pulse 900ms ease-in-out infinite;
+      }
+
+      /* Red vignette as hull runs low. */
+      #hurt {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 200ms linear;
+        background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 42%, rgba(190, 20, 20, 0.6) 100%);
+      }
+
+      /* Which way the last hit came from. */
+      /* Taking damage: a hard red pulse from the edges (Hud.flashHit). */
+      #hitflash {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 38%, rgba(220, 20, 20, 0.75) 100%);
+      }
+      #combat .bar.hull.flash { animation: hull-flash 380ms ease-out; }
+      @keyframes hull-flash {
+        0% { box-shadow: 0 0 0 2px #ff4d4d; background: rgba(255, 77, 77, 0.6); }
+        100% { box-shadow: 0 0 0 0 transparent; }
+      }
+
+      #hitdir {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 190px;
+        height: 190px;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 160ms linear;
+      }
+      #hitdir.on { opacity: 1; }
+      #hitdir::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 0;
+        transform: translateX(-50%);
+        border-left: 16px solid transparent;
+        border-right: 16px solid transparent;
+        border-bottom: 28px solid #ff4d4d;
+        filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.85));
+      }
+
+      /* Red vignette while outside the safe circle. */
+      #outside {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 220ms ease;
+        background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0) 42%, rgba(255, 20, 20, 0.32) 100%);
+      }
+      #outside.on { opacity: 1; }
+
+      /* ---- stand-by card: covers the first load, so nothing pops in ---- */
+      #standby {
+        position: absolute;
+        inset: 0;
+        z-index: 30;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #050608;
+        pointer-events: auto;
+        transition: opacity 600ms ease;
+      }
+      #standby.gone { opacity: 0; pointer-events: none; }
+      /* Faint broadcast colour bars and scanlines behind the card. */
+      #standby::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        opacity: 0.07;
+        background:
+          repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.5) 0 1px, transparent 1px 3px),
+          linear-gradient(90deg, #c0c0c0 0 14.3%, #c0c000 0 28.6%, #00c0c0 0 42.9%, #00c000 0 57.2%, #c000c0 0 71.5%, #c00000 0 85.8%, #0000c0 0);
+      }
+      .sb-card { position: relative; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+      .sb-logo { font-size: 13px; font-weight: 800; letter-spacing: 8px; }
+      .sb-logo span { margin-left: 6px; padding: 2px 6px; background: var(--accent); color: #0a0b0e; letter-spacing: 3px; }
+      .sb-title { margin-top: 18px; font-size: clamp(22px, 4vw, 36px); font-weight: 800; letter-spacing: 0.32em; padding-left: 0.32em; }
+      .sb-sub { font-size: 11px; letter-spacing: 3px; opacity: 0.55; }
+      #standby .bar { width: min(340px, 72vw); height: 3px; margin-top: 18px; }
+      #standby-text { font-size: 10px; letter-spacing: 2px; opacity: 0.45; min-height: 1em; }
+
+      /* ---- title: cinematic hero — the car owns the screen, the menu a side ---- */
+      #join {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-columns: minmax(260px, 340px) minmax(0, 420px) 1fr;
+        align-items: center;
+        gap: 28px;
+        padding: 6vh 5vw;
+        cursor: grab;
+        pointer-events: auto;
+        /* Dark where the menu is, clear where the car stands. */
+        background: linear-gradient(90deg, rgba(5, 6, 8, 0.92) 0%, rgba(5, 6, 8, 0.6) 32%, rgba(5, 6, 8, 0) 62%),
+          linear-gradient(0deg, rgba(5, 6, 8, 0.65) 0%, rgba(5, 6, 8, 0) 28%);
+      }
+      #join.hidden { display: none; }
+      .kicker { font-size: 10px; letter-spacing: 5px; color: var(--accent); }
+      .kicker::before {
+        content: '';
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        margin-right: 10px;
+        border-radius: 50%;
+        background: #ff3b3b;
+        vertical-align: 1px;
+        animation: repair-pulse 1.2s ease-in-out infinite;
+      }
+      .hero-side { display: flex; flex-direction: column; cursor: default; }
+      #join .title {
+        margin-top: 12px;
+        /* Sized to its column, so an open panel beside it never overlaps it. */
+        font-size: clamp(40px, 4.4vw, 72px);
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        line-height: 0.95;
+      }
+      #join .sub { margin-top: 10px; font-size: 11px; letter-spacing: 3px; opacity: 0.6; }
+
+      /* Vertical menu: shared by the title and the in-game menu. */
+      .menu { margin-top: 38px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+      .menu-item {
+        position: relative;
+        font: inherit;
+        font-size: 14px;
+        letter-spacing: 5px;
+        color: rgba(232, 237, 242, 0.62);
+        background: none;
+        border: 0;
+        padding: 9px 0 9px 22px;
+        cursor: pointer;
+        text-align: left;
+        pointer-events: auto;
+        transition: color 120ms ease, padding 120ms ease;
+      }
+      .menu-item::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        width: 10px;
+        height: 2px;
+        background: var(--accent);
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 120ms ease;
+      }
+      /* :focus too — a gamepad moves real focus through the menu. */
+      .menu-item:hover, .menu-item:focus, .menu-item.open { color: #fff; padding-left: 26px; outline: none; }
+      .menu-item:hover::before, .menu-item:focus::before, .menu-item.open::before { transform: scaleX(1); }
+      .menu-item.primary:focus { box-shadow: 0 0 0 2px #fff; }
+      .menu-item.primary {
+        margin-bottom: 14px;
+        padding: 14px 44px 14px 26px;
+        font-size: 20px;
+        font-weight: 800;
+        color: #0a0b0e;
+        background: var(--accent);
+        border-radius: 4px;
+      }
+      .menu-item.primary::before { display: none; }
+      .menu-item.primary:hover { color: #0a0b0e; padding-left: 30px; filter: brightness(1.08); }
+      .menu-item:disabled { opacity: 0.5; cursor: default; }
+      .menu-item.danger:hover { color: #ff6b6b; }
+      .menu-item.danger::before { background: #ff6b6b; }
+      #join-button small { display: block; margin-top: 2px; font-size: 9px; letter-spacing: 2px; font-weight: 400; opacity: 0.75; }
+      .callsign-line { margin-top: 26px; font-size: 10px; letter-spacing: 2px; opacity: 0.55; }
+      .callsign-line b { color: #fff; opacity: 1; letter-spacing: 3px; font-weight: 600; }
+      .callsign-line button {
+        margin-left: 8px; font: inherit; font-size: 10px; color: var(--accent); background: none; border: 0; cursor: pointer; pointer-events: auto;
+      }
+      .hero-panel { align-self: center; cursor: default; }
+      .touch-note { margin-top: 18px; max-width: 320px; font-size: 11px; line-height: 1.7; letter-spacing: 1px; opacity: 0.8; }
+      .touch-note b { color: var(--accent); font-weight: 600; }
+      .touch-note.hidden { display: none; }
+      .hero-hint { position: absolute; right: 5vw; bottom: 4vh; font-size: 10px; letter-spacing: 3px; opacity: 0.4; }
+      /* The source link: a caption, like the drag hint, opposite it. */
+      .hero-source {
+        position: absolute;
+        left: 5vw;
+        bottom: 4vh;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 10px;
+        letter-spacing: 3px;
+        color: #e8edf2;
+        opacity: 0.45;
+        text-decoration: none;
+        cursor: pointer;
+        transition: opacity 120ms ease, color 120ms ease;
+      }
+      .hero-source svg { width: 13px; height: 13px; }
+      .hero-source:hover, .hero-source:focus { opacity: 1; color: var(--accent); outline: none; }
+
+      /* Panels (garage, settings, credits, controls): beside a menu, one at a time. */
+      .drawer {
+        width: 100%;
+        max-height: 70vh;
+        overflow-y: auto;
+        padding: 16px 18px;
+        border-radius: 6px;
+        background: rgba(10, 12, 16, 0.78);
+        border: 1px solid var(--edge);
+        backdrop-filter: blur(6px);
+        text-align: left;
+      }
+      .drawer.hidden { display: none; }
+      .drawer .cos-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-size: 10px;
+        letter-spacing: 3px;
+        opacity: 0.7;
+        margin-bottom: 8px;
+      }
+      .cos-row, .set-row { margin-top: 12px; }
+      .cos-label {
+        display: block;
+        font-size: 9px;
+        letter-spacing: 2px;
+        opacity: 0.45;
+        margin-bottom: 6px;
+      }
+      .cos-options { display: flex; flex-wrap: wrap; gap: 6px; }
+      .cos-option, .chip {
+        margin: 0;
+        padding: 6px 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font: inherit;
+        font-size: 10px;
+        letter-spacing: 1px;
+        cursor: pointer;
+        color: #e8edf2;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        pointer-events: auto;
+      }
+      .cos-option.selected, .chip.on {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: rgba(255, 138, 61, 0.12);
+      }
+      .cos-option.locked { opacity: 0.5; cursor: default; }
+      .cos-need { font-size: 9px; letter-spacing: 1px; opacity: 0.85; }
+      .cos-need:empty { display: none; }
+      .cos-swatch { width: 10px; height: 10px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, 0.4); }
+      .set-line { display: flex; gap: 6px; align-items: center; }
+      #callsign-input {
+        flex: 1;
+        min-width: 0;
+        font: inherit;
+        font-size: 13px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        padding: 7px 10px;
+        pointer-events: auto;
+      }
+      #callsign-input:focus { outline: none; border-color: var(--accent); }
+      #credits-list { font-size: 11px; line-height: 1.7; }
+      #credits-list a { color: inherit; }
+      #credits .note a { color: var(--accent); }
+      #credits-list .heading { margin-bottom: 4px; font-size: 9px; letter-spacing: 2px; opacity: 0.45; }
+      #credits-list .who { margin-top: 6px; opacity: 0.6; }
+      #credits .note { margin-top: 10px; font-size: 10px; opacity: 0.5; line-height: 1.6; }
+      .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 11px; }
+      .pad-head { margin-top: 16px; }
+      .keys kbd {
+        font: inherit; font-size: 10px; padding: 2px 6px; border: 1px solid var(--edge); border-radius: 3px; background: rgba(255, 255, 255, 0.06);
+      }
+
+      /* ---- in-game menu (Esc): the match goes on behind it ---- */
+      #pause {
+        position: absolute;
+        inset: 0;
+        z-index: 20;
+        display: grid;
+        grid-template-columns: minmax(240px, 320px) minmax(0, 420px) 1fr;
+        align-items: center;
+        gap: 28px;
+        padding: 6vh 5vw;
+        background: linear-gradient(90deg, rgba(5, 6, 8, 0.9) 0%, rgba(5, 6, 8, 0.55) 45%, rgba(5, 6, 8, 0.25) 100%);
+        pointer-events: auto;
+      }
+      #pause.hidden { display: none; }
+      .pause-title { margin-top: 10px; font-size: clamp(36px, 4.4vw, 60px); font-weight: 800; letter-spacing: 0.14em; }
+      .pause-note { margin-top: 8px; font-size: 10px; letter-spacing: 2px; opacity: 0.55; }
+      body.paused #hud > *:not(#pause):not(#killfeed):not(#zone) { visibility: hidden; }
+
+      /* ---- loading: after PLAY, joining the match ---- */
+      #loading {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: rgba(5, 6, 8, 0.85);
+        pointer-events: auto;
+      }
+      #loading.hidden { display: none; }
+      #loading .bar { width: min(340px, 72vw); height: 3px; }
+      #loading-text { font-size: 10px; letter-spacing: 2px; opacity: 0.55; }
+
+      @media (max-width: 760px) {
+        #join, #pause { grid-template-columns: 1fr; align-content: start; overflow-y: auto; padding: 24px 16px; gap: 16px; }
+        #join { background: linear-gradient(180deg, rgba(5, 6, 8, 0.92) 0%, rgba(5, 6, 8, 0.4) 70%); }
+        .menu { margin-top: 20px; }
+        .hero-hint { display: none; }
+        .hero-source { position: static; margin-top: 4px; }
+      }
+
+      /* ---- centre: click-to-play ---- */
+      /* Aiming: a centre crosshair, and a hitmarker that flashes on a confirm. */
+      #crosshair {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 18px;
+        height: 18px;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+      }
+      #crosshair::before,
+      #crosshair::after {
+        content: '';
+        position: absolute;
+        background: rgba(255, 255, 255, 0.75);
+        box-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+      }
+      #crosshair::before { left: 50%; top: 0; width: 1.5px; height: 100%; transform: translateX(-50%); }
+      #crosshair::after { top: 50%; left: 0; height: 1.5px; width: 100%; transform: translateY(-50%); }
+
+      #hitmarker {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 30px;
+        height: 30px;
+        transform: translate(-50%, -50%) rotate(45deg) scale(0.6);
+        border: 2px solid transparent;
+        border-radius: 3px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 90ms linear, transform 90ms ease-out;
+      }
+      #hitmarker.on {
+        opacity: 1;
+        transform: translate(-50%, -50%) rotate(45deg) scale(1);
+        border-color: var(--accent);
+      }
+
+      /*
+       * Weapon reticles: where each mounted gun will ACTUALLY hit. On the
+       * crosshair while the target is within the gun's reach; split off toward
+       * the gun's limit when it is not — the honest answer to "will this hit?".
+       */
+      .reticle {
+        position: absolute;
+        left: 0;
+        top: 0;
+        pointer-events: none;
+        transform: translate(-50%, -50%);
+        transition: opacity 120ms linear;
+      }
+      .reticle.hidden { display: none; }
+      .reticle.primary {
+        width: 26px;
+        height: 26px;
+        border: 2px solid rgba(255, 255, 255, 0.85);
+        border-radius: 50%;
+        box-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+      }
+      .reticle.secondary {
+        width: 46px;
+        height: 30px;
+        border-left: 2px solid var(--accent);
+        border-right: 2px solid var(--accent);
+        filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
+      }
+      .reticle.outside { opacity: 0.45; border-color: #ff6b6b; }
+      .reticle.secondary.reloading { opacity: 0.3; }
+
+      #combat .key-hint {
+        display: inline-block;
+        margin-right: 6px;
+        padding: 0 4px;
+        border: 1px solid var(--edge);
+        border-radius: 3px;
+        font-size: 9px;
+        opacity: 0.6;
+      }
+      #combat .weapon2 { margin-top: 8px; }
+      #combat .weapon2.hidden { display: none; }
+      #combat .weapon2.ready #c-ammo2 { color: var(--accent); font-weight: 700; }
+
+      /* A kill you scored: unmistakable, brief. */
+      #killconfirm {
+        position: absolute;
+        left: 50%;
+        top: 38%;
+        transform: translate(-50%, -50%) scale(0.9);
+        font-size: 18px;
+        font-weight: 800;
+        letter-spacing: 4px;
+        color: #ff5a5a;
+        text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 160ms ease, transform 160ms ease;
+      }
+      #killconfirm.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+      /* Sits above centre so it never covers the car itself. */
+      #prompt {
+        position: absolute;
+        left: 50%;
+        top: 30%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        font-size: 13px;
+        letter-spacing: 3px;
+        opacity: 0.9;
+        padding: 14px 22px;
+        border-radius: 10px;
+        background: rgba(10, 12, 16, 0.45);
+        border: 1px solid var(--edge);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        transition: opacity 200ms ease;
+      }
+      #prompt.hidden { opacity: 0; }
+      /* The controls card is for when you are NOT driving, like the prompt. */
+      #controls.hidden { display: none; }
+
+      /* Diagnostics stay out of the way until asked for (F3 or the ` key). */
+      body:not(.debug-on) .debug { display: none; }
+      body.menu #speed, body.menu #combat, body.menu #controls,
+      body.menu #prompt, body.menu #crosshair { display: none; }
+      #combat .bar.hull > i { background: linear-gradient(90deg, #e5484d, #74d680); }
+      #combat .hidden { display: none; }
+      #prompt small {
+        display: block;
+        margin-top: 10px;
+        font-size: 11px;
+        letter-spacing: 1px;
+        opacity: 0.55;
+      }
+    </style>
+  </head>
+  <body class="menu">
+    <canvas id="game"></canvas>
+
+    <div class="hud">
+      <div id="scoreboard" class="panel hidden">
+        <span class="team" id="s-team0"><span class="tag" id="s-tag0">TEAM A</span><b class="score" id="s-score0">0</b></span>
+        <span class="clock" id="s-clock">--:--</span>
+        <span class="team" id="s-team1"><b class="score" id="s-score1">0</b><span class="tag" id="s-tag1">TEAM B</span></span>
+      </div>
+
+      <div id="outside"></div>
+      <div id="hurt"></div>
+      <div id="hitdir"></div>
+      <div id="damage"></div>
+      <div id="tip"></div>
+
+      <div id="killfeed"></div>
+
+      <div id="zone" class="panel hidden">ZONE</div>
+
+      <div id="telemetry" class="panel debug">
+        <div class="row"><span>STATE</span><b id="t-state">GROUND</b></div>
+        <div class="row"><span>FPS</span><b id="t-fps">–</b></div>
+      </div>
+
+      <pre id="perf" class="panel debug" title="Click to copy">measuring…</pre>
+
+      <div id="net" class="panel debug">
+        <div class="row"><span>STATUS</span><b id="t-status">–</b></div>
+        <div class="row"><span>PLAYERS</span><b id="t-players">–</b></div>
+        <div class="row"><span>PING</span><b id="t-ping">–</b></div>
+        <div class="row"><span>JITTER</span><b id="t-jitter">–</b></div>
+        <div class="row"><span>LATENCY</span><b id="t-latency">–</b></div>
+        <div class="row"><span>WORLD LAG</span><b id="t-world">–</b></div>
+      </div>
+
+      <div id="combat" class="panel">
+        <div class="label"><span><span class="key-hint" id="c-key">LMB</span><span id="c-weapon">RIFLE</span></span><span id="c-ammo">30 / 30</span></div>
+        <div class="bar"><i id="c-ammo-fill"></i></div>
+        <div class="weapon2 hidden" id="c-weapon2-row">
+          <div class="label"><span><span class="key-hint">RMB</span><span id="c-weapon2">RPG</span></span><span id="c-ammo2">READY</span></div>
+          <div class="bar"><i id="c-ammo2-fill"></i></div>
+        </div>
+        <div class="row" id="c-health-row"><span>HEALTH</span><b id="c-health">100</b></div>
+        <div class="row"><span>HULL</span><b id="c-hull">1200</b></div>
+        <div class="bar hull"><i id="c-hull-fill"></i></div>
+        <div class="row repairing" id="c-repairing">REPAIRING</div>
+        <div class="row parts">
+          <span>ENGINE</span><i class="pip" id="c-engine"></i>
+          <span>TYRES</span><i class="pip" id="c-tyres"></i>
+        </div>
+      </div>
+
+
+      <div id="speed" class="panel">
+        <div class="label">SPEED</div>
+        <div><span class="value" id="speed-value">0</span><span class="unit">km/h</span></div>
+        <div class="boost-label"><span>BOOST</span><span id="boost-pct">50%</span></div>
+        <div class="bar"><i id="boost-fill"></i></div>
+      </div>
+
+      <div id="controls" class="panel hidden">
+        <div><span class="key">W / S</span>throttle · brake</div>
+        <div><span class="key">A / D</span>steer</div>
+        <div><span class="key">SPACE</span>handbrake · drift</div>
+        <div><span class="key">SHIFT</span>boost</div>
+        <div><span class="key">MOUSE</span>look</div>
+      </div>
+
+      <div id="board" class="panel hidden"></div>
+
+      <div id="banner" class="hidden">
+        <div class="title" id="banner-title"></div>
+        <div class="sub" id="banner-sub"></div>
+        <button id="banner-button" class="hidden">REMATCH</button>
+      </div>
+
+      <div id="standby">
+        <div class="sb-card">
+          <div class="sb-logo">YovNok<span>TV</span></div>
+          <div class="sb-title">PLEASE STAND BY</div>
+          <div class="sb-sub">tonight's broadcast begins shortly</div>
+          <div class="bar"><i id="standby-fill"></i></div>
+          <div id="standby-text">tuning in</div>
+        </div>
+      </div>
+
+      <div id="join" class="hidden">
+        <div class="hero-side">
+          <div class="kicker">LIVE · YovNok TV</div>
+          <div class="title">CONVOY</div>
+          <div class="sub">twelve armed cars · one survivor</div>
+          <nav class="menu">
+            <button id="join-button" class="menu-item primary">PLAY</button>
+            <button id="join-garage" class="menu-item" data-panel="cosmetics">GARAGE</button>
+            <button id="join-settings" class="menu-item" data-panel="settings">SETTINGS</button>
+            <button id="join-credits" class="menu-item" data-panel="credits">CREDITS</button>
+          </nav>
+          <div id="touch-note" class="touch-note hidden">
+            CONVOY needs a <b>keyboard and mouse</b> for now — touch and gamepad controls aren't supported yet.
+            Open it on a computer to play; the garage is yours to browse here.
+          </div>
+          <div class="callsign-line">driving as <b id="callsign-show">—</b><button id="callsign-edit">change</button></div>
+        </div>
+        <div class="hero-panel" id="join-panels">
+          <div id="cosmetics" class="drawer hidden">
+            <div class="cos-head"><span>GARAGE</span><span id="cos-stats">0 matches · 0 kills · 0 wins</span></div>
+            <div class="cos-row"><span class="cos-label">PAINT</span><div class="cos-options" id="cos-livery"></div></div>
+          </div>
+          <div id="settings" class="drawer hidden">
+            <div class="cos-head"><span>SETTINGS</span></div>
+            <div class="set-row">
+              <span class="cos-label">CALLSIGN</span>
+              <div class="set-line"><input id="callsign-input" maxlength="16" spellcheck="false" autocomplete="off" /><button id="callsign-random" class="chip" title="Random callsign">↻</button></div>
+            </div>
+            <div class="set-row"><span class="cos-label">SOUND</span><button id="join-sound" class="chip">SOUND OFF</button></div>
+            <div class="set-row"><span class="cos-label">GRAPHICS</span><button id="join-quality" class="chip">QUALITY HIGH</button></div>
+          </div>
+          <div id="credits" class="drawer hidden">
+            <div class="cos-head"><span>CREDITS</span></div>
+            <div id="credits-list"></div>
+            <div class="note">CONVOY is free software under GPL-3.0-or-later —
+              <a href="https://github.com/Kpoke/convoy" target="_blank" rel="noopener">source on GitHub</a>.
+              Third-party assets are redistributed under their own licences, listed above.</div>
+          </div>
+        </div>
+        <div class="hero-hint">drag to turn the car</div>
+        <a class="hero-source" href="https://github.com/Kpoke/convoy" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          <span>open source · GPL-3.0 · on GitHub</span>
+        </a>
+      </div>
+
+      <div id="pause" class="hidden">
+        <div class="hero-side">
+          <div class="kicker">LIVE · THE MATCH GOES ON</div>
+          <div class="pause-title">MENU</div>
+          <div class="pause-note">your car coasts while this is open</div>
+          <nav class="menu">
+            <button id="pause-resume" class="menu-item primary">RESUME</button>
+            <button id="pause-settings" class="menu-item" data-panel="settings">SETTINGS</button>
+            <button id="pause-controls" class="menu-item" data-panel="controls-panel">CONTROLS</button>
+            <button id="pause-leave" class="menu-item danger">LEAVE MATCH</button>
+          </nav>
+        </div>
+        <div class="hero-panel" id="pause-panels">
+          <div id="controls-panel" class="drawer hidden">
+            <div class="cos-head"><span>CONTROLS</span></div>
+            <div class="keys">
+              <span><kbd>W</kbd> <kbd>S</kbd></span><span>throttle · brake / reverse</span>
+              <span><kbd>A</kbd> <kbd>D</kbd></span><span>steer</span>
+              <span><kbd>Space</kbd></span><span>handbrake</span>
+              <span><kbd>Shift</kbd></span><span>boost</span>
+              <span>mouse</span><span>aim</span>
+              <span>left click</span><span>twin machine guns</span>
+              <span>right click</span><span>roof RPG</span>
+              <span><kbd>R</kbd></span><span>reload</span>
+              <span><kbd>Esc</kbd></span><span>this menu</span>
+              <span><kbd>F3</kbd> / <kbd>`</kbd></span><span>performance overlay</span>
+            </div>
+            <div class="cos-head pad-head"><span>GAMEPAD</span></div>
+            <div class="keys">
+              <span>left stick</span><span>steer</span>
+              <span><kbd>RT</kbd> <kbd>LT</kbd></span><span>throttle · brake / reverse</span>
+              <span>right stick</span><span>aim</span>
+              <span><kbd>RB</kbd></span><span>twin machine guns</span>
+              <span><kbd>LB</kbd></span><span>roof RPG</span>
+              <span><kbd>X</kbd></span><span>handbrake</span>
+              <span><kbd>B</kbd> / <kbd>L3</kbd></span><span>boost</span>
+              <span><kbd>Y</kbd></span><span>reload</span>
+              <span><kbd>Start</kbd></span><span>this menu · D-pad + <kbd>A</kbd>/<kbd>B</kbd> to choose</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="loading" class="hidden">
+        <div class="kicker">GOING LIVE</div>
+        <div class="bar"><i id="loading-fill"></i></div>
+        <div id="loading-text">loading</div>
+      </div>
+
+      <div id="crosshair"></div>
+      <!-- Where each car-mounted weapon will actually hit (see Hud.setReticles). -->
+      <div id="reticle-0" class="reticle primary hidden"></div>
+      <div id="reticle-1" class="reticle secondary hidden"></div>
+      <div id="killconfirm"></div>
+      <div id="hitflash"></div>
+      <div id="hitmarker"></div>
+
+      <div id="prompt">
+        CLICK TO DRIVE
+        <small>mouse to look · esc to release</small>
+      </div>
+    </div>
+
+    <script type="module" src="/src/client/main.ts"></script>
+  </body>
+</html>
