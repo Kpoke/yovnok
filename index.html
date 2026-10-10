@@ -2,7 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <!-- Phones: installable full screen, landscape (Add to Home Screen). -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#050608" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>YOVNOK</title>
     <style>
       :root {
@@ -581,9 +587,6 @@
         margin-left: 8px; font: inherit; font-size: 10px; color: var(--accent); background: none; border: 0; cursor: pointer; pointer-events: auto;
       }
       .hero-panel { align-self: center; cursor: default; }
-      .touch-note { margin-top: 18px; max-width: 320px; font-size: 11px; line-height: 1.7; letter-spacing: 1px; opacity: 0.8; }
-      .touch-note b { color: var(--accent); font-weight: 600; }
-      .touch-note.hidden { display: none; }
       .hero-hint { position: absolute; right: 5vw; bottom: 4vh; font-size: 10px; letter-spacing: 3px; opacity: 0.4; }
       /* The source link: a caption, like the drag hint, opposite it. */
       .hero-source {
@@ -690,6 +693,53 @@
         font: inherit; font-size: 10px; padding: 2px 6px; border: 1px solid var(--edge); border-radius: 3px; background: rgba(255, 255, 255, 0.06);
       }
 
+      /* ---- touch: on-screen controls, landscape only ---- */
+      body.touch { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+      #touch { position: absolute; inset: 0; z-index: 12; pointer-events: none; }
+      #touch.hidden { display: none; }
+      #touch .touch-zone { position: absolute; top: 0; bottom: 0; pointer-events: auto; }
+      #touch .touch-zone.left { left: 0; width: 42%; }
+      #touch .touch-zone.right { right: 0; width: 58%; }
+      #touch .stick-base {
+        position: absolute; width: 124px; height: 124px; margin: -62px 0 0 -62px; border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.28); background: rgba(10, 12, 16, 0.25); pointer-events: none;
+      }
+      #touch .stick-base.hidden { display: none; }
+      #touch .stick-knob {
+        position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; border-radius: 50%;
+        background: rgba(255, 138, 61, 0.75); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+      }
+      #touch .touch-btn {
+        position: absolute; pointer-events: auto; border-radius: 50%; font: inherit; font-weight: 700; letter-spacing: 1px;
+        color: #fff; background: rgba(10, 12, 16, 0.42); border: 2px solid rgba(255, 255, 255, 0.35);
+        display: flex; align-items: center; justify-content: center; touch-action: none;
+      }
+      #touch .touch-btn.held { background: rgba(255, 138, 61, 0.55); border-color: var(--accent); }
+      #touch .fire { right: max(24px, env(safe-area-inset-right)); bottom: 28px; width: 92px; height: 92px; font-size: 16px; border-color: rgba(255, 138, 61, 0.8); }
+      #touch .fire2 { right: calc(max(24px, env(safe-area-inset-right)) + 14px); bottom: 136px; width: 66px; height: 66px; font-size: 13px; }
+      #touch .boost { right: calc(max(24px, env(safe-area-inset-right)) + 108px); bottom: 22px; width: 62px; height: 62px; font-size: 10px; }
+      #touch .drift { right: calc(max(24px, env(safe-area-inset-right)) + 110px); bottom: 96px; width: 56px; height: 56px; font-size: 10px; }
+      #touch .reload { right: calc(max(24px, env(safe-area-inset-right)) + 94px); bottom: 164px; width: 44px; height: 44px; font-size: 18px; }
+      #touch .menu { left: max(14px, env(safe-area-inset-left)); top: 12px; width: 44px; height: 44px; border-radius: 8px; font-size: 20px; }
+      /* On touch, the desktop-only cues go. */
+      body.touch #prompt, body.touch .hero-hint, body.touch #controls-hint { display: none !important; }
+
+      /* Portrait phone: ask for landscape. */
+      #rotate { display: none; }
+      @media (orientation: portrait) {
+        body.touch #rotate {
+          position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center;
+          justify-content: center; gap: 18px; padding: 24px; text-align: center; background: #050608; color: #e8edf2;
+        }
+        body.touch #rotate .phone {
+          width: 46px; height: 78px; border: 3px solid var(--accent); border-radius: 9px;
+          animation: turn 1.8s ease-in-out infinite;
+        }
+        body.touch #rotate .title { font-size: 22px; font-weight: 800; letter-spacing: 0.2em; }
+        body.touch #rotate .note { font-size: 12px; letter-spacing: 1px; opacity: 0.7; line-height: 1.7; max-width: 300px; }
+      }
+      @keyframes turn { 0%, 30% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
+
       /* ---- a new map loading under a live connection ---- */
       #map-loading {
         position: absolute; inset: 0; z-index: 17; display: flex; flex-direction: column; align-items: center;
@@ -761,7 +811,7 @@
       #pause.hidden { display: none; }
       .pause-title { margin-top: 10px; font-size: clamp(36px, 4.4vw, 60px); font-weight: 800; letter-spacing: 0.14em; }
       .pause-note { margin-top: 8px; font-size: 10px; letter-spacing: 2px; opacity: 0.55; }
-      body.paused #hud > *:not(#pause):not(#killfeed):not(#zone) { visibility: hidden; }
+      body.paused .hud > *:not(#pause):not(#killfeed):not(#zone) { visibility: hidden; }
 
       /* ---- loading: after PLAY, joining the match ---- */
       #loading {
@@ -790,6 +840,28 @@
         .hero-hint { display: none; }
         .hero-source { position: static; margin-top: 4px; }
       }
+
+      /* Landscape phones: a compact title, menu and panels side by side. */
+      @media (max-height: 520px) and (min-width: 600px) {
+        #join, #pause {
+          grid-template-columns: minmax(200px, 260px) minmax(0, 380px) 1fr;
+          padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(18px, env(safe-area-inset-left));
+          gap: 18px;
+          align-items: start;
+        }
+        #join .title { margin-top: 4px; font-size: 32px; }
+        .menu { margin-top: 10px; gap: 0; }
+        .menu-item { padding: 5px 0 5px 20px; font-size: 12px; letter-spacing: 4px; }
+        .menu-item.primary { margin-bottom: 8px; padding: 9px 34px 9px 20px; font-size: 16px; }
+        .play-choices { margin: -4px 0 6px 2px; }
+        .menu-item.choice small { margin-top: 1px; }
+        .callsign-line { margin-top: 8px; }
+        .hero-source { position: static; margin-top: 8px; }
+        .drawer { max-height: calc(100vh - 28px); padding: 12px 14px; }
+        #room-lobby { padding: 10px; }
+      }
+      /* Touch, in a match: the kill feed moves left, clear of the fire buttons. */
+      body.touch #killfeed { right: auto; left: max(14px, env(safe-area-inset-left)); top: 66px; align-items: flex-start; font-size: 10px; }
 
       /* ---- centre: click-to-play ---- */
       /* Aiming: a centre crosshair, and a hitmarker that flashes on a confirm. */
@@ -930,6 +1002,11 @@
     </style>
   </head>
   <body class="menu">
+    <div id="rotate">
+      <div class="phone"></div>
+      <div class="title">TURN YOUR PHONE</div>
+      <div class="note">YOVNOK plays sideways. Turn your phone to landscape — and for the full screen, add it to your home screen.</div>
+    </div>
     <canvas id="game"></canvas>
 
     <div class="hud">
@@ -1030,10 +1107,6 @@
             <button id="join-settings" class="menu-item" data-panel="settings">SETTINGS</button>
             <button id="join-credits" class="menu-item" data-panel="credits">CREDITS</button>
           </nav>
-          <div id="touch-note" class="touch-note hidden">
-            YOVNOK needs a <b>keyboard and mouse</b> for now — touch and gamepad controls aren't supported yet.
-            Open it on a computer to play; the garage is yours to browse here.
-          </div>
           <div class="callsign-line">driving as <b id="callsign-show">—</b><button id="callsign-edit">change</button></div>
         </div>
         <div class="hero-panel" id="join-panels">

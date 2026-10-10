@@ -11,6 +11,7 @@
 
 import { clamp, damp } from '../shared/math';
 import type { VehicleInput } from '../shared/vehicle';
+import { TouchControls } from './touch';
 
 const STEER_RATE = 9; // how fast the steering wheel reaches full lock
 const STEER_RETURN_RATE = 14; // how fast it self-centres
@@ -85,6 +86,17 @@ export class Input {
   };
   private menuPressed = false;
   private navQueue: PadNav[] = [];
+  /** On-screen controls, on a touch device (null elsewhere). */
+  touch: TouchControls | null = null;
+
+  /** Add the on-screen touch controls; they aim the same view the mouse does. */
+  attachTouch(): TouchControls {
+    this.touch = new TouchControls((dYaw, dPitch) => {
+      this.lookYaw = clamp(this.lookYaw + dYaw, -Math.PI, Math.PI);
+      this.lookPitch = clamp(this.lookPitch + dPitch, -1.2, 1.2);
+    });
+    return this.touch;
+  }
 
   attach(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
@@ -211,7 +223,7 @@ export class Input {
 
   /** True once after Start was pressed. */
   consumeMenuButton(): boolean {
-    const value = this.menuPressed;
+    const value = this.menuPressed || (this.touch?.consumeMenu() ?? false);
     this.menuPressed = false;
     return value;
   }
@@ -239,6 +251,18 @@ export class Input {
     if (this.down('KeyS', 'ArrowDown')) throttleTarget -= 1;
 
     const pad = this.pad;
+    const touch = this.touch?.state;
+    if (touch && (touch.steer !== 0 || touch.throttle !== 0)) {
+      // The touch stick is analogue too.
+      this.steer = damp(this.steer, touch.steer, 20, dt);
+      this.throttle = damp(this.throttle, touch.throttle, 14, dt);
+      return {
+        throttle: this.throttle,
+        steer: this.steer,
+        handbrake: touch.handbrake,
+        boost: touch.boost,
+      };
+    }
     if (pad.steer !== 0) {
       // An analogue stick is already smooth: follow it closely, no ramp.
       this.steer = damp(this.steer, pad.steer, 24, dt);
@@ -253,44 +277,47 @@ export class Input {
     return {
       throttle: this.throttle,
       steer: this.steer,
-      handbrake: this.down('Space') || pad.handbrake,
-      boost: this.down('ShiftLeft', 'ShiftRight') || pad.boost,
+      handbrake: this.down('Space') || pad.handbrake || (touch?.handbrake ?? false),
+      boost: this.down('ShiftLeft', 'ShiftRight') || pad.boost || (touch?.boost ?? false),
     };
   }
 
   /** True while the car is being asked to slide — used for HUD feedback. */
   get wantsHandbrake(): boolean {
-    return this.down('Space') || this.pad.handbrake;
+    return this.down('Space') || this.pad.handbrake || (this.touch?.state.handbrake ?? false);
   }
 
   /** True while the trigger is held (mouse or RB). */
   get wantsFire(): boolean {
-    return this.firing || this.pad.fire;
+    return this.firing || this.pad.fire || (this.touch?.state.fire ?? false);
   }
 
   /** True once after the trigger goes down. Consumed by the caller. */
   consumeFirePress(): boolean {
-    const value = this.firePressed;
+    const value = this.firePressed || (this.touch?.firePressed ?? false);
     this.firePressed = false;
+    if (this.touch) this.touch.firePressed = false;
     return value;
   }
 
   /** True while the secondary (right-mouse) trigger is held. */
   get wantsFire2(): boolean {
-    return this.firing2 || this.pad.fire2;
+    return this.firing2 || this.pad.fire2 || (this.touch?.state.fire2 ?? false);
   }
 
   /** True once after the secondary trigger goes down. Consumed by the caller. */
   consumeFire2Press(): boolean {
-    const value = this.fire2Pressed;
+    const value = this.fire2Pressed || (this.touch?.fire2Pressed ?? false);
     this.fire2Pressed = false;
+    if (this.touch) this.touch.fire2Pressed = false;
     return value;
   }
 
   /** True once after a reload key press. */
   consumeReload(): boolean {
-    const value = this.reloadRequested;
+    const value = this.reloadRequested || (this.touch?.reloadPressed ?? false);
     this.reloadRequested = false;
+    if (this.touch) this.touch.reloadPressed = false;
     return value;
   }
 

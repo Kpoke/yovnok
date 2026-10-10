@@ -15,7 +15,7 @@ import type { CreditsSection } from '../shared/credits';
 import * as THREE from 'three';
 import { CAMERA, COMBAT, LIGHTING_PRESETS, TICK, VEHICLE, ZONE } from '../shared/config';
 import { MAPS, SPAWNS, useMap } from '../shared/arena';
-import { DEFAULT_MAP, type MapId } from '../shared/mapIds';
+import { DEFAULT_MAP, isMapId, type MapId } from '../shared/mapIds';
 import { World } from './world';
 import { localToWorld, NEUTRAL_INPUT, stepVehicle, type VehicleInput } from '../shared/vehicle';
 import { relativeAim, vehiclePointWorld } from '../shared/combat';
@@ -257,19 +257,21 @@ hud.onRandomCallsign(() => {
 });
 hud.setNames(net.names);
 
-// Phones and tablets: the game needs a keyboard and mouse (no touch controls,
-// no pointer lock on mobile). On a touch-only device, say so instead of letting
-// PLAY drop someone into a match they cannot drive. A tablet with a keyboard
-// and mouse attached reports a fine pointer too, and plays normally.
+// Phones and tablets: on-screen controls (touch.ts), played in landscape and
+// full screen. A tablet with a keyboard and mouse attached reports a fine
+// pointer too, and plays as a computer.
 const touchOnly = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
-if (touchOnly) {
-  document.getElementById('join-button')?.setAttribute('hidden', '');
-  document.getElementById('touch-note')?.classList.remove('hidden');
+if (touchOnly) document.body.classList.add('touch');
+/** Full screen, and landscape where the browser lets a page lock it (Android). */
+function goFullscreen(): void {
+  const root = document.documentElement;
+  if (document.fullscreenElement || typeof root.requestFullscreen !== 'function') return;
+  root
+    .requestFullscreen({ navigationUI: 'hide' })
+    .then(() => (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape'))
+    .catch(() => undefined);
 }
-// A controller makes any device playable — including a touch tablet.
 window.addEventListener('gamepadconnected', () => {
-  document.getElementById('join-button')?.removeAttribute('hidden');
-  document.getElementById('touch-note')?.classList.add('hidden');
   hud.showTip('Controller connected — RT drive · LT brake · RB guns · LB RPG · Start menu', 6);
 });
 
@@ -279,6 +281,7 @@ window.addEventListener('gamepadconnected', () => {
 // Joining is explicit: the page opens a menu, and only PLAY places us (or
 // creating / joining a private room).
 function startJoin(room?: string): void {
+  if (touchOnly) goFullscreen();
   // Anonymous statistics: how people play (input device and quality preset).
   net.clientInfo = {
     input: inputs.padActive || inputs.padConnected ? 'gamepad' : touchOnly ? 'touch' : 'mouse',
@@ -407,7 +410,9 @@ const partLibrary: PartLibrary = new GltfPartLibrary(
 const world = new World(scene, lighting, gltfLoader);
 // Everything the title needs, loaded behind the stand-by card: vehicle parts
 // and the first map.
-await Promise.all([partLibrary.prepare(allPartRequests()), world.show(DEFAULT_MAP)]);
+// (Development: ?map=<id> shows that map on the title, to look at it.)
+const previewMap = import.meta.env.DEV ? new URLSearchParams(location.search).get('map') : null;
+await Promise.all([partLibrary.prepare(allPartRequests()), world.show(isMapId(previewMap) ? previewMap : DEFAULT_MAP)]);
 assetsLoaded = true;
 hud.setStandby(1, 'going live');
 markAssetsReady();
@@ -425,6 +430,41 @@ const remoteLookKeys = new Map<number, string>();
 
 const inputs = new Input();
 inputs.attach(canvas);
+if (touchOnly) inputs.attachTouch();
+
+/**
+ * Aim assist, touch only: a thumb is far less precise than a mouse, so when a
+ * car is near the crosshair the view eases toward it. Gentle (it never snaps)
+ * and only within a narrow cone, so it helps aim rather than aiming for you.
+ */
+const assistForward = new THREE.Vector3();
+const assistTo = new THREE.Vector3();
+function aimAssist(dt: number): void {
+  camera.getWorldDirection(assistForward);
+  let best: { yaw: number; pitch: number } | null = null;
+  let bestScore = Infinity;
+  for (const rig of remoteCars.values()) {
+    if (!rig.root.visible) continue;
+    assistTo.copy(rig.root.position).setY(rig.root.position.y + 0.8).sub(camera.position);
+    const distance = assistTo.length();
+    if (distance < 6 || distance > 160) continue;
+    assistTo.divideScalar(distance);
+    const cos = assistForward.dot(assistTo);
+    if (cos < Math.cos(0.17)) continue; // ~10° cone
+    // Signed horizontal angle: positive = target to the left.
+    const yaw = Math.atan2(assistForward.x * assistTo.z - assistForward.z * assistTo.x, assistForward.x * assistTo.x + assistForward.z * assistTo.z);
+    const pitch = Math.asin(assistTo.y) - Math.asin(assistForward.y);
+    const score = Math.acos(Math.min(1, cos)) * (1 + distance / 200);
+    if (score < bestScore) {
+      bestScore = score;
+      best = { yaw: -yaw, pitch };
+    }
+  }
+  if (!best) return;
+  const rate = 1 - Math.exp(-3.2 * dt);
+  inputs.lookYaw += best.yaw * rate;
+  inputs.lookPitch -= best.pitch * rate * 0.6;
+}
 
 const chase = new CameraRig();
 
@@ -646,6 +686,7 @@ function frame(now: number): void {
   }
   hud.setPauseVisible(inMatch && menuOpen);
   padNavigate(inputs.drainNav());
+  if (inputs.touch && playing && !menuOpen) aimAssist(realDt);
 
   // Fixed-step PREDICTION. The server simulates at the same rate with the same
   // code, so replaying unacknowledged inputs reproduces its result.
@@ -937,7 +978,7 @@ function frame(now: number): void {
     noteDeath(crew, !net.isDead(crew), state.pos.x, state.pos.y, state.pos.z);
   }
   explosions.update(realDt);
-  world.update(realDt);
+  world.update(realDt, camera.position);
   damageFx.update(realDt, camera);
   perf.mark('fx');
 
@@ -1203,7 +1244,8 @@ function frame(now: number): void {
   }
   inputs.enabled = net.connected;
   // No CLICK TO DRIVE for a pad player: they never need the mouse.
-  hud.setPromptVisible(!inputs.locked && playing && !menuOpen && !inputs.padActive);
+  hud.setPromptVisible(!inputs.locked && playing && !menuOpen && !inputs.padActive && !inputs.touch);
+  inputs.touch?.setVisible(playing && !menuOpen);
   hud.setMatch(net.match, net.crewId, net.localRespawnIn, net.localPlacement, spectateCrew);
   hud.setBoard(net.match.phase === 'results' ? net.board : [], net.crewId);
 
@@ -1299,7 +1341,7 @@ const relock = (): void => {
 /** Close the menu and go back to driving (re-taking the mouse for a mouse player). */
 function resumeFromMenu(): void {
   setMenu(false);
-  if (!inputs.padActive) relock();
+  if (!inputs.padActive && !inputs.touch) relock();
 }
 hud.onResume(resumeFromMenu);
 hud.onLeave(() => {

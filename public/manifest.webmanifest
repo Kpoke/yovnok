@@ -1,0 +1,10 @@
+{
+  "name": "YOVNOK",
+  "short_name": "YOVNOK",
+  "description": "A vehicle-combat battle royale in the browser.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#050608",
+  "theme_color": "#050608"
+}
