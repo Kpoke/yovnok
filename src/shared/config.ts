@@ -682,9 +682,10 @@ export const CAMERA = {
    * frame, and the crosshair is the world.
    */
   // Sized for the brawler (1.4 m tall plus a 0.5 m roof station): the sight
-  // line clears the station, so the crosshair is never on it.
-  soloDistance: 7.2,
-  soloHeight: 2.7,
+  // line clears the station, so the crosshair is never on it. Close enough
+  // that the car fills the lower third of the frame.
+  soloDistance: 6.0,
+  soloHeight: 2.5,
   /** How far ahead the camera looks. Larger flattens the aim feel. */
   soloLookAhead: 26,
   /**
