@@ -163,13 +163,17 @@ npm run assetcheck -- public/assets/vehicles/truck/chassis.glb chassis suv --tie
 npm run licensecheck -- --write
 ```
 
+Textures are encoded by the Khronos Group's
+[KTX-Software](https://github.com/KhronosGroup/KTX-Software) (4.3 or later):
+its `ktx` command must be on `PATH` when `assetbuild` runs.
+
 What `assetbuild` does:
 
 | Step | Result |
 |---|---|
 | clean-up | dedup, prune, weld — no visual change |
 | LODs | `lod0` (full), `lod1` (~35%), `lod2` (~10%, mesh permitting), as the scene's root nodes |
-| textures | resized to ≤ `maxTexture` px and converted to **KTX2** with mipmaps: normal maps UASTC (normal-map mode, RDO, zstd); occlusion/roughness/metal maps UASTC or ETC1S (`dataCodec`); colour ETC1S |
+| textures | resized to ≤ `maxTexture` px and converted to **KTX2** with mipmaps: normal maps UASTC (zstd); occlusion/roughness/metal maps UASTC or ETC1S (`dataCodec`); colour ETC1S |
 | geometry | quantised + `EXT_meshopt_compression` |
 
 Optional sidecar `assets-src/…/<name>.asset.json`:

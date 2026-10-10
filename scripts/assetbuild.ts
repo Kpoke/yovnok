@@ -48,7 +48,7 @@ import {
   unpartition,
   weld,
 } from '@gltf-transform/functions';
-import { ktx2 } from 'ktx2-encoder/gltf-transform';
+import { Mode, toktx } from '@gltf-transform/cli';
 import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 import { PART_ASSET_SPECS } from '../src/shared/assetSpec';
@@ -116,12 +116,6 @@ export async function createIO(): Promise<NodeIO> {
     'meshopt.decoder': MeshoptDecoder,
     'meshopt.encoder': MeshoptEncoder,
   });
-}
-
-/** Decode PNG/JPEG/WebP to raw RGBA for the Basis encoder. */
-async function decodeImage(buffer: Uint8Array): Promise<{ width: number; height: number; data: Uint8Array }> {
-  const { data, info } = await sharp(buffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  return { width: info.width, height: info.height, data: new Uint8Array(data) };
 }
 
 export function countTriangles(doc: Document, root?: Node): number {
@@ -285,14 +279,15 @@ export async function buildDocument(doc: Document, options: BuildOptions): Promi
     );
     if (options.ktx2) {
       await doc.transform(
-        // Normal maps: UASTC, tuned for normals. RDO (rate-distortion
-        // optimisation) spends quality where it cannot be seen so zstd can
-        // compress far better: the 2K arena materials went from ~10 MB each.
-        ktx2({ slots: NORMAL_SLOTS, isUASTC: true, isNormalMap: true, isPerceptual: false, enableRDO: true, rdoQualityLevel: 1.5, needSupercompression: true, generateMipmap: true, enableDebug: false, imageDecoder: decodeImage }),
+        // KTX-Software's `ktx create` (Khronos), driven by glTF-Transform.
+        // Normal maps: UASTC with zstd. Other data maps: ETC1S, or UASTC with
+        // RDO (rate-distortion optimisation spends quality where it cannot be
+        // seen, so zstd compresses far better). Colour: ETC1S.
+        toktx({ encoder: sharp, mode: Mode.UASTC, slots: NORMAL_SLOTS, level: 2, zstd: 18 }),
         options.dataCodec === 'etc1s'
-          ? ktx2({ slots: ORM_SLOTS, isUASTC: false, isPerceptual: false, qualityLevel: 200, generateMipmap: true, enableDebug: false, imageDecoder: decodeImage })
-          : ktx2({ slots: ORM_SLOTS, isUASTC: true, isPerceptual: false, enableRDO: true, rdoQualityLevel: 1.5, needSupercompression: true, generateMipmap: true, enableDebug: false, imageDecoder: decodeImage }),
-        ktx2({ slots: COLOUR_SLOTS, isUASTC: false, qualityLevel: 230, generateMipmap: true, enableDebug: false, imageDecoder: decodeImage }),
+          ? toktx({ encoder: sharp, mode: Mode.ETC1S, slots: ORM_SLOTS, quality: 200 })
+          : toktx({ encoder: sharp, mode: Mode.UASTC, slots: ORM_SLOTS, level: 2, rdo: true, rdoLambda: 1.5, zstd: 18 }),
+        toktx({ encoder: sharp, mode: Mode.ETC1S, slots: COLOUR_SLOTS, quality: 230 }),
       );
     }
   }
@@ -324,12 +319,6 @@ function listSources(dir: string, out: string[] = []): string[] {
 const kb = (bytes: number): string => `${(bytes / 1024).toFixed(0)} KB`;
 
 async function main(): Promise<number> {
-  // The Basis encoder prints per-mip debug lines regardless of `enableDebug`.
-  const log = console.log;
-  console.log = (...args: unknown[]) => {
-    if (typeof args[0] === 'string' && /^(Total slices|Slice: )/.test(args[0])) return;
-    log(...args);
-  };
   const io = await createIO();
   const only = process.argv.slice(2).filter((a) => !a.startsWith('--'));
   const sources = only.length > 0 ? only.map((p) => join(SRC, p)) : listSources(SRC);
