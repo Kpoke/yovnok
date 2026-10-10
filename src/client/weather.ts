@@ -33,9 +33,10 @@ export class Weather {
   private readonly phases: Float32Array;
   private time = 0;
 
-  constructor(kind: Exclude<WeatherKind, 'none'>) {
+  /** @param scale fewer particles at lower detail (0..1) */
+  constructor(kind: Exclude<WeatherKind, 'none'>, scale = 1) {
     this.kind = kind;
-    this.settings = SETTINGS[kind];
+    this.settings = { ...SETTINGS[kind], count: Math.max(20, Math.round(SETTINGS[kind].count * scale)) };
     const { count, half } = this.settings;
     const rain = kind === 'rain';
     // Rain is a short streak (two vertices); the rest are points.

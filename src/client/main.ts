@@ -660,10 +660,12 @@ window.addEventListener('resize', () => {
     lighting.applyQuality(next);
     saveQuality(next);
     label();
+    world.rebuild();
   });
   // HIGH steps itself down if a match cannot hold the frame rate; say so.
   lighting.onAutoDowngrade = (quality) => {
     label();
+    world.rebuild();
     hud.showTip(`Quality lowered to ${quality.toUpperCase()} to keep the frame rate up`, 5);
   };
 }

@@ -40,10 +40,12 @@ export class World {
     scene.add(this.sky, this.group);
   }
 
-  /** True while a map change is still loading. */
+  /** True while a map CHANGE is still loading (a quality rebuild is not one). */
   get loading(): boolean {
-    return this.building !== null;
+    return this.building !== null && !this.quiet;
   }
+  /** Rebuilding the same map for a quality change: no loading card. */
+  private quiet = false;
 
   /** Per frame: animate the scenery (crowd, screens, weather). */
   update(dt: number, view: THREE.Vector3): void {
@@ -67,6 +69,17 @@ export class World {
     ]);
   }
 
+  /** Rebuild the current map (the quality setting changed: more or less scenery). */
+  rebuild(): void {
+    const id = this.mapId;
+    if (!id) return;
+    this.mapId = null;
+    this.quiet = true;
+    void this.show(id).finally(() => {
+      this.quiet = false;
+    });
+  }
+
   /** Show a map (resolves once it is on screen). A newer call wins. */
   async show(id: MapId): Promise<void> {
     if (id === this.mapId && this.building === null) return;
@@ -83,7 +96,7 @@ export class World {
     useMap(id);
     setSurfaces(theme.surfaces);
     const arena = buildArena({ containers: theme.containers, skip: new Set(theme.skip ?? []) });
-    const [dressing] = await Promise.all([theme.dressing(this.loader), applyArenaSurfaces(arena, this.loader)]);
+    const [dressing] = await Promise.all([theme.dressing(this.loader, this.lighting.current), applyArenaSurfaces(arena, this.loader)]);
     const objects = dressing.flatMap((d) => d.objects);
     if (generation !== this.generation) {
       dispose(arena);

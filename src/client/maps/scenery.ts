@@ -177,7 +177,10 @@ function needleTexture(snowy: boolean): THREE.CanvasTexture {
  * Pine trees, instanced: a trunk and three stacked cones of needles. `points`
  * give each tree's base and height. Two draw calls however many trees.
  */
-export function pines(points: Array<{ x: number; z: number; y?: number; h: number }>, options: { snowy?: boolean; trunks?: boolean; seed?: number } = {}): THREE.Group {
+export function pines(
+  points: Array<{ x: number; z: number; y?: number; h: number }>,
+  options: { snowy?: boolean; trunks?: boolean; seed?: number; shadows?: boolean } = {},
+): THREE.Group {
   const group = new THREE.Group();
   group.name = 'pines';
   const cones: THREE.BufferGeometry[] = [];
@@ -219,7 +222,8 @@ export function pines(points: Array<{ x: number; z: number; y?: number; h: numbe
   for (const mesh of [canopyMesh, trunkMesh]) {
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
-    mesh.castShadow = true;
+    // Thousands of trees in the shadow pass is the heaviest thing on a phone.
+    mesh.castShadow = options.shadows ?? true;
     mesh.receiveShadow = true;
     mesh.raycast = () => {};
   }

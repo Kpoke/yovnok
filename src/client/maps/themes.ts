@@ -17,6 +17,16 @@ import { boxes, lampPosts, outerRock, pines, ringPoints, rocks, seeded, solidsOf
 
 export type Weather = 'none' | 'dust' | 'rain' | 'snow' | 'mist';
 
+/**
+ * How much scenery to build: the graphics quality setting. Low (phones) draws
+ * about a third of the trees, fans, outer rocks and weather particles, and only
+ * the arena itself casts shadows; High draws all of it.
+ */
+export type Detail = 'low' | 'medium' | 'high';
+/** Scale a count by the detail level. */
+export const amount = (n: number, detail: Detail): number =>
+  Math.round(n * (detail === 'low' ? 0.35 : detail === 'medium' ? 0.7 : 1));
+
 /** Something happened in the arena that the scenery may react to. */
 export type WorldEvent = { kind: 'kill' | 'blast'; x: number; z: number; label?: string };
 
@@ -34,13 +44,13 @@ export type MapTheme = {
   containers: boolean;
   /** Palette roles drawn by the scenery instead of as plain boxes. */
   skip?: number[];
-  /** Scenery: everything drawn beyond the solids themselves. */
-  dressing: (loader: GLTFLoader) => Promise<Dressing[]>;
+  /** Scenery: everything drawn beyond the solids themselves, at a level of detail. */
+  dressing: (loader: GLTFLoader, detail: Detail) => Promise<Dressing[]>;
 };
 
 /** Weather as a dressing: built for the map, following the camera. */
-function weather(kind: Exclude<Weather, 'none'>): Dressing {
-  const fx = new WeatherFx(kind);
+function weather(kind: Exclude<Weather, 'none'>, detail: Detail): Dressing {
+  const fx = new WeatherFx(kind, detail === 'low' ? 0.35 : detail === 'medium' ? 0.7 : 1);
   return { objects: [fx.object], update: (dt, view) => fx.update(dt, view) };
 }
 
@@ -56,7 +66,7 @@ const matte = (material: string, tile: number, tint?: number) => ({ material, ti
 export const THEMES: Record<MapId, MapTheme> = {
   stadium: {
     containers: true,
-    dressing: async (loader) => [buildStadium(), { objects: [await buildProps(loader)] }],
+    dressing: async (loader, detail) => [buildStadium(detail), { objects: [await buildProps(loader)] }],
   },
 
   canyon: {
@@ -76,16 +86,16 @@ export const THEMES: Record<MapId, MapTheme> = {
       pad: { material: 'sandstone_cracks', tile: 6, tint: 0xe8b090 },
       hazard: { material: 'brown_mud_03', tile: 4, tint: 0x302018, wet: true },
     },
-    dressing: async () => [
+    dressing: async (_loader, detail) => [
       {
         objects: [
           rocks(SOLIDS, PALETTE.rock, 1.4),
           // Canyon walls all round, and buttes further out.
-          outerRock(PALETTE.rock, { inner: STADIUM_HALF + 6, outer: STADIUM_HALF + 70, height: [26, 62], count: 90, seed: 3 }),
-          outerRock(PALETTE.rock, { inner: STADIUM_HALF + 120, outer: STADIUM_HALF + 260, height: [40, 110], count: 40, seed: 4 }),
+          outerRock(PALETTE.rock, { inner: STADIUM_HALF + 6, outer: STADIUM_HALF + 70, height: [26, 62], count: amount(90, detail), seed: 3 }),
+          outerRock(PALETTE.rock, { inner: STADIUM_HALF + 120, outer: STADIUM_HALF + 260, height: [40, 110], count: amount(40, detail), seed: 4 }),
         ],
       },
-      weather('dust'),
+      weather('dust', detail),
     ],
   },
 
@@ -103,7 +113,7 @@ export const THEMES: Record<MapId, MapTheme> = {
       building: { material: 'corrugated_iron', tile: 6, tint: 0x7f8f9d },
       hazard: { material: 'brown_mud_03', tile: 4, tint: 0x15161a, glossy: true },
     },
-    dressing: async () => {
+    dressing: async (_loader, detail) => {
       const yellow = new THREE.MeshStandardMaterial({ color: 0xd4a017, metalness: 0.5, roughness: 0.5 });
       const steel = new THREE.MeshStandardMaterial({ color: 0x3a4048, metalness: 0.6, roughness: 0.5 });
       const crane: Array<[number, number, number, number, number, number]> = [];
@@ -175,7 +185,7 @@ export const THEMES: Record<MapId, MapTheme> = {
             ),
           ],
         },
-        weather('rain'),
+        weather('rain', detail),
       ];
     },
   },
@@ -195,7 +205,7 @@ export const THEMES: Record<MapId, MapTheme> = {
       building: { material: 'corrugated_iron', tile: 6, tint: 0xb4c0ca },
       wall: { material: 'concrete_wall_007', tile: 5, tint: 0xe0e4e8 },
     },
-    dressing: async () => {
+    dressing: async (_loader, detail) => {
       const metal = new THREE.MeshStandardMaterial({ color: 0xc8d0d6, metalness: 0.6, roughness: 0.4 });
       const dark = new THREE.MeshStandardMaterial({ color: 0x2c3036, metalness: 0.4, roughness: 0.6 });
       const group = new THREE.Group();
@@ -252,8 +262,8 @@ export const THEMES: Record<MapId, MapTheme> = {
       }
       // Snowy pines all round, outside the fence.
       const rand = seeded(17);
-      const trees = ringPoints(rand, STADIUM_HALF + 10, STADIUM_HALF + 190, 700).map((p) => ({ ...p, h: 14 + rand() * 14 }));
-      return [{ objects: [group, pines(trees, { snowy: true, seed: 5 })] }, weather('snow')];
+      const trees = ringPoints(rand, STADIUM_HALF + 10, STADIUM_HALF + 190, amount(700, detail)).map((p) => ({ ...p, h: 14 + rand() * 14 }));
+      return [{ objects: [group, pines(trees, { snowy: true, seed: 5, shadows: detail === 'high' })] }, weather('snow', detail)];
     },
   },
 
@@ -275,7 +285,7 @@ export const THEMES: Record<MapId, MapTheme> = {
       pad: { material: 'concrete_floor_worn_001', tile: 6 },
       hazard: { material: 'brown_mud_03', tile: 4, tint: 0x6a5a40, wet: true },
     },
-    dressing: async () => {
+    dressing: async (_loader, detail) => {
       const steel = new THREE.MeshStandardMaterial({ color: 0x6b5a48, metalness: 0.5, roughness: 0.6 });
       const belt: Array<[number, number, number, number, number, number]> = [];
       const group = new THREE.Group();
@@ -298,10 +308,10 @@ export const THEMES: Record<MapId, MapTheme> = {
             group,
             boxes(belt, steel, 'crusher-hoppers'),
             // The pit's faces climbing away in benches.
-            outerRock(PALETTE.rock, { inner: STADIUM_HALF + 4, outer: STADIUM_HALF + 130, height: [24, 52], count: 110, seed: 8, steps: true }),
+            outerRock(PALETTE.rock, { inner: STADIUM_HALF + 4, outer: STADIUM_HALF + 130, height: [24, 52], count: amount(110, detail), seed: 8, steps: true }),
           ],
         },
-        weather('dust'),
+        weather('dust', detail),
       ];
     },
   },
@@ -325,7 +335,7 @@ export const THEMES: Record<MapId, MapTheme> = {
       pad: { material: 'concrete_floor_worn_001', tile: 6, tint: 0xb0a890 },
       hazard: { material: 'brown_mud_03', tile: 4, tint: 0x4a3a26, wet: true },
     },
-    dressing: async () => {
+    dressing: async (_loader, detail) => {
       const rand = seeded(21);
       // A pine on every trunk in the arena (the trunk is its collision)...
       const inside = solidsOf(SOLIDS, PALETTE.trunk).map((s) => ({
@@ -334,8 +344,8 @@ export const THEMES: Record<MapId, MapTheme> = {
         h: 22 + rand() * 10,
       }));
       // ...and a dense forest beyond the arena's edge.
-      const outside = ringPoints(rand, STADIUM_HALF + 4, STADIUM_HALF + 190, 1500).map((p) => ({ ...p, h: 20 + rand() * 14 }));
-      return [{ objects: [rocks(SOLIDS, PALETTE.rock, 0.6), pines([...inside, ...outside], { seed: 6 })] }, weather('mist')];
+      const outside = ringPoints(rand, STADIUM_HALF + 4, STADIUM_HALF + 190, amount(1500, detail)).map((p) => ({ ...p, h: 20 + rand() * 14 }));
+      return [{ objects: [rocks(SOLIDS, PALETTE.rock, 0.6), pines([...inside, ...outside], { seed: 6, shadows: detail !== 'low' })] }, weather('mist', detail)];
     },
   },
 };

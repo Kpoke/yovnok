@@ -25,7 +25,7 @@ import { PALETTE } from '../shared/config';
 import { surfaceOf } from './arenaSurfaces';
 import { appendGeometry, batchMesh } from './buildArena';
 import { ParticlePool, softTexture } from './explosions';
-import type { Dressing, WorldEvent } from './maps/themes';
+import type { Detail, Dressing, WorldEvent } from './maps/themes';
 
 /** The barrier's thickness; the stands start right behind it. */
 const BARRIER = 1.5;
@@ -124,10 +124,11 @@ function inTunnel(along: number, row: number): boolean {
 
 // ============================================================================
 
-export function buildStadium(): Dressing {
+export function buildStadium(detail: Detail = 'high'): Dressing {
   const group = new THREE.Group();
   group.name = 'stadium';
-  const crowdRig = crowd();
+  // Fewer fans at lower detail (the empty seats are still drawn).
+  const crowdRig = crowd(detail === 'low' ? 0.4 : detail === 'medium' ? 0.7 : 1);
   const screens = bigScreens();
   const ribbon = ledRibbon();
   const jets = flameJets();
@@ -506,7 +507,7 @@ function crowdAtlas(): THREE.CanvasTexture {
 /** How many recent events the crowd reacts to at once. */
 const EVENT_SLOTS = 4;
 
-function crowd(): {
+function crowd(density = 1): {
   mesh: THREE.Mesh;
   update: (t: number) => void;
   react: (event: WorldEvent, t: number) => void;
@@ -533,10 +534,10 @@ function crowd(): {
   };
   for (const side of SIDES) {
     for (let r = 0; r < LOWER_ROWS; r++) {
-      place(side, LOWER_START + r * LOWER_DEPTH + 0.5, LOWER_BASE + (r + 1) * LOWER_RISE, 0.88, r, true);
+      place(side, LOWER_START + r * LOWER_DEPTH + 0.5, LOWER_BASE + (r + 1) * LOWER_RISE, 0.88 * density, r, true);
     }
     for (let r = 0; r < UPPER_ROWS; r++) {
-      place(side, UPPER_START + r * UPPER_DEPTH + 0.5, UPPER_BASE + (r + 1) * UPPER_RISE, 0.7 - r * 0.012, r, false);
+      place(side, UPPER_START + r * UPPER_DEPTH + 0.5, UPPER_BASE + (r + 1) * UPPER_RISE, (0.7 - r * 0.012) * density, r, false);
     }
   }
 

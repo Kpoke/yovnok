@@ -50,8 +50,9 @@ const FIXUPS: Partial<Record<PropId, { layFlat?: boolean; scale?: number }>> = {
 
 async function loadModel(loader: GLTFLoader, url: string, fix: { layFlat?: boolean; scale?: number } = {}): Promise<Model> {
   const gltf = await loader.loadAsync(url);
-  // The highest-detail LOD; the props are small and few enough to afford it.
-  const root = gltf.scene.getObjectByName('lod0') ?? gltf.scene;
+  // The middle LOD: one instanced mesh draws every placement at one detail,
+  // and the props are small — at lod0 they were 235k triangles of the stadium.
+  const root = gltf.scene.getObjectByName('lod1') ?? gltf.scene.getObjectByName('lod0') ?? gltf.scene;
   root.updateWorldMatrix(true, true);
   const inverse = new THREE.Matrix4().copy(root.matrixWorld).invert();
   const parts: Model['parts'] = [];
