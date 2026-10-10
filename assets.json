@@ -486,6 +486,275 @@
       "source": "https://polyhaven.com/a/wooden_crate_01",
       "license": "CC0-1.0",
       "changes": "Poly Haven 1K glTF, simplified with LODs and KTX2 textures by scripts/assetbuild.ts; arena set dressing."
+    },
+    {
+      "files": [
+        "assets-src/materials/red_laterite_soil_stones/red_laterite_soil_stones_2k.gltf",
+        "assets-src/materials/red_laterite_soil_stones/textures/red_laterite_soil_stones_arm_2k.jpg",
+        "assets-src/materials/red_laterite_soil_stones/textures/red_laterite_soil_stones_nor_gl_2k.jpg",
+        "assets-src/materials/red_laterite_soil_stones/textures/red_laterite_soil_stones_diff_2k.jpg",
+        "assets-src/materials/red_laterite_soil_stones/red_laterite_soil_stones.bin",
+        "public/assets/materials/red_laterite_soil_stones/red_laterite_soil_stones_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Red Laterite Soil Stones",
+      "author": "Amal Kumar",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/red_laterite_soil_stones",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/coast_sand_01/coast_sand_01_2k.gltf",
+        "assets-src/materials/coast_sand_01/coast_sand_01.bin",
+        "assets-src/materials/coast_sand_01/textures/coast_sand_01_nor_gl_2k.jpg",
+        "assets-src/materials/coast_sand_01/textures/coast_sand_01_diff_2k.jpg",
+        "assets-src/materials/coast_sand_01/textures/coast_sand_01_rough_2k.jpg",
+        "public/assets/materials/coast_sand_01/coast_sand_01_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Coast Sand 01",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/coast_sand_01",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/sandstone_cracks/sandstone_cracks_2k.gltf",
+        "assets-src/materials/sandstone_cracks/textures/sandstone_cracks_rough_2k.jpg",
+        "assets-src/materials/sandstone_cracks/sandstone_cracks.bin",
+        "assets-src/materials/sandstone_cracks/textures/sandstone_cracks_nor_gl_2k.jpg",
+        "assets-src/materials/sandstone_cracks/textures/sandstone_cracks_diff_2k.jpg",
+        "public/assets/materials/sandstone_cracks/sandstone_cracks_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Sandstone Cracks",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/sandstone_cracks",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/rock_boulder_dry/rock_boulder_dry_2k.gltf",
+        "assets-src/materials/rock_boulder_dry/textures/rock_boulder_dry_diff_2k.jpg",
+        "assets-src/materials/rock_boulder_dry/textures/rock_boulder_dry_arm_2k.jpg",
+        "assets-src/materials/rock_boulder_dry/rock_boulder_dry.bin",
+        "assets-src/materials/rock_boulder_dry/textures/rock_boulder_dry_nor_gl_2k.jpg",
+        "public/assets/materials/rock_boulder_dry/rock_boulder_dry_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Rock Boulder Dry",
+      "author": "Dimitrios Savva, Rico Cilliers",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/rock_boulder_dry",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/snow_02/snow_02_2k.gltf",
+        "assets-src/materials/snow_02/snow_02.bin",
+        "assets-src/materials/snow_02/textures/snow_02_rough_2k.jpg",
+        "assets-src/materials/snow_02/textures/snow_02_diff_2k.jpg",
+        "assets-src/materials/snow_02/textures/snow_02_nor_gl_2k.jpg",
+        "public/assets/materials/snow_02/snow_02_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Snow 02",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/snow_02",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/snow_field_aerial/snow_field_aerial_2k.gltf",
+        "assets-src/materials/snow_field_aerial/textures/snow_field_aerial_nor_gl_2k.jpg",
+        "assets-src/materials/snow_field_aerial/textures/snow_field_aerial_col_2k.jpg",
+        "assets-src/materials/snow_field_aerial/snow_field_aerial.bin",
+        "assets-src/materials/snow_field_aerial/textures/snow_field_aerial_rough_2k.jpg",
+        "public/assets/materials/snow_field_aerial/snow_field_aerial_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Snow Field Aerial",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/snow_field_aerial",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/rocky_trail/rocky_trail_2k.gltf",
+        "assets-src/materials/rocky_trail/textures/rocky_trail_nor_gl_2k.jpg",
+        "assets-src/materials/rocky_trail/textures/rocky_trail_arm_2k.jpg",
+        "assets-src/materials/rocky_trail/rocky_trail.bin",
+        "assets-src/materials/rocky_trail/textures/rocky_trail_diff_2k.jpg",
+        "public/assets/materials/rocky_trail/rocky_trail_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Rocky Trail",
+      "author": "Amal Kumar",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/rocky_trail",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/sandy_gravel_02/sandy_gravel_02_2k.gltf",
+        "assets-src/materials/sandy_gravel_02/textures/sandy_gravel_02_diff_2k.jpg",
+        "assets-src/materials/sandy_gravel_02/sandy_gravel_02.bin",
+        "assets-src/materials/sandy_gravel_02/textures/sandy_gravel_02_arm_2k.jpg",
+        "assets-src/materials/sandy_gravel_02/textures/sandy_gravel_02_nor_gl_2k.jpg",
+        "public/assets/materials/sandy_gravel_02/sandy_gravel_02_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Sandy Gravel 02",
+      "author": "Dario Barresi",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/sandy_gravel_02",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/forrest_ground_01/forrest_ground_01_2k.gltf",
+        "assets-src/materials/forrest_ground_01/forrest_ground_01.bin",
+        "assets-src/materials/forrest_ground_01/textures/forrest_ground_01_rough_2k.jpg",
+        "assets-src/materials/forrest_ground_01/textures/forrest_ground_01_nor_gl_2k.jpg",
+        "assets-src/materials/forrest_ground_01/textures/forrest_ground_01_diff_2k.jpg",
+        "public/assets/materials/forrest_ground_01/forrest_ground_01_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Forest Ground 01",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/forrest_ground_01",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/forest_leaves_02/forest_leaves_02_2k.gltf",
+        "assets-src/materials/forest_leaves_02/forest_leaves_02.bin",
+        "assets-src/materials/forest_leaves_02/textures/forest_leaves_02_nor_gl_2k.jpg",
+        "assets-src/materials/forest_leaves_02/textures/forest_leaves_02_diffuse_2k.jpg",
+        "assets-src/materials/forest_leaves_02/textures/forest_leaves_02_rough_2k.jpg",
+        "public/assets/materials/forest_leaves_02/forest_leaves_02_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Forest Leaves 02",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/forest_leaves_02",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/brown_mud_leaves_01/brown_mud_leaves_01_2k.gltf",
+        "assets-src/materials/brown_mud_leaves_01/textures/brown_mud_leaves_01_arm_2k.jpg",
+        "assets-src/materials/brown_mud_leaves_01/textures/brown_mud_leaves_01_nor_gl_2k.jpg",
+        "assets-src/materials/brown_mud_leaves_01/textures/brown_mud_leaves_01_diff_2k.jpg",
+        "assets-src/materials/brown_mud_leaves_01/brown_mud_leaves_01.bin",
+        "public/assets/materials/brown_mud_leaves_01/brown_mud_leaves_01_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Brown Mud Leaves 01",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/brown_mud_leaves_01",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/bark_brown_02/bark_brown_02_2k.gltf",
+        "assets-src/materials/bark_brown_02/textures/bark_brown_02_rough_2k.jpg",
+        "assets-src/materials/bark_brown_02/textures/bark_brown_02_diff_2k.jpg",
+        "assets-src/materials/bark_brown_02/textures/bark_brown_02_nor_gl_2k.jpg",
+        "assets-src/materials/bark_brown_02/bark_brown_02.bin",
+        "public/assets/materials/bark_brown_02/bark_brown_02_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Bark Brown 02",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/bark_brown_02",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "assets-src/materials/mossy_rock/mossy_rock_2k.gltf",
+        "assets-src/materials/mossy_rock/mossy_rock.bin",
+        "assets-src/materials/mossy_rock/textures/mossy_rock_rough_2k.jpg",
+        "assets-src/materials/mossy_rock/textures/mossy_rock_diff_2k.jpg",
+        "assets-src/materials/mossy_rock/textures/mossy_rock_nor_gl_2k.jpg",
+        "public/assets/materials/mossy_rock/mossy_rock_2k.glb"
+      ],
+      "kind": "texture",
+      "title": "Mossy Rock",
+      "author": "Rob Tuytel",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/mossy_rock",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 2K glTF, recompressed to KTX2 by scripts/assetbuild.ts; tiled in world space on the arena."
+    },
+    {
+      "files": [
+        "public/assets/hdri/kloppenheim_06_puresky_1k.hdr"
+      ],
+      "kind": "hdri",
+      "title": "Kloppenheim 06 (Pure Sky)",
+      "author": "Greg Zaal, Jarod Guest",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/kloppenheim_06_puresky",
+      "license": "CC0-1.0",
+      "changes": "Unmodified 1K HDR; used as the environment (image-based) lighting, not shown as the sky."
+    },
+    {
+      "files": [
+        "public/assets/hdri/overcast_soil_puresky_1k.hdr"
+      ],
+      "kind": "hdri",
+      "title": "Overcast Soil (Pure Sky)",
+      "author": "Jarod Guest, Sergej Majboroda",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/overcast_soil_puresky",
+      "license": "CC0-1.0",
+      "changes": "Unmodified 1K HDR; used as the environment (image-based) lighting, not shown as the sky."
+    },
+    {
+      "files": [
+        "public/assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
+      ],
+      "kind": "hdri",
+      "title": "Kloofendal 48d Partly Cloudy (Pure Sky)",
+      "author": "Greg Zaal, Jarod Guest",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky",
+      "license": "CC0-1.0",
+      "changes": "Unmodified 1K HDR; used as the environment (image-based) lighting, not shown as the sky."
+    },
+    {
+      "files": [
+        "public/assets/hdri/mud_road_puresky_1k.hdr"
+      ],
+      "kind": "hdri",
+      "title": "Mud Road (Pure Sky)",
+      "author": "Sergey Rudavin, Jarod Guest",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/mud_road_puresky",
+      "license": "CC0-1.0",
+      "changes": "Unmodified 1K HDR; used as the environment (image-based) lighting, not shown as the sky."
     }
   ]
 }

@@ -134,6 +134,42 @@
         {
           "title": "Brown Mud 03",
           "source": "https://polyhaven.com/a/brown_mud_03"
+        },
+        {
+          "title": "Coast Sand 01",
+          "source": "https://polyhaven.com/a/coast_sand_01"
+        },
+        {
+          "title": "Sandstone Cracks",
+          "source": "https://polyhaven.com/a/sandstone_cracks"
+        },
+        {
+          "title": "Snow 02",
+          "source": "https://polyhaven.com/a/snow_02"
+        },
+        {
+          "title": "Snow Field Aerial",
+          "source": "https://polyhaven.com/a/snow_field_aerial"
+        },
+        {
+          "title": "Forest Ground 01",
+          "source": "https://polyhaven.com/a/forrest_ground_01"
+        },
+        {
+          "title": "Forest Leaves 02",
+          "source": "https://polyhaven.com/a/forest_leaves_02"
+        },
+        {
+          "title": "Brown Mud Leaves 01",
+          "source": "https://polyhaven.com/a/brown_mud_leaves_01"
+        },
+        {
+          "title": "Bark Brown 02",
+          "source": "https://polyhaven.com/a/bark_brown_02"
+        },
+        {
+          "title": "Mossy Rock",
+          "source": "https://polyhaven.com/a/mossy_rock"
         }
       ],
       "attribution": "Rob Tuytel (polyhaven.com)",
@@ -146,6 +182,10 @@
         {
           "title": "Concrete Floor Worn 001",
           "source": "https://polyhaven.com/a/concrete_floor_worn_001"
+        },
+        {
+          "title": "Rock Boulder Dry",
+          "source": "https://polyhaven.com/a/rock_boulder_dry"
         }
       ],
       "attribution": "Dimitrios Savva, Rico Cilliers (polyhaven.com)",
@@ -158,6 +198,10 @@
         {
           "title": "Gravelly Sand",
           "source": "https://polyhaven.com/a/gravelly_sand"
+        },
+        {
+          "title": "Sandy Gravel 02",
+          "source": "https://polyhaven.com/a/sandy_gravel_02"
         }
       ],
       "attribution": "Dario Barresi (polyhaven.com)",
@@ -205,6 +249,22 @@
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
     },
     {
+      "heading": "TEXTURES",
+      "items": [
+        {
+          "title": "Red Laterite Soil Stones",
+          "source": "https://polyhaven.com/a/red_laterite_soil_stones"
+        },
+        {
+          "title": "Rocky Trail",
+          "source": "https://polyhaven.com/a/rocky_trail"
+        }
+      ],
+      "attribution": "Amal Kumar (polyhaven.com)",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
       "heading": "SKIES & LIGHTING",
       "items": [
         {
@@ -213,6 +273,46 @@
         }
       ],
       "attribution": "Greg Zaal (polyhaven.com)",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "heading": "SKIES & LIGHTING",
+      "items": [
+        {
+          "title": "Kloppenheim 06 (Pure Sky)",
+          "source": "https://polyhaven.com/a/kloppenheim_06_puresky"
+        },
+        {
+          "title": "Kloofendal 48d Partly Cloudy (Pure Sky)",
+          "source": "https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky"
+        }
+      ],
+      "attribution": "Greg Zaal, Jarod Guest (polyhaven.com)",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "heading": "SKIES & LIGHTING",
+      "items": [
+        {
+          "title": "Overcast Soil (Pure Sky)",
+          "source": "https://polyhaven.com/a/overcast_soil_puresky"
+        }
+      ],
+      "attribution": "Jarod Guest, Sergej Majboroda (polyhaven.com)",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "heading": "SKIES & LIGHTING",
+      "items": [
+        {
+          "title": "Mud Road (Pure Sky)",
+          "source": "https://polyhaven.com/a/mud_road_puresky"
+        }
+      ],
+      "attribution": "Sergey Rudavin, Jarod Guest (polyhaven.com)",
       "license": "CC0 1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
     },

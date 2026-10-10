@@ -86,7 +86,12 @@ async function fetchMaterial(id: string): Promise<{ files: string[]; title: stri
     written.push(join('assets-src', 'materials', id, path));
   }
   // A material library: no LODs, and the displacement plane is dropped.
-  writeFileSync(join(dir, gltfName.replace(/\.gltf$/, '.asset.json')), '{ "lods": [], "materialOnly": true }\n');
+  // 1K textures and ETC1S data maps: ~1.7 MB a material instead of ~9 MB at
+  // 2K/UASTC, with no visible loss at the tiling sizes the arena uses.
+  writeFileSync(
+    join(dir, gltfName.replace(/\.gltf$/, '.asset.json')),
+    '{ "lods": [], "materialOnly": true, "maxTexture": 1024, "dataCodec": "etc1s" }\n',
+  );
   return { files: written, title: info.name, authors: Object.keys(info.authors).join(', ') };
 }
 
