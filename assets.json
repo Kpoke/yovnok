@@ -755,6 +755,57 @@
       "source": "https://polyhaven.com/a/mud_road_puresky",
       "license": "CC0-1.0",
       "changes": "Unmodified 1K HDR; used as the environment (image-based) lighting, not shown as the sky."
+    },
+    {
+      "files": [
+        "assets-src/props/namaqualand_boulder_05/namaqualand_boulder_05_1k.gltf",
+        "assets-src/props/namaqualand_boulder_05/textures/namaqualand_boulder_05_arm_1k.jpg",
+        "assets-src/props/namaqualand_boulder_05/textures/namaqualand_boulder_05_nor_gl_1k.jpg",
+        "assets-src/props/namaqualand_boulder_05/namaqualand_boulder_05.bin",
+        "assets-src/props/namaqualand_boulder_05/textures/namaqualand_boulder_05_diff_1k.jpg",
+        "public/assets/props/namaqualand_boulder_05/namaqualand_boulder_05_1k.glb"
+      ],
+      "kind": "model",
+      "title": "Namaqualand Boulder 05",
+      "author": "Jenelle van Heerden, Dario Barresi",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/namaqualand_boulder_05",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 1K glTF, simplified with LODs and KTX2 textures by scripts/assetbuild.ts; arena set dressing."
+    },
+    {
+      "files": [
+        "assets-src/props/rock_09/rock_09_1k.gltf",
+        "assets-src/props/rock_09/textures/rock_09_arm_1k.jpg",
+        "assets-src/props/rock_09/textures/rock_09_nor_gl_1k.jpg",
+        "assets-src/props/rock_09/textures/rock_09_diff_1k.jpg",
+        "assets-src/props/rock_09/rock_09.bin",
+        "public/assets/props/rock_09/rock_09_1k.glb"
+      ],
+      "kind": "model",
+      "title": "Rock 09",
+      "author": "Jenelle van Heerden",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/rock_09",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 1K glTF, simplified with LODs and KTX2 textures by scripts/assetbuild.ts; arena set dressing."
+    },
+    {
+      "files": [
+        "assets-src/props/rock_moss_set_01/rock_moss_set_01_1k.gltf",
+        "assets-src/props/rock_moss_set_01/textures/rock_moss_set_01_nor_gl_1k.jpg",
+        "assets-src/props/rock_moss_set_01/rock_moss_set_01.bin",
+        "assets-src/props/rock_moss_set_01/textures/rock_moss_set_01_rough_1k.jpg",
+        "assets-src/props/rock_moss_set_01/textures/rock_moss_set_01_diff_1k.jpg",
+        "public/assets/props/rock_moss_set_01/rock_moss_set_01_1k.glb"
+      ],
+      "kind": "model",
+      "title": "Rock Moss Set 01",
+      "author": "Kless Gyzen",
+      "authorUrl": "https://polyhaven.com",
+      "source": "https://polyhaven.com/a/rock_moss_set_01",
+      "license": "CC0-1.0",
+      "changes": "Poly Haven 1K glTF, simplified with LODs and KTX2 textures by scripts/assetbuild.ts; arena set dressing."
     }
   ]
 }

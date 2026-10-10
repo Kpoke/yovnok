@@ -10,6 +10,8 @@ import { STADIUM_HALF } from '../../shared/arena';
 import { appendGeometry, batchMesh } from '../buildArena';
 import { surfaceOf } from '../arenaSurfaces';
 import { softTexture } from '../explosions';
+import type { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { loadModel, type Model } from '../buildProps';
 
 /** Deterministic pseudo-random numbers, so every page builds the same scenery. */
 export function seeded(seed: number): () => number {
@@ -299,3 +301,82 @@ export function solidsOf(solids: readonly Solid[], colour: number): Solid[] {
 
 /** The arena's half-extent, for scenery placed just outside it. */
 export const EDGE = STADIUM_HALF;
+
+/** Rock models (Poly Haven scans), downloaded once. */
+const rockModels = new Map<string, Promise<Model | null>>();
+
+/**
+ * Scanned rocks, instanced: boulders round the foot of every rock solid (so a
+ * mesa or a heap stops reading as a box) and scattered beyond the arena's edge.
+ * Rocks inside the arena sit half inside a solid, so nothing you see but cannot
+ * hit stands in the way.
+ */
+export async function scannedRocks(
+  loader: GLTFLoader,
+  id: string,
+  solids: readonly Solid[],
+  options: { colour: number; perSolid: number; outside: number; tint?: number; seed: number },
+): Promise<THREE.Group> {
+  const group = new THREE.Group();
+  group.name = `rocks:${id}`;
+  let pending = rockModels.get(id);
+  if (!pending) {
+    pending = loadModel(loader, `/assets/props/${id}/${id}_1k.glb`).catch(() => null);
+    rockModels.set(id, pending);
+  }
+  const model = await pending;
+  if (!model) return group;
+  const rand = seeded(options.seed);
+  const size = model.box.getSize(new THREE.Vector3());
+  const footprint = Math.max(size.x, size.z);
+  const places: Array<{ x: number; z: number; y: number; scale: number; yaw: number }> = [];
+  for (const s of solids) {
+    if (s.color !== options.colour) continue;
+    const w = s.max.x - s.min.x;
+    const d = s.max.z - s.min.z;
+    const perimeter = 2 * (w + d);
+    const n = Math.max(2, Math.round((perimeter / 30) * options.perSolid));
+    for (let i = 0; i < n; i++) {
+      // A point on the box's edge, nudged inward so the rock straddles it.
+      let t = rand() * perimeter;
+      let x: number;
+      let z: number;
+      if (t < w) [x, z] = [s.min.x + t, s.min.z];
+      else if ((t -= w) < d) [x, z] = [s.max.x, s.min.z + t];
+      else if ((t -= d) < w) [x, z] = [s.max.x - t, s.max.z];
+      else [x, z] = [s.min.x, s.max.z - (t - w)];
+      const height = s.max.y - s.min.y;
+      const want = Math.min(height * (0.35 + rand() * 0.4), 9);
+      const scale = Math.max(0.6, want / Math.max(0.1, size.y));
+      const half = (footprint * scale) / 2;
+      // Mostly inside the solid: at most ~40% of the rock stands proud of what you hit.
+      x = Math.min(Math.max(x, s.min.x + half * 0.6), s.max.x - half * 0.6);
+      z = Math.min(Math.max(z, s.min.z + half * 0.6), s.max.z - half * 0.6);
+      places.push({ x, z, y: s.min.y - 0.3, scale, yaw: rand() * Math.PI * 2 });
+    }
+  }
+  for (const p of ringPoints(rand, EDGE + 8, EDGE + 160, options.outside)) {
+    places.push({ ...p, y: -0.5, scale: 3 + rand() * 7, yaw: rand() * Math.PI * 2 });
+  }
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const centre = model.box.getCenter(new THREE.Vector3());
+  for (const part of model.parts) {
+    const material = (part.material as THREE.MeshStandardMaterial).clone();
+    if (options.tint !== undefined) material.color.multiply(new THREE.Color(options.tint));
+    const mesh = new THREE.InstancedMesh(part.geometry, material, places.length);
+    places.forEach((p, i) => {
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.yaw);
+      const offset = new THREE.Vector3(-centre.x, -model.box.min.y, -centre.z).multiplyScalar(p.scale).applyQuaternion(q);
+      m.compose(new THREE.Vector3(p.x + offset.x, p.y + offset.y, p.z + offset.z), q, new THREE.Vector3(p.scale, p.scale, p.scale));
+      mesh.setMatrixAt(i, m);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.raycast = () => {};
+    group.add(mesh);
+  }
+  return group;
+}

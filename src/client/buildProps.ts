@@ -27,7 +27,7 @@ const FILES: Record<PropId, string> = {
 };
 
 /** A loaded prop: its meshes baked into one frame, and its bounds there. */
-type Model = { parts: Array<{ geometry: THREE.BufferGeometry; material: THREE.Material }>; box: THREE.Box3 };
+export type Model = { parts: Array<{ geometry: THREE.BufferGeometry; material: THREE.Material }>; box: THREE.Box3 };
 
 /** One placement: where, which way, how big. */
 type Place = { x: number; y: number; z: number; yaw: number };
@@ -48,7 +48,7 @@ const FIXUPS: Partial<Record<PropId, { layFlat?: boolean; scale?: number }>> = {
   crate: { scale: 1.7 },
 };
 
-async function loadModel(loader: GLTFLoader, url: string, fix: { layFlat?: boolean; scale?: number } = {}): Promise<Model> {
+export async function loadModel(loader: GLTFLoader, url: string, fix: { layFlat?: boolean; scale?: number } = {}): Promise<Model> {
   const gltf = await loader.loadAsync(url);
   // The middle LOD: one instanced mesh draws every placement at one detail,
   // and the props are small — at lod0 they were 235k triangles of the stadium.

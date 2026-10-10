@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import type { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SOLIDS, STADIUM_HALF } from '../../shared/arena';
 import { PALETTE } from '../../shared/config';
 import type { MapId } from '../../shared/mapIds';
@@ -14,7 +15,7 @@ import { buildProps } from '../buildProps';
 import { buildStadium } from '../buildStadium';
 import { Weather as WeatherFx } from '../weather';
 import type { AmbienceKind } from '../ambience';
-import { boxes, lampPosts, outerRock, pines, ringPoints, rocks, seeded, solidsOf, water } from './scenery';
+import { boxes, lampPosts, outerRock, pines, ringPoints, rocks, scannedRocks, seeded, solidsOf, water } from './scenery';
 
 export type Weather = 'none' | 'dust' | 'rain' | 'snow' | 'mist';
 
@@ -91,9 +92,16 @@ export const THEMES: Record<MapId, MapTheme> = {
       pad: { material: 'sandstone_cracks', tile: 6, tint: 0xe8b090 },
       hazard: { material: 'brown_mud_03', tile: 4, tint: 0x302018, wet: true },
     },
-    dressing: async (_loader, detail) => [
+    dressing: async (loader, detail) => [
       {
         objects: [
+          await scannedRocks(loader, 'namaqualand_boulder_05', SOLIDS, {
+            colour: PALETTE.rock,
+            perSolid: detail === 'low' ? 1 : 2,
+            outside: amount(60, detail),
+            tint: 0xe8a070,
+            seed: 31,
+          }),
           rocks(SOLIDS, PALETTE.rock, 1.4),
           // Canyon walls all round, and buttes further out.
           outerRock(PALETTE.rock, { inner: STADIUM_HALF + 6, outer: STADIUM_HALF + 70, height: [26, 62], count: amount(90, detail), seed: 3 }),
@@ -258,14 +266,40 @@ export const THEMES: Record<MapId, MapTheme> = {
         }
         const long = Math.max(sx, sz);
         const span = Math.min(sx, sz);
-        const vault = new THREE.Mesh(new THREE.CylinderGeometry(span / 2, span / 2, long, 20, 1, false, 0, Math.PI), metal);
-        vault.rotation.z = Math.PI / 2;
-        if (sz > sx) vault.rotation.y = Math.PI / 2;
-        vault.scale.set(1, 1, 0.45);
-        if (sz > sx) vault.scale.set(1, 1, 0.45);
-        vault.position.set(cx, s.max.y, cz);
+        const alongZ = sz > sx;
+        const hangar = new THREE.Group();
+        hangar.position.set(cx, s.max.y, cz);
+        if (alongZ) hangar.rotation.y = Math.PI / 2;
+        // The barrel vault, with steel ribs every few metres.
+        // A half cylinder lying along the hangar (x), its arch flattened to a
+        // low roof: the upper half after the quarter turn, squashed in height.
+        const arch = (radius: number, length: number, x: number, open: boolean): THREE.BufferGeometry => {
+          const g = new THREE.CylinderGeometry(radius, radius, length, 24, 1, open, 0, Math.PI);
+          g.rotateZ(Math.PI / 2);
+          g.scale(1, 0.45, 1);
+          g.translate(x, 0, 0);
+          return g;
+        };
+        const vault = new THREE.Mesh(arch(span / 2, long, 0, false), metal);
         vault.castShadow = true;
-        group.add(vault);
+        hangar.add(vault);
+        const ribs: THREE.BufferGeometry[] = [];
+        for (let x = -long / 2 + 2; x <= long / 2 - 2; x += 4) ribs.push(arch(span / 2 + 0.12, 0.35, x, true));
+        hangar.add(new THREE.Mesh(mergeGeometries(ribs)!, dark));
+        // Big sliding doors on both ends, with a hazard stripe and a number.
+        const wallHeight = s.max.y - s.min.y;
+        for (const end of [-1, 1]) {
+          const door = new THREE.Mesh(new THREE.BoxGeometry(0.4, wallHeight * 0.82, span * 0.78), dark);
+          door.position.set(end * (long / 2 + 0.15), -wallHeight * 0.5, 0);
+          hangar.add(door);
+          const stripe = new THREE.Mesh(
+            new THREE.BoxGeometry(0.42, 0.6, span * 0.78),
+            new THREE.MeshStandardMaterial({ color: 0xf2b705, roughness: 0.6 }),
+          );
+          stripe.position.set(end * (long / 2 + 0.16), -wallHeight * 0.88, 0);
+          hangar.add(stripe);
+        }
+        group.add(hangar);
       }
       // Snowy pines all round, outside the fence.
       const rand = seeded(17);
@@ -293,7 +327,7 @@ export const THEMES: Record<MapId, MapTheme> = {
       pad: { material: 'concrete_floor_worn_001', tile: 6 },
       hazard: { material: 'brown_mud_03', tile: 4, tint: 0x6a5a40, wet: true },
     },
-    dressing: async (_loader, detail) => {
+    dressing: async (loader, detail) => {
       const steel = new THREE.MeshStandardMaterial({ color: 0x6b5a48, metalness: 0.5, roughness: 0.6 });
       const belt: Array<[number, number, number, number, number, number]> = [];
       const group = new THREE.Group();
@@ -312,6 +346,12 @@ export const THEMES: Record<MapId, MapTheme> = {
       return [
         {
           objects: [
+            await scannedRocks(loader, 'rock_09', SOLIDS, {
+              colour: PALETTE.rock,
+              perSolid: detail === 'low' ? 1 : 2,
+              outside: amount(40, detail),
+              seed: 32,
+            }),
             rocks(SOLIDS, PALETTE.rock, 0.8),
             group,
             boxes(belt, steel, 'crusher-hoppers'),
@@ -344,7 +384,7 @@ export const THEMES: Record<MapId, MapTheme> = {
       pad: { material: 'concrete_floor_worn_001', tile: 6, tint: 0xb0a890 },
       hazard: { material: 'brown_mud_03', tile: 4, tint: 0x4a3a26, wet: true },
     },
-    dressing: async (_loader, detail) => {
+    dressing: async (loader, detail) => {
       const rand = seeded(21);
       // A pine on every trunk in the arena (the trunk is its collision)...
       const inside = solidsOf(SOLIDS, PALETTE.trunk).map((s) => ({
@@ -354,7 +394,16 @@ export const THEMES: Record<MapId, MapTheme> = {
       }));
       // ...and a dense forest beyond the arena's edge.
       const outside = ringPoints(rand, STADIUM_HALF + 4, STADIUM_HALF + 190, amount(1500, detail)).map((p) => ({ ...p, h: 20 + rand() * 14 }));
-      return [{ objects: [rocks(SOLIDS, PALETTE.rock, 0.6), pines([...inside, ...outside], { seed: 6, shadows: detail !== 'low' })] }, weather('mist', detail)];
+      const mossy = await scannedRocks(loader, 'rock_moss_set_01', SOLIDS, {
+        colour: PALETTE.rock,
+        perSolid: 2,
+        outside: amount(80, detail),
+        seed: 33,
+      });
+      return [
+        { objects: [mossy, rocks(SOLIDS, PALETTE.rock, 0.6), pines([...inside, ...outside], { seed: 6, shadows: detail !== 'low' })] },
+        weather('mist', detail),
+      ];
     },
   },
 };
