@@ -29,10 +29,12 @@ import {
   GLOWS,
   LIVERIES,
   loadoutOf,
+  ROOFS,
   WHEELS,
   type CosmeticLook,
 } from '../../shared/cosmetics';
 import { buildGun } from './guns';
+import { buildBodyKit, buildDecals } from './bodyKits';
 import { seatsFor } from '../../shared/crews';
 import { componentIntegrity, type ComponentId } from '../../shared/components';
 import type { VehicleInput, VehicleState } from '../../shared/vehicle';
@@ -145,6 +147,15 @@ export function buildVehicle(
     const roof = library.create({ kind: 'roof', cls: spec.id, style: skin.roof }, materials);
     roof.group.position.copy(roofSocket.position);
     chassis.add(roof.group);
+  }
+  // Bolt-ons and door decals, placed against the chassis's measured size (the
+  // realistic chassis has no roof socket; the kits fit any body).
+  const bodyBox = new THREE.Box3().setFromObject(chassis);
+  if (!bodyBox.isEmpty()) {
+    const kit = roofSocket ? null : buildBodyKit(ROOFS[skin.roof].kind, bodyBox);
+    if (kit) root.add(kit);
+    const decals = buildDecals(skin.decal, skin.number, ACCENTS[skin.accent].colour, bodyBox);
+    if (decals) root.add(decals);
   }
   // Engine sits under the bonnet, forward of the cabin. The low body shape
   // (coupe AND solo brawler) shares the coupe's mount; only the tall SUV differs.

@@ -67,8 +67,10 @@ a seat frees up.
   seconds — come back in time and **REJOIN** puts you back behind the wheel.
 
 **The garage.** Paint, a pattern (stripes, hazard, camo, tiger, checker) in a
-colour of your choice, and underglow — some unlocked by playing (matches, kills,
-wins). And your guns, all open from the start:
+colour of your choice, rim colour, a body kit (bull bar, light bar, rear wing,
+side armour, side exhausts), a door decal with your race number, and underglow —
+some unlocked by playing (matches, kills, wins). And your guns, all open from
+the start:
 
 | Bumper guns | | Roof weapon | |
 |---|---|---|---|

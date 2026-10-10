@@ -663,6 +663,11 @@
       .cos-need { font-size: 9px; letter-spacing: 1px; opacity: 0.85; }
       .cos-option.gun { flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
       .cos-about { font-size: 9px; letter-spacing: 0.5px; opacity: 0.6; }
+      #cos-number {
+        width: 64px; font: inherit; font-size: 16px; font-weight: 700; text-align: center; letter-spacing: 2px; color: #fff;
+        background: rgba(0, 0, 0, 0.35); border: 1px solid var(--edge); border-radius: 4px; padding: 6px; pointer-events: auto;
+      }
+      #cos-number:focus { outline: none; border-color: var(--accent); }
       .drawer .cos-head.cos-sub { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--edge); }
       .cos-need:empty { display: none; }
       .cos-swatch { width: 10px; height: 10px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, 0.4); }
@@ -1121,6 +1126,13 @@
             <div class="cos-row"><span class="cos-label">PAINT</span><div class="cos-options" id="cos-livery"></div></div>
             <div class="cos-row"><span class="cos-label">PATTERN</span><div class="cos-options" id="cos-pattern"></div></div>
             <div class="cos-row"><span class="cos-label">PATTERN COLOUR</span><div class="cos-options" id="cos-accent"></div></div>
+            <div class="cos-row"><span class="cos-label">RIMS</span><div class="cos-options" id="cos-wheels"></div></div>
+            <div class="cos-row"><span class="cos-label">BODY KIT</span><div class="cos-options" id="cos-roof"></div></div>
+            <div class="cos-row"><span class="cos-label">DOOR DECAL</span><div class="cos-options" id="cos-decal"></div></div>
+            <div class="cos-row">
+              <span class="cos-label">RACE NUMBER</span>
+              <div class="set-line"><input id="cos-number" inputmode="numeric" maxlength="2" placeholder="—" autocomplete="off" /><span class="cos-about">0–99, painted in the door roundel (blank for none)</span></div>
+            </div>
             <div class="cos-row"><span class="cos-label">UNDERGLOW</span><div class="cos-options" id="cos-glow"></div></div>
             <div class="cos-head cos-sub"><span>GUNS</span><span>every gun is open</span></div>
             <div class="cos-row"><span class="cos-label">BUMPER GUNS</span><div class="cos-options" id="cos-primary"></div></div>

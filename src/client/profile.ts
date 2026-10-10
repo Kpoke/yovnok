@@ -53,6 +53,8 @@ export function loadProfile(): Profile {
         glow: num(parsed.look?.glow, DEFAULT_LOOK.glow),
         primary: num(parsed.look?.primary, DEFAULT_LOOK.primary),
         secondary: num(parsed.look?.secondary, DEFAULT_LOOK.secondary),
+        decal: num(parsed.look?.decal, DEFAULT_LOOK.decal),
+        number: num(parsed.look?.number, DEFAULT_LOOK.number),
       }),
     };
   } catch {

@@ -16,6 +16,7 @@
  * Assets must satisfy `src/shared/assetSpec.ts`; `npm run assetcheck` enforces it.
  */
 
+import { WHEELS } from '../../shared/cosmetics';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { PartManifestEntry, VehicleManifest } from '../../shared/assetSpec';
@@ -92,6 +93,11 @@ export class GltfPartLibrary implements PartLibrary {
           const scene = (await file).clone(true);
           const root = entry.node ? (scene.getObjectByName(entry.node) ?? scene) : scene;
           const template = toLod(root, entry.lodDistances);
+          // Give every vertex its position in the PART's space (metres, -Z
+          // forward) as an attribute: the model's own nodes are scaled and
+          // turned, and the paint patterns and rim colour are drawn in part space.
+          const levels = (template as THREE.LOD).isLOD ? (template as THREE.LOD).levels.map((l) => l.object) : [template];
+          for (const level of levels) addPartSpace(level);
           template.traverse((object) => {
             const mesh = object as THREE.Mesh;
             if (!mesh.isMesh) return;
@@ -138,6 +144,8 @@ export class GltfPartLibrary implements PartLibrary {
       // Substitute by slot name, so an asset's "body" takes the accent colour.
       const material = mesh.material as THREE.Material | THREE.Material[];
       const apply = (m: THREE.Material): THREE.Material => {
+        // Wheels: the rim colour, painted inside the tyre (one model, one texture).
+        if (request.kind === 'wheel' && (request.style ?? 0) > 0) return rimPainted(m, WHEELS[request.style ?? 0].hub);
         const base = entry?.baseTint?.[m.name];
         if (base || paint.has(m.name)) {
           return tint(m, base ? new THREE.Color(base) : null, paint.has(m.name) ? materials : null, strength);
@@ -292,8 +300,8 @@ export function applyPaint(
     // The car's own coordinates (metres, x across, y up, -z forward: the asset
     // pipeline normalises every part to that), for the pattern.
     shader.vertexShader = shader.vertexShader
-      .replace('void main() {', 'varying vec3 vCarPos;\nvoid main() {')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCarPos = position;');
+      .replace('void main() {', 'attribute vec3 partPos;\nvarying vec3 vCarPos;\nvoid main() {')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCarPos = partPos;');
     shader.fragmentShader = shader.fragmentShader
       .replace(
         'void main() {',
@@ -332,6 +340,68 @@ export function applyPaint(
       );
   };
   material.customProgramCacheKey = () => 'livery-paint';
+}
+
+/**
+ * A wheel material with its RIM painted: everything inside ~65% of the wheel's
+ * radius (the model is centred on its axle, which runs along x), shaded by the
+ * texture so the spokes' detail shows through. The tyre keeps its rubber.
+ */
+const rims = new WeakMap<THREE.Material, Map<number, THREE.Material>>();
+function rimPainted(material: THREE.Material, colour: number): THREE.Material {
+  const source = material as THREE.MeshStandardMaterial;
+  if (!source.isMeshStandardMaterial) return material;
+  let byColour = rims.get(material);
+  if (!byColour) rims.set(material, (byColour = new Map()));
+  let painted = byColour.get(colour);
+  if (painted) return painted;
+  const copy = source.clone();
+  const rim = new THREE.Color(colour);
+  copy.metalness = 0.75;
+  copy.onBeforeCompile = (shader) => {
+    shader.uniforms.uRim = { value: rim };
+    shader.vertexShader = shader.vertexShader
+      .replace('void main() {', 'attribute vec3 partPos;\nvarying vec3 vWheelPos;\nvoid main() {')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWheelPos = partPos;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('void main() {', 'uniform vec3 uRim;\nvarying vec3 vWheelPos;\nvoid main() {')
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+        {
+          float r = length(vWheelPos.yz);
+          float rim = 1.0 - smoothstep(0.215, 0.235, r);
+          float lum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+          diffuseColor.rgb = mix(diffuseColor.rgb, uRim * clamp(0.45 + lum * 1.8, 0.35, 1.25), rim);
+        }`,
+      );
+  };
+  copy.customProgramCacheKey = () => 'rim-paint';
+  byColour.set(colour, (painted = copy));
+  return painted;
+}
+
+/** Add a `partPos` attribute: each vertex's position relative to `level`. */
+function addPartSpace(level: THREE.Object3D): void {
+  level.updateMatrixWorld(true);
+  const inverse = new THREE.Matrix4().copy(level.matrixWorld).invert();
+  const v = new THREE.Vector3();
+  level.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const relative = new THREE.Matrix4().multiplyMatrices(inverse, mesh.matrixWorld);
+    const position = mesh.geometry.getAttribute('position');
+    const out = new Float32Array(position.count * 3);
+    for (let i = 0; i < position.count; i++) {
+      v.fromBufferAttribute(position, i).applyMatrix4(relative);
+      out[i * 3] = v.x;
+      out[i * 3 + 1] = v.y;
+      out[i * 3 + 2] = v.z;
+    }
+    // A copy of the geometry: other templates (wheel styles) share the file's.
+    mesh.geometry = mesh.geometry.clone();
+    mesh.geometry.setAttribute('partPos', new THREE.BufferAttribute(out, 3));
+  });
 }
 
 /** Carry a material's paint onto a clone of it. */

@@ -31,6 +31,7 @@ const KIND_LABELS: Record<CosmeticKind, string> = {
   pattern: 'PATTERN',
   accent: 'PATTERN COLOUR',
   glow: 'UNDERGLOW',
+  decal: 'DOOR DECAL',
   primary: 'BUMPER GUNS',
   secondary: 'ROOF WEAPON',
 };
@@ -55,6 +56,7 @@ export class Garage {
   private readonly stats: HTMLElement;
   private readonly rows = new Map<CosmeticKind, HTMLElement>();
   private profile: Profile;
+  private numberInput: HTMLInputElement | null = null;
   private onLookCallback: ((look: CosmeticLook) => void) | null = null;
 
   constructor(root: HTMLElement, profile: Profile) {
@@ -62,13 +64,22 @@ export class Garage {
     this.profile = profile;
     this.stats = root.querySelector('#cos-stats') as HTMLElement;
 
-    // Wheel styles and roof kits do nothing on the realistic cars (see main.ts
-    // `paintOnly`), so they are not offered.
-    for (const kind of ['livery', 'pattern', 'accent', 'glow', 'primary', 'secondary'] as CosmeticKind[]) {
+    for (const kind of ['livery', 'pattern', 'accent', 'wheels', 'roof', 'decal', 'glow', 'primary', 'secondary'] as CosmeticKind[]) {
       const row = root.querySelector(`#cos-${kind}`) as HTMLElement;
       if (row) this.rows.set(kind, row);
     }
     this.root.addEventListener('click', (event) => this.onClick(event));
+    // The race number: digits only, 0–99, blank for none.
+    const number = root.querySelector<HTMLInputElement>('#cos-number');
+    if (number) {
+      this.numberInput = number;
+      number.addEventListener('keydown', (e) => e.stopPropagation());
+      number.addEventListener('input', () => {
+        number.value = number.value.replace(/\D/g, '').slice(0, 2);
+        const value = number.value === '' ? 0 : Math.min(99, Number(number.value));
+        this.onLookCallback?.({ ...this.profile.look, number: value });
+      });
+    }
   }
 
   onLook(callback: (look: CosmeticLook) => void): void {
@@ -78,6 +89,9 @@ export class Garage {
   render(profile: Profile): void {
     this.profile = profile;
     this.stats.textContent = `${profile.matches} matches · ${profile.kills} kills · ${profile.wins} wins`;
+    if (this.numberInput && document.activeElement !== this.numberInput) {
+      this.numberInput.value = profile.look.number ? String(profile.look.number) : '';
+    }
 
     for (const entry of shopCatalog(profile)) {
       const row = this.rows.get(entry.kind);

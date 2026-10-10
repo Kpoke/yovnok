@@ -379,12 +379,6 @@ scene.add(tracers.object);
  * purely visual: the simulation never reads a look.
  */
 let profile = loadProfile();
-// Only PAINT is offered: wheel styles and roof kits were built for the old
-// procedural cars and do nothing on the realistic models (no roof mount, one
-// wheel model). The look format keeps the fields, pinned to their defaults, so
-// an old saved choice cannot leave the car in a state the garage cannot show.
-const paintOnly = (look: CosmeticLook): CosmeticLook => ({ ...look, wheels: 0, roof: 0 });
-profile = setLook(profile, paintOnly(profile.look));
 const lookKey = (l: ReturnType<typeof unpackLook>): string => String(packLook(l));
 net.look = packLook(profile.look);
 let localLookKey = lookKey(profile.look);
@@ -397,7 +391,7 @@ if (garageRoot) {
   garage = new Garage(garageRoot, profile);
   garage.build();
   garage.onLook((look) => {
-    profile = setLook(profile, paintOnly(look));
+    profile = setLook(profile, look);
     net.look = packLook(profile.look);
     garage?.render(profile);
   });

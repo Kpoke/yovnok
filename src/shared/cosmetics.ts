@@ -45,7 +45,7 @@ export type WheelStyle = {
   unlock: UnlockRule;
 };
 
-export type RoofKind = 'none' | 'rack' | 'wing' | 'scoop' | 'lights';
+export type RoofKind = 'none' | 'rack' | 'wing' | 'scoop' | 'lights' | 'bullbar' | 'armour' | 'exhaust';
 
 export type RoofKit = {
   id: string;
@@ -72,19 +72,39 @@ export const LIVERIES: readonly Livery[] = [
   { id: 'chrome', name: 'Chrome', body: 0xdfe6ee, finish: 'chrome', unlock: { type: 'kills', n: 50 } },
 ];
 
+/**
+ * Rim colours. The realistic wheel is one textured model; the rim is painted
+ * in the shader inside the tyre's radius (gltfPartLibrary). Factory keeps the
+ * model's own finish.
+ */
 export const WHEELS: readonly WheelStyle[] = [
-  { id: 'steel', name: 'Steel', spokes: 0, hub: 0xa7b0bb, unlock: { type: 'default' } },
-  { id: 'sport', name: 'Sport Five', spokes: 5, hub: 0xcfd6df, unlock: { type: 'default' } },
-  { id: 'mesh', name: 'Mesh Nine', spokes: 9, hub: 0x9aa3ad, unlock: { type: 'matches', n: 8 } },
-  { id: 'gold', name: 'Gold Teeth', spokes: 5, hub: 0xe8c35a, unlock: { type: 'kills', n: 25 } },
+  { id: 'factory', name: 'Factory', spokes: 5, hub: 0xa7b0bb, unlock: { type: 'default' } },
+  { id: 'black', name: 'Black', spokes: 5, hub: 0x1a1c20, unlock: { type: 'default' } },
+  { id: 'gunmetal', name: 'Gunmetal', spokes: 5, hub: 0x50565e, unlock: { type: 'matches', n: 4 } },
+  { id: 'red', name: 'Red', spokes: 5, hub: 0xc8302a, unlock: { type: 'kills', n: 10 } },
+  { id: 'bronze', name: 'Bronze', spokes: 5, hub: 0xb07a3a, unlock: { type: 'matches', n: 12 } },
+  { id: 'gold', name: 'Gold', spokes: 5, hub: 0xe8c35a, unlock: { type: 'kills', n: 25 } },
+  { id: 'white', name: 'White', spokes: 5, hub: 0xeeeeea, unlock: { type: 'wins', n: 1 } },
 ];
 
+/** Body kits, bolted on (client/vehicle/bodyKits.ts). Looks only. */
 export const ROOFS: readonly RoofKit[] = [
   { id: 'clean', name: 'Clean', kind: 'none', unlock: { type: 'default' } },
-  { id: 'rack', name: 'Roof Rack', kind: 'rack', unlock: { type: 'default' } },
-  { id: 'scoop', name: 'Hood Scoop', kind: 'scoop', unlock: { type: 'matches', n: 5 } },
+  { id: 'bullbar', name: 'Bull Bar', kind: 'bullbar', unlock: { type: 'default' } },
+  { id: 'lights', name: 'Light Bar', kind: 'lights', unlock: { type: 'matches', n: 3 } },
   { id: 'wing', name: 'Rear Wing', kind: 'wing', unlock: { type: 'kills', n: 15 } },
-  { id: 'lights', name: 'Light Bar', kind: 'lights', unlock: { type: 'wins', n: 3 } },
+  { id: 'armour', name: 'Side Armour', kind: 'armour', unlock: { type: 'matches', n: 12 } },
+  { id: 'exhaust', name: 'Side Exhausts', kind: 'exhaust', unlock: { type: 'wins', n: 1 } },
+];
+
+/** Door decals; the number (if any) is painted inside the roundel. */
+export const DECALS: readonly { id: string; name: string; unlock: UnlockRule }[] = [
+  { id: 'none', name: 'None', unlock: { type: 'default' } },
+  { id: 'roundel', name: 'Race Number', unlock: { type: 'default' } },
+  { id: 'flames', name: 'Flames', unlock: { type: 'matches', n: 5 } },
+  { id: 'bolt', name: 'Lightning', unlock: { type: 'kills', n: 8 } },
+  { id: 'skull', name: 'Skull', unlock: { type: 'kills', n: 30 } },
+  { id: 'star', name: 'Star', unlock: { type: 'wins', n: 1 } },
 ];
 
 /** A paint pattern over the livery, in the accent colour (drawn in the paint shader). */
@@ -142,9 +162,24 @@ export type CosmeticLook = {
    */
   primary: number;
   secondary: number;
+  /** Index into `DECALS`. */
+  decal: number;
+  /** Race number on the doors, 0 = none, else 1–99. */
+  number: number;
 };
 
-export const DEFAULT_LOOK: CosmeticLook = { livery: 0, wheels: 0, roof: 0, pattern: 0, accent: 0, glow: 0, primary: 0, secondary: 0 };
+export const DEFAULT_LOOK: CosmeticLook = {
+  livery: 0,
+  wheels: 0,
+  roof: 0,
+  pattern: 0,
+  accent: 0,
+  glow: 0,
+  primary: 0,
+  secondary: 0,
+  decal: 0,
+  number: 0,
+};
 
 /** Clamp every index into range, so a stale profile cannot crash a render. */
 export function clampLook(look: Partial<CosmeticLook>): CosmeticLook {
@@ -157,6 +192,8 @@ export function clampLook(look: Partial<CosmeticLook>): CosmeticLook {
     glow: clampIndex(look.glow ?? 0, GLOWS.length),
     primary: clampIndex(look.primary ?? 0, PRIMARIES.length),
     secondary: clampIndex(look.secondary ?? 0, SECONDARIES.length),
+    decal: clampIndex(look.decal ?? 0, DECALS.length),
+    number: clampIndex(look.number ?? 0, 100),
   };
 }
 
@@ -172,30 +209,40 @@ function clampIndex(v: number, length: number): number {
   return i < 0 ? 0 : i >= length ? length - 1 : i;
 }
 
+/** Above the low 32 bits: arithmetic, not bit operations (those are 32-bit). */
+const HIGH = 2 ** 32;
+
 /**
- * Pack a look into one integer for the wire — many fields per vehicle per tick
+ * Pack a look into one number for the wire — many fields per vehicle per tick
  * would be many fields in the hottest message in the game; one is enough:
  *
  *   bits 0–7 livery · 8–11 wheels · 12–15 roof · 16–19 pattern · 20–23 accent
  *   24–26 underglow · 27–28 primary gun · 29–30 secondary gun
+ *   above 2^32: decal (4 bits) and race number (7 bits)
  */
 export function packLook(look: Partial<CosmeticLook>): number {
   const l = clampLook(look);
-  return (
-    (l.livery & 0xff) |
-    ((l.wheels & 0xf) << 8) |
-    ((l.roof & 0xf) << 12) |
-    ((l.pattern & 0xf) << 16) |
-    ((l.accent & 0xf) << 20) |
-    ((l.glow & 0x7) << 24) |
-    ((l.primary & 0x3) << 27) |
-    ((l.secondary & 0x3) << 29)
-  );
+  const low =
+    ((l.livery & 0xff) |
+      ((l.wheels & 0xf) << 8) |
+      ((l.roof & 0xf) << 12) |
+      ((l.pattern & 0xf) << 16) |
+      ((l.accent & 0xf) << 20) |
+      ((l.glow & 0x7) << 24) |
+      ((l.primary & 0x3) << 27) |
+      ((l.secondary & 0x3) << 29)) >>>
+    0;
+  const high = (l.decal & 0xf) | ((l.number & 0x7f) << 4);
+  return low + high * HIGH;
 }
 
 export function unpackLook(packed: number): CosmeticLook {
-  const n = Number.isFinite(packed) ? Math.floor(packed) : 0;
+  const whole = Number.isFinite(packed) && packed >= 0 ? Math.floor(packed) : 0;
+  const n = whole % HIGH;
+  const high = Math.floor(whole / HIGH);
   return clampLook({
+    decal: high & 0xf,
+    number: (high >> 4) & 0x7f,
     livery: n & 0xff,
     wheels: (n >> 8) & 0xf,
     roof: (n >> 12) & 0xf,
@@ -215,8 +262,10 @@ export function botLook(id: number): CosmeticLook {
   const a = Math.abs(id);
   return clampLook({
     livery: a % LIVERIES.length,
-    wheels: 0,
-    roof: 0,
+    wheels: (a * 3) % WHEELS.length,
+    roof: (a * 5 + 1) % ROOFS.length,
+    decal: a % 2 === 0 ? 1 : (a * 3) % DECALS.length,
+    number: ((a * 37) % 98) + 1,
     // Some bots wear a pattern; guns vary too, so the field is not all MGs.
     pattern: a % 3 === 0 ? 0 : (a * 7 + 1) % PATTERNS.length,
     accent: (a * 5 + 2) % ACCENTS.length,
@@ -249,7 +298,16 @@ export function unlockMet(rule: UnlockRule, profile: Profile): boolean {
   }
 }
 
-export type CosmeticKind = 'livery' | 'wheels' | 'roof' | 'pattern' | 'accent' | 'glow' | 'primary' | 'secondary';
+export type CosmeticKind =
+  | 'livery'
+  | 'wheels'
+  | 'roof'
+  | 'pattern'
+  | 'accent'
+  | 'glow'
+  | 'decal'
+  | 'primary'
+  | 'secondary';
 
 /** The garage's gun choices, described. Sidegrades: all open from the start. */
 export const GUN_CHOICES: Record<'primary' | 'secondary', readonly { name: string; blurb: string; unlock: UnlockRule }[]> = {
@@ -292,6 +350,8 @@ function listOf(kind: CosmeticKind): readonly { name: string; unlock: UnlockRule
       return ACCENTS.map((a) => ({ name: a.name, unlock: { type: 'default' } as UnlockRule }));
     case 'glow':
       return GLOWS;
+    case 'decal':
+      return DECALS;
     case 'primary':
     case 'secondary':
       return GUN_CHOICES[kind];
@@ -366,7 +426,7 @@ export function shopCatalog(profile: Profile): ShopEntry[] {
       });
     });
   };
-  for (const kind of ['livery', 'wheels', 'roof', 'pattern', 'accent', 'glow', 'primary', 'secondary'] as const) {
+  for (const kind of ['livery', 'wheels', 'roof', 'pattern', 'accent', 'glow', 'decal', 'primary', 'secondary'] as const) {
     add(kind, listOf(kind));
   }
   return out;
