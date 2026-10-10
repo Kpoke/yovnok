@@ -24,8 +24,9 @@ sideways; add it to the home screen for full screen).
 
 Press **PLAY**, then:
 
-- **VS BOTS** — a public match. Bots fill whatever seats players do not, so a
-  match starts at once; other players arriving together join the same match.
+- **VS BOTS** — a public match. Bots fill whatever seats players do not. Alone
+  on the server, it starts in seconds; when others are online, it waits up to
+  a minute so people pressing PLAY around the same time share the match.
 - **PRIVATE ROOM** — create a room and send friends its five-letter code or
   invite link. 2–12 players, no bots; the host picks the map and starts.
 
