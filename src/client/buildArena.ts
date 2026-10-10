@@ -202,8 +202,10 @@ const DEFAULT_TILE = 4;
  * arena cost ~50 calls before a single vehicle was drawn; merged, it is a
  * handful no matter how much map is added. Cars are the budget that matters.
  */
-export function buildArena(options: { containers?: boolean } = {}): THREE.Group {
+export function buildArena(options: { containers?: boolean; skip?: ReadonlySet<number> } = {}): THREE.Group {
   const containers = options.containers ?? true;
+  // Palette roles the map's scenery draws itself (rocks, tree trunks…).
+  const skip = options.skip ?? new Set<number>();
   const group = new THREE.Group();
   group.name = 'arena';
 
@@ -243,7 +245,7 @@ export function buildArena(options: { containers?: boolean } = {}): THREE.Group 
   for (const solid of SOLIDS) {
     // Cover blocks are drawn as container stacks instead (one mesh, below).
     // …and props by buildProps (models inside the same collision box).
-    if (solid.ground || (containers && isContainerBlock(solid)) || solid.prop) continue;
+    if (solid.ground || (containers && isContainerBlock(solid)) || solid.prop || skip.has(solid.color)) continue;
     const key = `${solid.color}:${solid.kind}`;
     const batch = batches.get(key) ?? { color: solid.color, kind: solid.kind, solids: [] };
     batch.solids.push(solid);

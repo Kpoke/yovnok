@@ -44,7 +44,9 @@ import {
   type Solid,
   STADIUM_HALF,
   STADIUM_WALL,
+  useMap,
 } from '../src/shared/arena';
+import { MAP_IDS } from '../src/shared/mapIds';
 import { wrapAngle } from '../src/shared/math';
 import { buildZonePlan, seededRandom, zoneAt, zoneRules } from '../src/shared/zone';
 import { SpatialGrid } from '../src/shared/grid';
@@ -1132,6 +1134,61 @@ console.log('\n=== 26. authored map: verticality, landmarks, roads (M12) ===');
     road ? !isBlockingAt(road, 200, 0, TEST_SPEC.rideHeight, VEHICLE.stepUp) : false,
   );
 }
+
+console.log('\n=== 27. every map is sound ===');
+for (const id of MAP_IDS) {
+  // Each map is its own shape: the same guarantees must hold on all of them.
+  const map = useMap(id);
+  const spec = VEHICLE_CLASSES.solo;
+  const ring = spawnRing(MATCH.soloCars, SOLO_SPAWN_RADIUS);
+
+  let blocked = 0;
+  for (const spawn of ring) {
+    const s = createVehicle(spawn.x, spawn.y, spawn.z, spawn.yaw, spec);
+    run(s, 120, {});
+    if (Math.hypot(s.pos.x - spawn.x, s.pos.z - spawn.z) >= 2 || !s.onGround || hazardAt(s.pos.x, s.pos.z) > 0) blocked++;
+  }
+  check(`${map.name}: all ${ring.length} spawns clear`, blocked === 0, `${blocked} blocked`);
+
+  let mismatches = 0;
+  for (let x = -380; x <= 380; x += 5) {
+    for (let z = -380; z <= 380; z += 5) {
+      if (Math.abs(terrainHeightAt(x, z, 100) - terrainHeightAt(z, -x, 100)) > 1e-6) mismatches++;
+    }
+  }
+  check(`${map.name}: 4-fold symmetric`, mismatches === 0, `${mismatches} samples differed`);
+
+  let buried = 0;
+  for (const crate of REPAIR_CRATES) {
+    const ground = terrainHeightAt(crate.x, crate.z, 40);
+    if (!Number.isFinite(ground)) buried++;
+    else for (const solid of SOLIDS) if (isBlockingAt(solid, crate.x, crate.z, ground, VEHICLE.stepUp)) buried++;
+  }
+  const onHazard = REPAIR_CRATES.filter((c) => hazardAt(c.x, c.z) > 0).length;
+  check(`${map.name}: crates reachable and off hazards`, buried === 0 && onHazard === 0, `${buried} buried, ${onHazard} on hazard`);
+
+  // From each cardinal spawn, full throttle straight at the middle gets there.
+  let reached = 0;
+  for (const spawn of [ring[0], ring[3], ring[6], ring[9]]) {
+    const s = createVehicle(spawn.x, spawn.y, spawn.z, spawn.yaw, spec);
+    let nearest = Infinity;
+    for (let t = 0; t < 60 * 15; t++) {
+      stepVehicle(s, input({ throttle: 1 }), DT);
+      nearest = Math.min(nearest, Math.hypot(s.pos.x, s.pos.z));
+    }
+    if (nearest < 20) reached++;
+  }
+  check(`${map.name}: the centre is reachable from every side`, reached === 4, `${reached}/4`);
+
+  let escaped = 0;
+  for (const yaw of [-Math.PI / 4, Math.PI / 4, (-3 * Math.PI) / 4, (3 * Math.PI) / 4]) {
+    const s = createVehicle(0, terrainHeightAt(0, 0, 100) + 2, 0, yaw, spec);
+    run(s, 900, { throttle: 1 });
+    if (Math.abs(s.pos.x) > STADIUM_HALF + 1 || Math.abs(s.pos.z) > STADIUM_HALF + 1) escaped++;
+  }
+  check(`${map.name}: nobody leaves the arena`, escaped === 0, `${escaped} escaped`);
+}
+useMap('stadium');
 
 console.log(
   failures === 0 ? '\n✓ all simulation checks passed\n' : `\n✗ ${failures} check(s) failed\n`,

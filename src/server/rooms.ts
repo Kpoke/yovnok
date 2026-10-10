@@ -24,7 +24,7 @@
  */
 
 import type { WebSocket } from 'ws';
-import { MAP_IDS } from '../shared/mapIds';
+import { isMapId, MAP_IDS } from '../shared/mapIds';
 import { Room } from './room';
 import { record } from './stats';
 
@@ -39,7 +39,7 @@ const MAX_ROOMS = Number(process.env.MAX_ROOMS ?? 3);
  * server carries with headroom. Past it, PLAY answers "busy" and the page waits
  * its turn. A player taking back a held car is always let in.
  */
-const MAX_PLAYERS = Number(process.env.MAX_PLAYERS ?? 20);
+const MAX_PLAYERS = Number(process.env.MAX_PLAYERS ?? 16);
 /** How long a turned-away page waits before asking again. */
 const BUSY_RETRY_SECONDS = 15;
 /** A connected page that never presses PLAY is closed after this long. */
@@ -47,6 +47,8 @@ const TITLE_IDLE_MS = Number(process.env.TITLE_IDLE_MS ?? 30 * 60 * 1000);
 /** Room codes: letters only, none that read alike (I/L, O/Q). */
 const CODE_LETTERS = 'ABCDEFGHJKMNPRSTUVWXYZ';
 const CODE_LENGTH = 5;
+/** Tests only: every public room on this map, no rotation. */
+const DEV_MAP = isMapId(process.env.DEV_MAP) ? process.env.DEV_MAP : null;
 /** Keepalive for sockets still on the title (proxies drop silent sockets). */
 const PING_MS = 25_000;
 
@@ -160,8 +162,8 @@ export class RoomManager {
 
   /** A public room (on a random map), or a private one with its code. */
   private open(code?: string): Room {
-    const map = code ? undefined : MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)];
-    const room = new Room({ code, map });
+    const map = code ? undefined : (DEV_MAP ?? MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)]);
+    const room = new Room({ code, map, rotate: !code && !DEV_MAP });
     room.start();
     this.rooms.push(room);
     console.log(`[rooms] opened ${code ? `private room ${code}` : 'a public room'} (${this.rooms.length} running)`);

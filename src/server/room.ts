@@ -402,6 +402,8 @@ export type RoomOptions = {
   code?: string;
   /** The first map (public rooms rotate after each match). */
   map?: MapId;
+  /** Pick a new map after each match (public rooms). */
+  rotate?: boolean;
 };
 
 export class Room {
@@ -410,12 +412,14 @@ export class Room {
   /** The map this room's match is on, and the next one when decided. */
   private mapId: MapId;
   private nextMapId: MapId | null = null;
+  private readonly rotate: boolean;
   /** Private rooms: who picks the map and starts the match. */
   private hostId: number | null = null;
 
   constructor(options: RoomOptions = {}) {
     this.code = options.code ?? null;
     this.mapId = options.map ?? DEFAULT_MAP;
+    this.rotate = options.rotate ?? !this.code;
     this.crates = this.cratesFor(this.mapId);
     this.nextCrateId = this.crates.length;
     if (this.code) {
@@ -2125,7 +2129,7 @@ export class Room {
     // A match just ended: a public room picks the next map now, so pages can
     // load it during the results.
     if (this.match.phase !== this.seenPhase) {
-      if (this.match.phase === 'results' && !this.isPrivate) this.pickNextMap();
+      if (this.match.phase === 'results' && this.rotate) this.pickNextMap();
       this.seenPhase = this.match.phase;
     }
   }

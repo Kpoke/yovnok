@@ -28,6 +28,10 @@ export type Surface = {
    * normal variation glittered like wet glass at grazing angles.
    */
   matte?: boolean;
+  /** Rain-soaked: the texture's roughness halved, so the lamps streak in it. */
+  wet?: boolean;
+  /** Ice: near-mirror smooth, no texture roughness. */
+  glossy?: boolean;
 };
 
 /** Shipping containers (buildContainers.ts): galvanised corrugated metal, painted per box. */
@@ -56,6 +60,12 @@ export const SURFACES: SurfaceTable = {
   ramp: { material: 'metal_plate', tile: 3 },
   landmark: { material: 'rusty_metal_02', tile: 3 },
   hazard: { material: 'brown_mud_03', tile: 4, tint: 0xb07a5a, matte: true },
+  // Roles the other maps use; each map's theme may override them.
+  rock: { material: 'rock_boulder_dry', tile: 9 },
+  ice: { material: 'snow_02', tile: 8, tint: 0xa9c8e6, glossy: true },
+  trunk: { material: 'bark_brown_02', tile: 2 },
+  log: { material: 'bark_brown_02', tile: 2, tint: 0xc8b090 },
+  building: { material: 'corrugated_iron', tile: 6 },
 };
 
 /** The active map's surfaces (its theme's table over the defaults). */
@@ -77,10 +87,12 @@ export function surfaceOf(colour: number): Surface | undefined {
   return byColour.get(colour);
 }
 
-/** Every material a surface table needs (to download ahead of time). */
-export function materialsOf(overrides: SurfaceTable = {}, containers = false): string[] {
+/** The materials a map needs: its solids' roles in its table (to download ahead). */
+export function materialsOf(overrides: SurfaceTable = {}, containers = false, colours?: ReadonlySet<number>): string[] {
   const table = { ...SURFACES, ...overrides };
-  const ids = Object.values(table).map((s) => s!.material);
+  const ids = (Object.entries(table) as [PaletteRole, Surface][])
+    .filter(([role]) => !colours || colours.has(PALETTE[role] as number))
+    .map(([, s]) => s.material);
   if (containers) ids.push(CONTAINER_SURFACE.material);
   return [...new Set(ids)];
 }
@@ -140,7 +152,7 @@ export async function applyArenaSurfaces(arena: THREE.Object3D, loader: GLTFLoad
     const base = loaded.get(surface.material);
     if (!base) return;
     const layer = (mesh.userData.groundLayer as number | undefined) ?? -1;
-    const key = `${surface.material}:${surface.tint ?? ''}:${mesh.userData.doubleSided ? 2 : 1}:${layer}:${surface.vertexColors ? 'vc' : ''}:${surface.matte ? 'm' : ''}`;
+    const key = `${surface.material}:${surface.tint ?? ''}:${mesh.userData.doubleSided ? 2 : 1}:${layer}:${surface.vertexColors ? 'vc' : ''}:${surface.matte ? 'm' : ''}:${surface.wet ? 'w' : ''}:${surface.glossy ? 'g' : ''}`;
     let material = variants.get(key);
     if (!material) {
       material = base.clone();
@@ -160,6 +172,17 @@ export async function applyArenaSurfaces(arena: THREE.Object3D, loader: GLTFLoad
         material.metalnessMap = null;
         material.metalness = 0;
         material.normalScale.set(0.55, 0.55);
+      }
+      if (surface.wet) {
+        material.roughness = 0.45;
+        material.envMapIntensity = 1.6;
+      }
+      if (surface.glossy) {
+        material.roughnessMap = null;
+        material.roughness = 0.08;
+        material.metalnessMap = null;
+        material.metalness = 0;
+        material.envMapIntensity = 1.4;
       }
       if (surface.vertexColors) {
         // Painted steel: the paint is a dielectric coat over the metal, so the

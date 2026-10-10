@@ -46,8 +46,8 @@ export class World {
   }
 
   /** Per frame: animate the scenery (crowd, screens, weather). */
-  update(dt: number): void {
-    for (const d of this.dressing) d.update?.(dt);
+  update(dt: number, view: THREE.Vector3): void {
+    for (const d of this.dressing) d.update?.(dt, view);
   }
 
   /** A kill or a blast: the scenery reacts (cheers, pyro, the big screen). */
@@ -60,7 +60,9 @@ export class World {
     const map = MAPS[id];
     const theme = THEMES[id];
     return Promise.all([
-      ...materialsOf(theme.surfaces, theme.containers).map((m) => loadMaterial(m, this.loader)),
+      ...materialsOf(theme.surfaces, theme.containers, new Set(map.solids.map((s) => s.color))).map((m) =>
+        loadMaterial(m, this.loader),
+      ),
       this.lighting.loadEnvironment(LIGHTING_PRESETS[map.lighting]),
     ]);
   }
@@ -80,7 +82,7 @@ export class World {
     // Builders read the active map's solids and surfaces.
     useMap(id);
     setSurfaces(theme.surfaces);
-    const arena = buildArena({ containers: theme.containers });
+    const arena = buildArena({ containers: theme.containers, skip: new Set(theme.skip ?? []) });
     const [dressing] = await Promise.all([theme.dressing(this.loader), applyArenaSurfaces(arena, this.loader)]);
     const objects = dressing.flatMap((d) => d.objects);
     if (generation !== this.generation) {
