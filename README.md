@@ -76,7 +76,8 @@ Useful switches (environment variables for the server):
 | `MODE` | `duel` | `solo` is the game as released (one-car teams, bots, the ring) |
 | `BOTS` | `fill` in solo | `off`, or a number to fill the field to |
 | `SOLO_CARS` | `12` | cars per solo match |
-| `MAX_ROOMS` | `8` | simultaneous matches in one process |
+| `MAX_ROOMS` | `3` | simultaneous matches in one process, public and private |
+| `MAX_PLAYERS` | `20` | players at once; past it, PLAY waits for a seat |
 | `REJOIN_SECONDS` | `30` | how long a dropped player's car is held |
 | `ALLOWED_ORIGINS` | *(any)* | comma-separated origins allowed to open sockets |
 | `TRUST_PROXY` | off | `1` behind a reverse proxy (client IP from `X-Forwarded-For`) |

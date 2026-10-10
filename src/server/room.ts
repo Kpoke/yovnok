@@ -25,11 +25,13 @@ import {
   ARENA_HALF,
   DUEL_SPAWN_RADIUS,
   hazardAt,
+  MAPS,
   raycastSolids,
-  REPAIR_CRATES,
   SOLO_SPAWN_RADIUS,
   spawnForTeam,
+  useMap,
 } from '../shared/arena';
+import { DEFAULT_MAP, isMapId, MAP_IDS, type MapId } from '../shared/mapIds';
 import { SpatialGrid } from '../shared/grid';
 import {
   beginCountdown,
@@ -390,7 +392,59 @@ const ZONE_SEED = process.env.ZONE_SEED === undefined ? null : Number(process.en
  */
 const FORCE_LIVE = process.env.MATCH_FORCE_LIVE === '1';
 
+/** A private room's player limits: no bots, so a match needs two people. */
+export const PRIVATE_MIN_PLAYERS = 2;
+export const PRIVATE_MAX_PLAYERS = 12;
+
+/** Options for a room. A private room has a code and is joined only with it. */
+export type RoomOptions = {
+  /** Private room code; absent for a public match. */
+  code?: string;
+  /** The first map (public rooms rotate after each match). */
+  map?: MapId;
+};
+
 export class Room {
+  /** Private room code, or null for a public room. */
+  readonly code: string | null;
+  /** The map this room's match is on, and the next one when decided. */
+  private mapId: MapId;
+  private nextMapId: MapId | null = null;
+  /** Private rooms: who picks the map and starts the match. */
+  private hostId: number | null = null;
+
+  constructor(options: RoomOptions = {}) {
+    this.code = options.code ?? null;
+    this.mapId = options.map ?? DEFAULT_MAP;
+    this.crates = this.cratesFor(this.mapId);
+    this.nextCrateId = this.crates.length;
+    if (this.code) {
+      // Every seat is a person: no bots, and two make a match.
+      this.rules = { ...this.rules, minPlayers: PRIVATE_MIN_PLAYERS };
+    }
+  }
+
+  get isPrivate(): boolean {
+    return this.code !== null;
+  }
+
+  /** Make this room's map the active one before touching the simulation. */
+  private enter(): void {
+    useMap(this.mapId);
+  }
+
+  private cratesFor(id: MapId): RepairCrate[] {
+    return MAPS[id].crates.map((p, i) => ({
+      id: i,
+      x: p.x,
+      z: p.z,
+      charge: REPAIR.capacitySeconds,
+      respawnIn: 0,
+      salvage: false,
+      expiresIn: 0,
+    }));
+  }
+
   private players = new Map<number, Player>();
   private crews = new Map<number, Crew>();
   private nextPlayerId = 1;
@@ -420,17 +474,9 @@ export class Room {
    * Repair crates. Created once from the arena definition; their charge and
    * respawn timers are the only mutable state.
    */
-  private crates: RepairCrate[] = REPAIR_CRATES.map((p, i) => ({
-    id: i,
-    x: p.x,
-    z: p.z,
-    charge: REPAIR.capacitySeconds,
-    respawnIn: 0,
-    salvage: false,
-    expiresIn: 0,
-  }));
+  private crates: RepairCrate[] = [];
   /** Ids for salvage piles, kept clear of the static crates' ids. */
-  private nextCrateId = REPAIR_CRATES.length;
+  private nextCrateId = 0;
   /** Shots fired since the last snapshot, flushed with it. */
   private pendingShots: ShotEvent[] = [];
   /** Destructions since the last snapshot, for the kill feed. */
@@ -539,7 +585,14 @@ export class Room {
   /** Can a new player be placed here now? (Not mid-match, and a seat free.) */
   get joinable(): boolean {
     const phase = this.match.phase;
+    if (this.isPrivate) return phase !== 'live' && this.humanCount() < PRIVATE_MAX_PLAYERS;
     return (phase === 'lobby' || phase === 'countdown') && this.humanCount() < this.teamCount;
+  }
+
+  /** A private room that is full or mid-match (a code-holder must wait). */
+  get privateState(): 'open' | 'full' | 'live' {
+    if (this.humanCount() >= PRIVATE_MAX_PLAYERS) return 'full';
+    return this.match.phase === 'live' ? 'live' : 'open';
   }
 
   /** Lobby before countdown: used to prefer the room closest to starting. */
@@ -579,7 +632,7 @@ export class Room {
 
   /** How many bots should exist right now (DESIGN.md §12.4: lobby fill). */
   private desiredBots(): number {
-    if (BOT_TARGET === 'off') return 0;
+    if (BOT_TARGET === 'off' || this.isPrivate) return 0;
     const field = BOT_TARGET === 'fill' ? this.teamCount : Math.min(BOT_TARGET, this.teamCount);
     return Math.max(0, field - this.humanCount());
   }
@@ -684,6 +737,9 @@ export class Room {
   private stepBots(now: number): Map<number, VehicleInput> {
     const inputs = new Map<number, VehicleInput>();
     if (this.match.phase !== 'live') return inputs;
+    // A private room has no bots: a car held for a player who dropped waits,
+    // parked, for them to come back.
+    if (this.isPrivate) return inputs;
 
     // Repair points are the same for every bot this tick, so build them once
     // rather than per bot per tick.
@@ -924,10 +980,59 @@ export class Room {
       this.send(other.socket, { t: 'join', id: player.id, crew: player.crew, seat: player.seat });
     }
 
+    this.send(player.socket, { t: 'map', id: this.mapId, next: this.nextMapId });
+    if (this.isPrivate && (this.hostId === null || !this.players.get(this.hostId)?.socket)) this.hostId = player.id;
+
     console.log(
       `[room] player ${player.id} → crew ${crew.id} as ${seat} (${this.playerCount} players, ${this.crews.size} crews)`,
     );
     this.broadcastRoster();
+    this.broadcastRoomState();
+  }
+
+  // ------------------------------------------------------- maps and private rooms
+
+  /** Change this room's map (between matches): crates, spawns, everyone told. */
+  private switchMap(id: MapId): void {
+    this.mapId = id;
+    this.nextMapId = null;
+    this.enter();
+    this.crates = this.cratesFor(id);
+    this.nextCrateId = this.crates.length;
+    // Out of a match, cars wait on the new map's spawns.
+    if (this.match.phase !== 'live') for (const crew of this.crews.values()) this.respawnCrew(crew);
+    for (const p of this.players.values()) this.send(p.socket, { t: 'map', id, next: null });
+    this.broadcastRoomState();
+    console.log(`[room] map → ${id}`);
+  }
+
+  /** Public rooms rotate: a different map for the next match, announced early. */
+  private pickNextMap(): void {
+    const others = MAP_IDS.filter((id) => id !== this.mapId);
+    if (others.length === 0) return;
+    this.nextMapId = others[Math.floor(Math.random() * others.length)];
+    for (const p of this.players.values()) this.send(p.socket, { t: 'map', id: this.mapId, next: this.nextMapId });
+  }
+
+  /** The private lobby, to every member (each told whether they host). */
+  private broadcastRoomState(): void {
+    if (!this.code) return;
+    const humans = [...this.players.values()].filter((p) => p.joined && !p.bot && p.socket);
+    if (this.hostId === null || !humans.some((p) => p.id === this.hostId)) this.hostId = humans[0]?.id ?? null;
+    const host = this.hostId !== null ? this.players.get(this.hostId) : undefined;
+    const players = humans.map((p) => p.name);
+    for (const p of humans) {
+      this.send(p.socket, {
+        t: 'room',
+        code: this.code,
+        host: p.id === this.hostId,
+        hostName: host?.name ?? '',
+        players,
+        map: this.mapId,
+        min: PRIVATE_MIN_PLAYERS,
+        max: PRIVATE_MAX_PLAYERS,
+      });
+    }
   }
 
   /**
@@ -989,7 +1094,9 @@ export class Room {
     }
     console.log(`[room] player ${player.id} REJOINED crew ${crew.id} (was ${away.id})`);
     record('rejoin', player.token, null);
+    this.send(player.socket, { t: 'map', id: this.mapId, next: this.nextMapId });
     this.broadcastRoster();
+    this.broadcastRoomState();
     return true;
   }
 
@@ -1068,6 +1175,7 @@ export class Room {
   }
 
   private removeClient(id: number): void {
+    this.enter();
     const player = this.players.get(id);
     if (!player) return;
 
@@ -1092,7 +1200,8 @@ export class Room {
       player.awayUntil = performance.now() + REJOIN_SECONDS * 1000;
       this.ready.delete(id);
       record('left', player.token, null, { held: true });
-      console.log(`[room] player ${id} left mid-match; a bot holds crew ${crew.id} for ${REJOIN_SECONDS}s`);
+      console.log(`[room] player ${id} left mid-match; crew ${crew.id} held for ${REJOIN_SECONDS}s`);
+      this.broadcastRoomState();
       return;
     }
 
@@ -1118,9 +1227,11 @@ export class Room {
     }
     console.log(`[room] player ${id} left (${this.playerCount} players, ${this.crews.size} crews)`);
     this.broadcastRoster();
+    this.broadcastRoomState();
   }
 
   private onMessage(player: Player, data: unknown): void {
+    this.enter();
     player.lastSeenAt = performance.now();
 
     let msg: ClientMessage;
@@ -1164,6 +1275,19 @@ export class Room {
 
     if (msg.t === 'ready') {
       this.toggleReady(player);
+      return;
+    }
+
+    // Private room, host only: pick the map, start the match.
+    if (msg.t === 'roomMap' || msg.t === 'roomStart') {
+      if (!this.isPrivate || player.id !== this.hostId) return;
+      const phase = this.match.phase;
+      if (phase !== 'lobby' && phase !== 'results') return;
+      if (msg.t === 'roomMap') {
+        if (isMapId(msg.map) && msg.map !== this.mapId) this.switchMap(msg.map);
+        return;
+      }
+      if (this.humanCount() >= PRIVATE_MIN_PLAYERS) this.startCountdown(performance.now());
       return;
     }
 
@@ -1759,6 +1883,7 @@ export class Room {
   // --------------------------------------------------------------------- loop
 
   private advance(): void {
+    this.enter();
     const now = performance.now();
     let dt = (now - this.lastTime) / 1000;
     this.lastTime = now;
@@ -1939,7 +2064,10 @@ export class Room {
 
     // A room with no humans does not start a match, however many bots are in it:
     // idle servers should wait, not play to an empty house.
-    const readiness = this.humanCount() > 0 ? counts : counts.map(() => 0);
+    // A private room starts only when its host says so: until the countdown,
+    // readiness is nil (and during it, real, so dropping below two cancels it).
+    const waitForHost = this.isPrivate && this.match.phase !== 'countdown';
+    const readiness = this.humanCount() > 0 && !waitForHost ? counts : counts.map(() => 0);
 
     if (this.match.phase === 'results' && !this.matchRecorded && this.liveSince > 0) this.recordMatch(now);
 
@@ -1993,10 +2121,20 @@ export class Room {
       this.ready.clear();
       console.log('[room] results expired → lobby');
     }
+
+    // A match just ended: a public room picks the next map now, so pages can
+    // load it during the results.
+    if (this.match.phase !== this.seenPhase) {
+      if (this.match.phase === 'results' && !this.isPrivate) this.pickNextMap();
+      this.seenPhase = this.match.phase;
+    }
   }
+
+  private seenPhase: MatchState['phase'] = 'lobby';
 
   /** Fresh field at the top of a match: crews home, healed, full crates. */
   private resetForMatch(): void {
+    if (this.nextMapId) this.switchMap(this.nextMapId);
     for (const crew of this.crews.values()) this.respawnCrew(crew);
     this.projectiles.length = 0;
     this.pendingShots.length = 0;

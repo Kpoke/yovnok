@@ -23,6 +23,10 @@ import {
   type VehicleClassId,
 } from '../shared/config';
 import { SPAWNS } from '../shared/arena';
+import { DEFAULT_MAP, type MapId } from '../shared/mapIds';
+
+/** A private room's lobby, as the server last described it. */
+export type RoomState = Extract<ServerMessage, { t: 'room' }>;
 import {
   clampToArc,
   seatById,
@@ -155,6 +159,21 @@ export class NetClient {
   readonly sessionToken = loadSessionToken();
   /** Callsign per crew, from the server's roster. */
   readonly names = new Map<number, string>();
+  /**
+   * The server is at its player limit and asked us to wait: when it will be
+   * asked again (performance.now), and the counts it gave. Null otherwise.
+   */
+  busy: { online: number; capacity: number; retryAt: number; reason: 'full' | 'rooms' | 'live' } | null = null;
+  /** Why the last join was refused (`no such room`, `room full`…), until the next try. */
+  rejected: string | null = null;
+  /** The match's map, and the next one when the server has decided it. */
+  mapId: MapId = DEFAULT_MAP;
+  nextMapId: MapId | null = null;
+  /** The private room we are in, or null (public match / title). */
+  room: RoomState | null = null;
+  /** What `hello` asks for: a private room (`new` or a code), or a public match. */
+  private roomRequest: string | undefined;
+  private busyTimer: ReturnType<typeof setTimeout> | null = null;
   /** True after a `welcome` that handed back a car we had left (REJOIN). */
   resumed = false;
   /** When (performance.now) the server stops holding a car we left; 0 = none. */
@@ -405,6 +424,11 @@ export class NetClient {
 
     socket.onclose = () => {
       this.socketOpen = false;
+      this.busy = null;
+      this.room = null;
+      this.nextMapId = null;
+      if (this.busyTimer) clearTimeout(this.busyTimer);
+      this.busyTimer = null;
       this.connected = false;
       this.wantJoin = false;
       this.playerId = null;
@@ -427,10 +451,30 @@ export class NetClient {
   }
 
   /** Join the lobby. The only thing that turns a connection into a seat. */
-  join(): void {
+  /** @param room a private room: `new` to create one, or its code */
+  join(room?: string): void {
     if (this.connected) return;
+    this.roomRequest = room;
+    this.rejected = null;
     this.wantJoin = true;
     if (this.socketOpen) this.sendHello();
+  }
+
+  /** Private room, host only. */
+  sendRoomMap(map: MapId): void {
+    if (this.socket?.readyState === 1) this.socket.send(JSON.stringify({ t: 'roomMap', map } satisfies ClientMessage));
+  }
+
+  sendRoomStart(): void {
+    if (this.socket?.readyState === 1) this.socket.send(JSON.stringify({ t: 'roomStart' } satisfies ClientMessage));
+  }
+
+  /** Stop waiting for a seat (the waiting card's BACK). */
+  cancelJoin(): void {
+    this.wantJoin = false;
+    this.busy = null;
+    if (this.busyTimer) clearTimeout(this.busyTimer);
+    this.busyTimer = null;
   }
 
   private sendHello(): void {
@@ -447,6 +491,7 @@ export class NetClient {
       name: this.callsign,
       token: this.sessionToken,
       client: this.clientInfo,
+      room: this.roomRequest,
     };
     socket.send(JSON.stringify(hello));
   }
@@ -475,6 +520,7 @@ export class NetClient {
         this.seat = msg.seat;
         this.vehicleClass = msg.cls;
         this.connected = true;
+        this.busy = null;
         this.local.spec = VEHICLE_CLASSES[msg.cls];
         this.renderLocal.spec = VEHICLE_CLASSES[msg.cls];
         // What we hold follows from the seat: a car-mounted gun, or the
@@ -507,6 +553,23 @@ export class NetClient {
         this.heldUntil = msg.seconds > 0 ? performance.now() + msg.seconds * 1000 : 0;
         break;
       }
+      case 'busy': {
+        // No seat yet: wait, then ask again on the same connection.
+        if (!this.wantJoin) break;
+        const wait = Math.max(3, msg.retrySeconds) * 1000;
+        this.busy = {
+          online: msg.online,
+          capacity: msg.capacity,
+          retryAt: performance.now() + wait,
+          reason: msg.reason ?? 'full',
+        };
+        if (this.busyTimer) clearTimeout(this.busyTimer);
+        this.busyTimer = setTimeout(() => {
+          this.busyTimer = null;
+          if (this.wantJoin && !this.connected) this.sendHello();
+        }, wait);
+        break;
+      }
       case 'roster': {
         this.names.clear();
         for (const [crew, name] of Object.entries(msg.names)) this.names.set(Number(crew), name);
@@ -537,6 +600,17 @@ export class NetClient {
       }
       case 'reject': {
         this.onStatus(`refused: ${msg.reason}`);
+        this.rejected = msg.reason;
+        this.wantJoin = false;
+        break;
+      }
+      case 'map': {
+        this.mapId = msg.id;
+        this.nextMapId = msg.next;
+        break;
+      }
+      case 'room': {
+        this.room = msg;
         break;
       }
       case 'pong': {

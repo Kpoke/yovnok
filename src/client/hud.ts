@@ -149,6 +149,7 @@ export class Hud {
   private loadingPanel = byId('loading');
   private loadingFill = byId('loading-fill');
   private loadingText = byId('loading-text');
+  private loadingKicker = byId('loading-kicker');
   private loadingActive = false;
   private onSoundCallback: (() => void) | null = null;
 
@@ -342,6 +343,53 @@ export class Hud {
    * hides it. While it is up the title card stays down, whatever the frame loop
    * says about the connection.
    */
+  /**
+   * The server is at its player limit: the loading card becomes a waiting card
+   * (who is playing, when we try again) with a way back to the title.
+   */
+  setBusy(
+    busy: { online: number; capacity: number; retryIn: number; reason: 'full' | 'rooms' | 'live' } | null,
+  ): void {
+    this.loadingPanel.classList.toggle('busy', busy !== null);
+    this.loadingKicker.textContent = busy ? (busy.reason === 'live' ? 'MATCH UNDER WAY' : 'ARENA FULL') : 'GOING LIVE';
+    if (!busy) return;
+    if (busy.reason === 'rooms') {
+      this.loadingText.textContent =
+        `Every arena is mid-match right now. You'll go into the next one that opens ` +
+        `(next try in ${Math.max(0, Math.ceil(busy.retryIn))} s), or come back in a few minutes.`;
+      return;
+    }
+    if (busy.reason === 'live') {
+      this.loadingText.textContent =
+        `That room's match is still running. You'll go in as soon as it ends ` +
+        `(checking again in ${Math.max(0, Math.ceil(busy.retryIn))} s).`;
+      return;
+    }
+    this.loadingText.textContent =
+      `All ${busy.capacity} seats are taken right now. ` +
+      `Hold on here — you'll go in as soon as one frees up (next try in ${Math.max(0, Math.ceil(busy.retryIn))} s), ` +
+      `or come back in a few minutes.`;
+  }
+
+  /**
+   * A new map is loading under a live connection: a card says which, over the
+   * half-built scene. Null hides it.
+   */
+  setMapLoading(name: string | null): void {
+    if (name === this.mapLoading) return;
+    this.mapLoading = name;
+    this.mapCard.classList.toggle('hidden', name === null);
+    if (name) this.mapCardName.textContent = name.toUpperCase();
+  }
+  private mapLoading: string | null = null;
+  private mapCard = byId('map-loading');
+  private mapCardName = byId('map-loading-name');
+
+  /** Register the handler for leaving the waiting card. */
+  onCancelWait(handler: () => void): void {
+    byId('loading-cancel').addEventListener('click', handler);
+  }
+
   setLoading(fraction: number | null, text = ''): void {
     this.loadingActive = fraction !== null;
     this.loadingPanel.classList.toggle('hidden', fraction === null);

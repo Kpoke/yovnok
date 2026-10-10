@@ -16,17 +16,37 @@
  * be mid-match by the time PLAY is pressed. Until then the socket belongs to
  * the manager, which answers the title's `held?` by asking every room.
  *
+ * PRIVATE ROOMS. `hello` with `room: 'new'` opens a room with a five-letter
+ * code and no bots; `room: '<code>'` joins it (while it is not mid-match). They
+ * count toward the same room and player limits.
+ *
  * Extra rooms close once idle (no humans, no held car). There is always one.
  */
 
 import type { WebSocket } from 'ws';
+import { MAP_IDS } from '../shared/mapIds';
 import { Room } from './room';
 import { record } from './stats';
 
-/** Upper bound on rooms in one process (each is a simulation at 60 Hz). */
-const MAX_ROOMS = Number(process.env.MAX_ROOMS ?? 8);
+/**
+ * Upper bound on matches at once (public and private), each a simulation at
+ * 60 Hz. On the production server (1 shared vCPU) a live 12-car match costs
+ * about a quarter of the CPU with bots, a third with twelve players.
+ */
+const MAX_ROOMS = Number(process.env.MAX_ROOMS ?? 3);
+/**
+ * People playing at once, across every match (bots not counted): what the
+ * server carries with headroom. Past it, PLAY answers "busy" and the page waits
+ * its turn. A player taking back a held car is always let in.
+ */
+const MAX_PLAYERS = Number(process.env.MAX_PLAYERS ?? 20);
+/** How long a turned-away page waits before asking again. */
+const BUSY_RETRY_SECONDS = 15;
 /** A connected page that never presses PLAY is closed after this long. */
 const TITLE_IDLE_MS = Number(process.env.TITLE_IDLE_MS ?? 30 * 60 * 1000);
+/** Room codes: letters only, none that read alike (I/L, O/Q). */
+const CODE_LETTERS = 'ABCDEFGHJKMNPRSTUVWXYZ';
+const CODE_LENGTH = 5;
 /** Keepalive for sockets still on the title (proxies drop silent sockets). */
 const PING_MS = 25_000;
 
@@ -49,7 +69,7 @@ export class RoomManager {
     this.pending.add(entry);
 
     const onMessage = (data: unknown): void => {
-      let msg: { t?: unknown; token?: unknown; client?: { input?: unknown; quality?: unknown } };
+      let msg: { t?: unknown; token?: unknown; room?: unknown; client?: { input?: unknown; quality?: unknown } };
       try {
         msg = JSON.parse(String(data)) as typeof msg;
       } catch {
@@ -58,7 +78,9 @@ export class RoomManager {
       if (msg.t === 'held?') {
         const token = typeof msg.token === 'string' ? msg.token : '';
         const seconds = token ? Math.max(0, ...this.rooms.map((r) => r.heldSecondsFor(token))) : 0;
-        if (socket.readyState === 1) socket.send(JSON.stringify({ t: 'held', seconds }));
+        if (socket.readyState === 1) {
+          socket.send(JSON.stringify({ t: 'held', seconds, online: this.online, capacity: MAX_PLAYERS }));
+        }
         // (Visits are counted by /config.json, which the page fetches through
         // Cloudflare; the socket itself may come straight to the server.)
         return;
@@ -66,13 +88,38 @@ export class RoomManager {
       if (msg.t !== 'hello') return; // nothing else means anything before joining
 
       const token = typeof msg.token === 'string' ? msg.token : '';
-      const room = this.place(token);
-      cleanup();
-      if (!room) {
-        if (socket.readyState === 1) socket.send(JSON.stringify({ t: 'reject', reason: 'server full' }));
-        console.log('[rooms] rejected a player: every room is mid-match and the room cap is reached');
-        return;
+      const rejoining = token !== '' && this.rooms.some((r) => r.heldSecondsFor(token) > 0);
+      const busy = (reason: 'full' | 'rooms' | 'live'): void => {
+        if (socket.readyState !== 1) return;
+        socket.send(
+          JSON.stringify({ t: 'busy', online: this.online, capacity: MAX_PLAYERS, retrySeconds: BUSY_RETRY_SECONDS, reason }),
+        );
+      };
+      const refuse = (reason: string): void => {
+        if (socket.readyState === 1) socket.send(JSON.stringify({ t: 'reject', reason }));
+      };
+      // At the player limit: ask the page to wait its turn. The socket stays
+      // open here, so its next `hello` is tried again.
+      if (!rejoining && this.online >= MAX_PLAYERS) return busy('full');
+
+      let room: Room | null;
+      const wanted = typeof msg.room === 'string' ? msg.room.trim().toUpperCase() : '';
+      if (rejoining) {
+        room = this.place(token);
+      } else if (wanted === 'NEW') {
+        if (this.rooms.length >= MAX_ROOMS) return refuse('no rooms free');
+        room = this.open(this.newCode());
+      } else if (wanted) {
+        room = this.rooms.find((r) => r.code === wanted) ?? null;
+        if (!room) return refuse('no such room');
+        const state = room.privateState;
+        if (state === 'full') return refuse('room full');
+        if (state === 'live') return busy('live');
+      } else {
+        room = this.place(token);
       }
+      if (!room) return busy('rooms');
+      cleanup();
       const input = ['mouse', 'gamepad', 'touch'].includes(String(msg.client?.input)) ? String(msg.client?.input) : null;
       const quality = ['low', 'medium', 'high'].includes(String(msg.client?.quality)) ? String(msg.client?.quality) : null;
       record('join', token || null, country, { input, quality });
@@ -92,13 +139,18 @@ export class RoomManager {
     socket.on('close', cleanup);
   }
 
+  /** People playing right now, across every match (bots not counted). */
+  get online(): number {
+    return this.rooms.reduce((n, r) => n + r.playerCount, 0);
+  }
+
   /** Which room a player pressing PLAY goes to; null when full. */
   private place(token: string): Room | null {
     if (token) {
       const holding = this.rooms.find((r) => r.heldSecondsFor(token) > 0);
       if (holding) return holding;
     }
-    const joinable = this.rooms.filter((r) => r.joinable);
+    const joinable = this.rooms.filter((r) => r.joinable && !r.isPrivate);
     // Closest to starting first, then the fullest: players gather, not scatter.
     joinable.sort((a, b) => Number(b.startingSoon) - Number(a.startingSoon) || b.playerCount - a.playerCount);
     if (joinable[0]) return joinable[0];
@@ -106,12 +158,23 @@ export class RoomManager {
     return this.open();
   }
 
-  private open(): Room {
-    const room = new Room();
+  /** A public room (on a random map), or a private one with its code. */
+  private open(code?: string): Room {
+    const map = code ? undefined : MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)];
+    const room = new Room({ code, map });
     room.start();
     this.rooms.push(room);
-    console.log(`[rooms] opened room ${this.rooms.length} (${this.rooms.length} running)`);
+    console.log(`[rooms] opened ${code ? `private room ${code}` : 'a public room'} (${this.rooms.length} running)`);
     return room;
+  }
+
+  /** A room code no running room has. */
+  private newCode(): string {
+    for (;;) {
+      let code = '';
+      for (let i = 0; i < CODE_LENGTH; i++) code += CODE_LETTERS[Math.floor(Math.random() * CODE_LETTERS.length)];
+      if (!this.rooms.some((r) => r.code === code)) return code;
+    }
   }
 
   /** Close idle extra rooms; keep title sockets alive; drop abandoned ones. */
@@ -138,10 +201,12 @@ export class RoomManager {
   }
 
   /** Totals across rooms, for /healthz. No identities, no positions. */
-  health(): { rooms: number; players: number; waiting: number; phases: string[] } {
+  health(): { rooms: number; private: number; players: number; capacity: number; waiting: number; phases: string[] } {
     return {
       rooms: this.rooms.length,
-      players: this.rooms.reduce((n, r) => n + r.playerCount, 0),
+      private: this.rooms.filter((r) => r.isPrivate).length,
+      players: this.online,
+      capacity: MAX_PLAYERS,
       waiting: this.pending.size,
       phases: this.rooms.map((r) => r.health().phase),
     };

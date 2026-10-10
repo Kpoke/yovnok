@@ -27,6 +27,7 @@ import type { WeaponId } from './weapons';
 import type { Components } from './components';
 import type { MatchSnapshot } from './match';
 import type { ZoneState } from './zone';
+import type { MapId } from './mapIds';
 
 /** A single tick of input, tagged so the server can acknowledge it. */
 export type InputCmd = VehicleInput & { seq: number };
@@ -216,12 +217,54 @@ export type ServerMessage =
    * left mid-match (0: nothing held — it was destroyed, the match ended, or
    * the window passed). Drives the title's REJOIN button.
    */
-  | { t: 'held'; seconds: number }
+  | {
+      t: 'held';
+      seconds: number;
+      /** People playing right now (all matches), and the server's limit. */
+      online?: number;
+      capacity?: number;
+    }
+  /**
+   * The server is at its player limit: no seat now. The page waits and sends
+   * `hello` again after `retrySeconds`.
+   */
+  | {
+      t: 'busy';
+      online: number;
+      capacity: number;
+      retrySeconds: number;
+      /**
+       * `full`: the server's player limit. `rooms`: every match slot is taken
+       * by a match in progress. `live`: the private room is mid-match.
+       */
+      reason?: 'full' | 'rooms' | 'live';
+    }
+  /**
+   * The room's map, sent on joining and whenever it changes; `next` is the map
+   * the following match will be on, when already decided (so the page can load
+   * it during the results).
+   */
+  | { t: 'map'; id: MapId; next: MapId | null }
+  /** A private room's lobby: sent to each member whenever it changes. */
+  | {
+      t: 'room';
+      code: string;
+      /** Whether the receiver is the host (picks the map, presses START). */
+      host: boolean;
+      hostName: string;
+      players: string[];
+      map: MapId;
+      min: number;
+      max: number;
+    }
   /** Callsign per crew, sent whenever it changes (joins, leaves, bots). */
   | { t: 'roster'; names: Record<number, string> }
   | { t: 'join'; id: number; crew: number; seat: SeatId }
   | { t: 'leave'; id: number }
-  /** Admission refused — currently only when a solo field is full. */
+  /**
+   * Admission refused: `match full`, or for a private room `no such room`,
+   * `room full`, `no rooms free`.
+   */
   | { t: 'reject'; reason: string }
   | { t: 'pong'; id: number }
   | {
@@ -285,7 +328,16 @@ export type ClientMessage =
       token?: string;
       /** For anonymous statistics only: how this player plays. */
       client?: { input?: 'mouse' | 'gamepad' | 'touch'; quality?: string };
+      /**
+       * A private room: `new` creates one (the sender hosts it), a code joins
+       * one. Absent: a public match.
+       */
+      room?: string;
     }
+  /** Private room, host only: the map for the next match. */
+  | { t: 'roomMap'; map: MapId }
+  /** Private room, host only: start the match (2+ players). */
+  | { t: 'roomStart' }
   /** Leave the match on purpose (the in-game menu): forfeit, no rejoin window. */
   | { t: 'leave' }
   /** Before joining: is a car this browser left still being held? */

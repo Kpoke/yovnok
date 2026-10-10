@@ -123,7 +123,8 @@ Environment variables of the game container:
 | `ALLOWED_ORIGINS` | `https://<domain>` | Origins allowed to open game sockets |
 | `PUBLIC_WS_URL` | `wss://ws.<domain>/ws` | Where the page opens the game socket (served by `/config.json`) |
 | `TRUST_PROXY` | `1` | Take the client address from Cloudflare's header |
-| `MAX_ROOMS` | `8` | Simultaneous matches |
+| `MAX_ROOMS` | `3` | Simultaneous matches, public and private |
+| `MAX_PLAYERS` | `20` | Players at once across all matches; past it, PLAY shows a waiting card |
 | `SOLO_CARS` | `12` | Cars per match (bots fill free seats) |
 | `REJOIN_SECONDS` | `30` | How long a dropped player's car is held |
 | `BANDWIDTH_BUDGET_GB` | `850` | Monthly outbound limit before new players are turned away |
