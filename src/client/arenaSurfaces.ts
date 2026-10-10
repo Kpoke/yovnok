@@ -33,14 +33,16 @@ export type Surface = {
 /** Shipping containers (buildContainers.ts): galvanised corrugated metal, painted per box. */
 export const CONTAINER_SURFACE: Surface = { material: 'corrugated_iron', tile: 7, vertexColors: true };
 
-type PaletteRole = keyof typeof PALETTE;
+export type PaletteRole = keyof typeof PALETTE;
+/** What each palette role is made of on one map. */
+export type SurfaceTable = Partial<Record<PaletteRole, Surface>>;
 
 /**
  * The look of each role. The stadium floor is worn concrete; the outfield goes
  * from dried mud to gravelly sand toward the rim; cover is cast concrete; ramps
  * are steel plate; the scrapyard crane is rusted metal.
  */
-export const SURFACES: Partial<Record<PaletteRole, Surface>> = {
+export const SURFACES: SurfaceTable = {
   zoneCentre: { material: 'concrete_floor_worn_001', tile: 7 },
   zoneDunes: { material: 'brown_mud_dry', tile: 9, matte: true },
   zoneScrapyard: { material: 'gravel_concrete', tile: 8, matte: true },
@@ -56,14 +58,57 @@ export const SURFACES: Partial<Record<PaletteRole, Surface>> = {
   hazard: { material: 'brown_mud_03', tile: 4, tint: 0xb07a5a, matte: true },
 };
 
-const byColour = new Map<number, Surface>();
-for (const [role, surface] of Object.entries(SURFACES) as [PaletteRole, Surface][]) {
-  byColour.set(PALETTE[role] as number, surface);
+/** The active map's surfaces (its theme's table over the defaults). */
+let active: SurfaceTable = SURFACES;
+let byColour = new Map<number, Surface>();
+
+/** Use a map's surfaces: called before its arena is built. */
+export function setSurfaces(overrides: SurfaceTable = {}): void {
+  active = { ...SURFACES, ...overrides };
+  byColour = new Map();
+  for (const [role, surface] of Object.entries(active) as [PaletteRole, Surface][]) {
+    byColour.set(PALETTE[role] as number, surface);
+  }
 }
+setSurfaces();
 
 /** The surface for a solid's palette colour, or undefined to keep it flat-coloured. */
 export function surfaceOf(colour: number): Surface | undefined {
   return byColour.get(colour);
+}
+
+/** Every material a surface table needs (to download ahead of time). */
+export function materialsOf(overrides: SurfaceTable = {}, containers = false): string[] {
+  const table = { ...SURFACES, ...overrides };
+  const ids = Object.values(table).map((s) => s!.material);
+  if (containers) ids.push(CONTAINER_SURFACE.material);
+  return [...new Set(ids)];
+}
+
+/** Downloaded materials by Poly Haven id (null: failed, keep flat colour). */
+const materialCache = new Map<string, Promise<THREE.MeshStandardMaterial | null>>();
+
+/** Download (once) and return a material. */
+export function loadMaterial(id: string, loader: GLTFLoader): Promise<THREE.MeshStandardMaterial | null> {
+  let pending = materialCache.get(id);
+  if (!pending) {
+    pending = loader
+      .loadAsync(`/assets/materials/${id}/${id}_2k.glb`)
+      .then((gltf) => {
+        let found: THREE.MeshStandardMaterial | null = null;
+        gltf.scene.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (mesh.isMesh && !found) found = mesh.material as THREE.MeshStandardMaterial;
+        });
+        return found;
+      })
+      .catch((error) => {
+        console.warn(`[arena] material ${id} failed to load; keeping flat colour`, error);
+        return null;
+      });
+    materialCache.set(id, pending);
+  }
+  return pending;
 }
 
 /**
@@ -72,19 +117,17 @@ export function surfaceOf(colour: number): Surface | undefined {
  * flat palette colour, so a slow load never leaves holes in the map.
  */
 export async function applyArenaSurfaces(arena: THREE.Object3D, loader: GLTFLoader): Promise<void> {
-  const ids = [...new Set([...Object.values(SURFACES).map((s) => s!.material), CONTAINER_SURFACE.material])];
+  // Only what this arena's meshes ask for.
+  const ids = new Set<string>();
+  arena.traverse((o) => {
+    const surface = o.userData.surface as Surface | undefined;
+    if (surface) ids.add(surface.material);
+  });
   const loaded = new Map<string, THREE.MeshStandardMaterial>();
   await Promise.all(
-    ids.map(async (id) => {
-      try {
-        const gltf = await loader.loadAsync(`/assets/materials/${id}/${id}_2k.glb`);
-        gltf.scene.traverse((o) => {
-          const mesh = o as THREE.Mesh;
-          if (mesh.isMesh && !loaded.has(id)) loaded.set(id, mesh.material as THREE.MeshStandardMaterial);
-        });
-      } catch (error) {
-        console.warn(`[arena] material ${id} failed to load; keeping flat colour`, error);
-      }
+    [...ids].map(async (id) => {
+      const material = await loadMaterial(id, loader);
+      if (material) loaded.set(id, material);
     }),
   );
 

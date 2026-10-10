@@ -829,6 +829,12 @@ export type LightingPreset = {
     fogNear: number;
     fogFar: number;
   };
+  /**
+   * A visible sun (or moon) on the dome, in the key light's direction: its
+   * colour, angular size (0..1, larger is bigger) and the strength of its glow.
+   * Absent at night under floodlights.
+   */
+  sun?: { colour: number; size: number; glow: number };
 };
 
 export const LIGHTING_PRESETS = {

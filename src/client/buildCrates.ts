@@ -27,6 +27,8 @@ const SALVAGE_SPENT = 0x4a3a30;
 export type CrateRig = {
   group: THREE.Group;
   update(crates: RepairCrateSnapshot[]): void;
+  /** Forget every crate (a new map: same ids, new places). */
+  reset(): void;
   dispose(): void;
 };
 
@@ -151,9 +153,20 @@ export function buildCrates(): CrateRig {
     }
   };
 
+  const reset = (): void => {
+    for (const rig of rigs.values()) {
+      group.remove(rig.root);
+      rig.body.geometry.dispose();
+      rig.lid.geometry.dispose();
+      rig.marker.geometry.dispose();
+    }
+    rigs.clear();
+  };
+
   return {
     group,
     update,
+    reset,
     dispose: () => {
       for (const rig of rigs.values()) {
         rig.body.geometry.dispose();

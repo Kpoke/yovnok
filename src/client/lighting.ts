@@ -27,7 +27,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
-import { LIGHTING } from '../shared/config';
+import { LIGHTING_PRESETS, type LightingPreset } from '../shared/config';
 
 export type Quality = 'low' | 'medium' | 'high';
 export const QUALITIES: Quality[] = ['low', 'medium', 'high'];
@@ -107,6 +107,11 @@ export class Lighting {
   /** The floodlight key: the one light that casts shadows; it follows the view. */
   readonly key: THREE.DirectionalLight;
   private readonly fill: THREE.DirectionalLight;
+  private readonly hemi: THREE.HemisphereLight;
+  /** The active map's time of day. */
+  private preset: LightingPreset = LIGHTING_PRESETS.floodlitNight;
+  /** Prefiltered environments by HDRI file, so a map switch back is instant. */
+  private readonly environments = new Map<string, THREE.Texture>();
   /** Smoothed frame time, and the shortest frame seen (≈ the display's refresh). */
   private frameEma = 1 / 60;
   private refresh = 1 / 60;
@@ -136,11 +141,13 @@ export class Lighting {
   ) {
     this.quality = quality;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    const LIGHTING = this.preset;
     renderer.toneMappingExposure = LIGHTING.exposure;
 
-    scene.add(new THREE.HemisphereLight(LIGHTING.hemiSky, LIGHTING.hemiGround, LIGHTING.hemiIntensity));
+    this.hemi = new THREE.HemisphereLight(LIGHTING.hemiSky, LIGHTING.hemiGround, LIGHTING.hemiIntensity);
+    scene.add(this.hemi);
 
-    // Key: one bank of floodlights, high and off to one corner.
+    // Key: the floodlights (or the sun), high and off to one corner.
     this.key = new THREE.DirectionalLight(LIGHTING.keyColour, LIGHTING.keyIntensity);
     this.key.castShadow = true;
     const extent = 110;
@@ -159,19 +166,43 @@ export class Lighting {
     this.applyQuality(quality);
   }
 
-  /** Load the night HDRI and use it as the scene's environment light. */
-  async loadEnvironment(url: string): Promise<void> {
+  /**
+   * Prepare a preset's HDRI (download and prefilter) without applying it, so a
+   * map can be loaded behind the current one.
+   */
+  async loadEnvironment(preset: LightingPreset): Promise<void> {
+    if (this.environments.has(preset.hdri)) return;
     try {
-      const hdr = await new HDRLoader().loadAsync(url);
+      const hdr = await new HDRLoader().loadAsync(`/assets/hdri/${preset.hdri}`);
       hdr.mapping = THREE.EquirectangularReflectionMapping;
       const pmrem = new THREE.PMREMGenerator(this.renderer);
-      this.scene.environment = pmrem.fromEquirectangular(hdr).texture;
-      this.scene.environmentIntensity = LIGHTING.environmentIntensity;
+      this.environments.set(preset.hdri, pmrem.fromEquirectangular(hdr).texture);
       hdr.dispose();
       pmrem.dispose();
     } catch (error) {
       console.warn('[lighting] HDRI failed to load; keeping the sky environment', error);
     }
+  }
+
+  /** Switch to a map's time of day: lights, exposure, bloom, environment. */
+  applyPreset(preset: LightingPreset): void {
+    this.preset = preset;
+    this.renderer.toneMappingExposure = preset.exposure;
+    this.hemi.color.setHex(preset.hemiSky);
+    this.hemi.groundColor.setHex(preset.hemiGround);
+    this.hemi.intensity = preset.hemiIntensity;
+    this.key.color.setHex(preset.keyColour);
+    this.key.intensity = preset.keyIntensity;
+    this.fill.color.setHex(preset.fillColour);
+    this.fill.intensity = preset.fillIntensity;
+    if (this.bloom) {
+      this.bloom.strength = preset.bloomStrength;
+      this.bloom.radius = preset.bloomRadius;
+      this.bloom.threshold = preset.bloomThreshold;
+    }
+    const environment = this.environments.get(preset.hdri);
+    if (environment) this.scene.environment = environment;
+    this.scene.environmentIntensity = preset.environmentIntensity;
   }
 
   get current(): Quality {
@@ -204,9 +235,9 @@ export class Lighting {
       this.composer.addPass(new ShaderPass(SanitiseShader));
       this.bloom = new HalfResBloomPass(
         new THREE.Vector2(size.x / 2, size.y / 2),
-        LIGHTING.bloomStrength,
-        LIGHTING.bloomRadius,
-        LIGHTING.bloomThreshold,
+        this.preset.bloomStrength,
+        this.preset.bloomRadius,
+        this.preset.bloomThreshold,
       );
       this.composer.addPass(this.bloom);
       this.composer.addPass(new OutputPass());
@@ -248,7 +279,8 @@ export class Lighting {
 
   /** Keep the shadow camera on whatever the view is following. */
   follow(x: number, z: number): void {
-    this.key.position.set(x + LIGHTING.keyOffset[0], LIGHTING.keyOffset[1], z + LIGHTING.keyOffset[2]);
+    const offset = this.preset.keyOffset;
+    this.key.position.set(x + offset[0], offset[1], z + offset[2]);
     this.key.target.position.set(x, 0, z);
     this.key.target.updateMatrixWorld();
   }

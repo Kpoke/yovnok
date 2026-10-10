@@ -13,8 +13,10 @@
 import { createGltfLoader } from './assetLoaders';
 import type { CreditsSection } from '../shared/credits';
 import * as THREE from 'three';
-import { CAMERA, COMBAT, LIGHTING, SKY, TICK, VEHICLE, ZONE } from '../shared/config';
-import { SPAWNS } from '../shared/arena';
+import { CAMERA, COMBAT, LIGHTING_PRESETS, TICK, VEHICLE, ZONE } from '../shared/config';
+import { MAPS, SPAWNS, useMap } from '../shared/arena';
+import { DEFAULT_MAP, type MapId } from '../shared/mapIds';
+import { World } from './world';
 import { localToWorld, NEUTRAL_INPUT, stepVehicle, type VehicleInput } from '../shared/vehicle';
 import { relativeAim, vehiclePointWorld } from '../shared/combat';
 import { WS_PATH } from '../shared/protocol';
@@ -25,9 +27,6 @@ import { outsideZone } from '../shared/zone';
 import { packLook, unpackLook, type CosmeticLook } from '../shared/cosmetics';
 import { applyMatch, loadProfile, setLook } from './profile';
 import { Garage } from './garage';
-import { buildArena } from './buildArena';
-import { buildStadium } from './buildStadium';
-import { applyArenaSurfaces } from './arenaSurfaces';
 import { buildCrates } from './buildCrates';
 import { buildZone } from './buildZone';
 import { buildSky } from './sky';
@@ -36,7 +35,6 @@ import { DamageFx } from './damageFx';
 import { CarLights } from './carLights';
 import { DriveFx, groundAt } from './driveFx';
 import { callsignAllowed, randomCallsign, sanitiseCallsign } from '../shared/callsign';
-import { buildProps } from './buildProps';
 import { FramePerf } from './perf';
 import { Lighting, loadQuality, QUALITIES, saveQuality } from './lighting';
 import { WeaponFx } from './weaponFx';
@@ -46,6 +44,7 @@ import { buildVehicle, type VehicleRig } from './vehicle/buildVehicle';
 import { GltfPartLibrary, toLod } from './vehicle/gltfPartLibrary';
 import { allPartRequests, proceduralPartLibrary, type PartLibrary } from './vehicle/partLibrary';
 import { CameraRig } from './camera';
+import { RoomUi } from './roomUi';
 import { Hud } from './hud';
 import { Input } from './input';
 import { NetClient, readCrewRequest, readVehicleClass } from './net';
@@ -72,9 +71,9 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
 // A flat background is the fallback; the dome below is what you actually see.
-scene.background = new THREE.Color(SKY.background);
-scene.fog = new THREE.Fog(SKY.fog, SKY.fogNear, SKY.fogFar);
-scene.add(buildSky());
+// The map's own sky, fog and light replace these once it is built (World).
+scene.background = new THREE.Color(LIGHTING_PRESETS.floodlitNight.sky.background);
+scene.fog = new THREE.Fog(LIGHTING_PRESETS.floodlitNight.sky.fog, 300, 820);
 
 /**
  * Image-based lighting, first pass: the sky dome as the environment, so PBR
@@ -277,8 +276,9 @@ window.addEventListener('gamepadconnected', () => {
 // Rejoin: a car left mid-match is held (bot-driven) by the server for a while;
 // the network layer asks on connect, and PLAY becomes REJOIN while it lasts.
 
-// Joining is explicit: the page opens a menu, and only PLAY places us.
-hud.onJoin(() => {
+// Joining is explicit: the page opens a menu, and only PLAY places us (or
+// creating / joining a private room).
+function startJoin(room?: string): void {
   // Anonymous statistics: how people play (input device and quality preset).
   net.clientInfo = {
     input: inputs.padActive || inputs.padConnected ? 'gamepad' : touchOnly ? 'touch' : 'mouse',
@@ -288,9 +288,33 @@ hud.onJoin(() => {
   loadingSince = performance.now();
   hud.setLoading(0, 'loading');
   void assetsReady.then(() => {
-    hud.setLoading(1, 'joining the broadcast');
-    net.join();
+    hud.setLoading(1, room ? 'opening the room' : 'joining the broadcast');
+    net.join(room);
   });
+}
+hud.onJoin(() => startJoin());
+
+// Private rooms: the drawer on the title and the room's own lobby.
+const roomUi = new RoomUi();
+roomUi.handlers({
+  join: (room) => startJoin(room),
+  pickMap: (map) => net.sendRoomMap(map),
+  start: () => net.sendRoomStart(),
+  leave: () => net.leave(),
+});
+{
+  // An invite link: ?room=CODE opens the drawer with the code filled in.
+  const invited = new URLSearchParams(location.search).get('room');
+  if (invited) roomUi.prefill(invited);
+}
+
+/** The last map whose downloads were started early. */
+let prefetched: MapId | null = null;
+
+hud.onCancelWait(() => {
+  net.cancelJoin();
+  loadingSince = 0;
+  hud.setLoading(null);
 });
 
 // Diagnostics (FPS, ping, jitter…) are hidden until asked for. F3 is the usual
@@ -324,11 +348,6 @@ void fetch('/credits.json')
 canvas.addEventListener('click', () => audio.init());
 
 // --------------------------------------------------------------- world & car
-
-const arena = buildArena();
-// The televised arena around the floor: stands, crowd, sponsor boards, masts.
-arena.add(buildStadium());
-scene.add(arena);
 
 const skidMarks = new SkidMarks();
 scene.add(skidMarks.mesh);
@@ -383,14 +402,12 @@ const partLibrary: PartLibrary = new GltfPartLibrary(
   proceduralPartLibrary,
   gltfLoader,
 );
-// Everything the match needs, loaded behind the PLAY loading screen: vehicle
-// parts and the arena's real materials (it shows flat colours until then).
-await Promise.all([
-  partLibrary.prepare(allPartRequests()),
-  applyArenaSurfaces(arena, gltfLoader),
-  lighting.loadEnvironment(`/assets/hdri/${LIGHTING.hdri}`),
-  buildProps(gltfLoader).then((props) => arena.add(props)),
-]);
+// The map: arena, scenery, materials and time of day; it changes with the
+// match's map (see the frame loop).
+const world = new World(scene, lighting, gltfLoader);
+// Everything the title needs, loaded behind the stand-by card: vehicle parts
+// and the first map.
+await Promise.all([partLibrary.prepare(allPartRequests()), world.show(DEFAULT_MAP)]);
 assetsLoaded = true;
 hud.setStandby(1, 'going live');
 markAssetsReady();
@@ -414,6 +431,10 @@ const chase = new CameraRig();
 // Repair crates: positions come from the shared arena, state from snapshots.
 const crates = buildCrates();
 scene.add(crates.group);
+world.onShown = () => {
+  crates.reset();
+  skidMarks.clear();
+};
 
 // The closing danger zone: a ring the server moves, drawn from the snapshot.
 const zoneRig = buildZone();
@@ -546,7 +567,7 @@ let accumulator = 0;
 let previous = performance.now();
 let lastInput: VehicleInput = { ...NEUTRAL_INPUT };
 
-const obstacles: THREE.Object3D[] = [arena];
+const obstacles: THREE.Object3D[] = [world.group];
 
 /** Last known alive state per crew, so a death explosion fires on the edge. */
 const wasAlive = new Map<number, boolean>();
@@ -1124,6 +1145,43 @@ function frame(now: number): void {
   hud.setNet(net.ping, net.jitter, net.match.roster, net.connected);
   // The loading screen holds until we are in, and gives up if the join never
   // lands, so a dead server returns you to the title instead of a stuck bar.
+  // Waiting for a seat (server at its player limit, or a private room's match
+  // still running) is not a stuck join.
+  hud.setBusy(
+    loadingSince && net.busy
+      ? {
+          online: net.busy.online,
+          capacity: net.busy.capacity,
+          retryIn: (net.busy.retryAt - now) / 1000,
+          reason: net.busy.reason,
+        }
+      : null,
+  );
+  // Refused (no such room, room full…): back to the title, and say why.
+  if (net.rejected) {
+    roomUi.showRefusal(net.rejected);
+    net.rejected = null;
+    loadingSince = 0;
+    hud.setLoading(null);
+  }
+  // The match's map. Prediction switches at once (it must agree with the
+  // server); the scenery follows as soon as it has loaded, behind a card.
+  if (net.connected && net.mapId !== world.mapId) {
+    useMap(net.mapId);
+    void world.show(net.mapId);
+  }
+  // The next map, named at the end of a match: download it during the results.
+  if (net.nextMapId && net.nextMapId !== prefetched) {
+    prefetched = net.nextMapId;
+    void world.prefetch(net.nextMapId);
+  }
+  hud.setMapLoading(net.connected && world.loading ? MAPS[net.mapId].name : null);
+
+  // A private room between matches: its lobby (and a free mouse to use it).
+  const inRoomLobby = net.connected && net.room !== null && (net.match.phase === 'lobby' || net.match.phase === 'countdown');
+  roomUi.setLobby(inRoomLobby && net.match.phase === 'lobby' ? net.room : null, net.callsign);
+  if (roomUi.lobbyVisible && inputs.locked) document.exitPointerLock();
+  if (net.busy) loadingSince = Math.max(loadingSince, now - 1000);
   if (loadingSince && net.connected) {
     loadingSince = 0;
     hud.setLoading(null);

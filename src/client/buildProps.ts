@@ -145,22 +145,33 @@ function nestPlaces(solid: Solid): Record<Exclude<PropId, 'barrier'>, Place[]> {
   return { barrel: barrels, tyre: tyres, crate: crates };
 }
 
+/** Prop models, downloaded once and shared by every map that uses them. */
+const modelCache = new Map<PropId, Promise<Model | null>>();
+
+/** Download the prop models (once). */
+export function loadPropModels(loader: GLTFLoader): Promise<Map<PropId, Model>> {
+  return Promise.all(
+    (Object.keys(FILES) as PropId[]).map(async (id) => {
+      let pending = modelCache.get(id);
+      if (!pending) {
+        pending = loadModel(loader, FILES[id], FIXUPS[id]).catch((error) => {
+          console.warn(`[props] ${id} failed to load; drawing its boxes plain`, error);
+          return null;
+        });
+        modelCache.set(id, pending);
+      }
+      return [id, await pending] as const;
+    }),
+  ).then((entries) => new Map(entries.filter((e): e is readonly [PropId, Model] => e[1] !== null)));
+}
+
 /** Prop meshes for every `prop` solid in the arena. */
 export async function buildProps(loader: GLTFLoader): Promise<THREE.Group> {
   const group = new THREE.Group();
   group.name = 'props';
   const solids = SOLIDS.filter((s) => s.prop);
-
-  const models = new Map<PropId, Model>();
-  await Promise.all(
-    (Object.keys(FILES) as PropId[]).map(async (id) => {
-      try {
-        models.set(id, await loadModel(loader, FILES[id], FIXUPS[id]));
-      } catch (error) {
-        console.warn(`[props] ${id} failed to load; drawing its boxes plain`, error);
-      }
-    }),
-  );
+  if (solids.length === 0) return group;
+  const models = await loadPropModels(loader);
 
   const places = new Map<PropId, Place[]>();
   const push = (id: PropId, list: Place[]): void => {

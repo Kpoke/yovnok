@@ -53,6 +53,13 @@ export class SkidMarks {
     this.mesh.name = 'skidmarks';
   }
 
+  /** Wipe every mark (a new map). */
+  clear(): void {
+    this.positions.fill(0);
+    this.cursor = 0;
+    this.attribute.needsUpdate = true;
+  }
+
   /** Lay one tyre mark between two ground positions. */
   segment(ax: number, az: number, bx: number, bz: number, y: number): void {
     const dx = bx - ax;

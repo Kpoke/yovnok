@@ -11,7 +11,7 @@
  */
 
 import * as THREE from 'three';
-import { SKY } from '../shared/config';
+import { LIGHTING_PRESETS, type LightingPreset } from '../shared/config';
 
 export function buildSky(): THREE.Mesh {
   // Radius must fit inside the camera's far plane from ANY point in the arena,
@@ -26,8 +26,12 @@ export function buildSky(): THREE.Mesh {
     depthWrite: false,
     fog: false,
     uniforms: {
-      uTop: { value: new THREE.Color(SKY.skyTop) },
-      uBottom: { value: new THREE.Color(SKY.skyBottom) },
+      uTop: { value: new THREE.Color() },
+      uBottom: { value: new THREE.Color() },
+      uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+      uSunColour: { value: new THREE.Color() },
+      uSunSize: { value: 0 },
+      uSunGlow: { value: 0 },
     },
     vertexShader: `
       varying vec3 vWorld;
@@ -40,13 +44,24 @@ export function buildSky(): THREE.Mesh {
     fragmentShader: `
       uniform vec3 uTop;
       uniform vec3 uBottom;
+      uniform vec3 uSunDir;
+      uniform vec3 uSunColour;
+      uniform float uSunSize;
+      uniform float uSunGlow;
       varying vec3 vWorld;
       void main() {
+        vec3 dir = normalize(vWorld);
         // Height of this fragment on the dome, 0 at the horizon, 1 overhead.
-        float h = normalize(vWorld).y;
+        float h = dir.y;
         // A gentle curve: more sky than horizon, so the ground stays readable.
         float t = clamp(pow(max(h, 0.0), 0.55), 0.0, 1.0);
-        gl_FragColor = vec4(mix(uBottom, uTop, t), 1.0);
+        vec3 colour = mix(uBottom, uTop, t);
+        // The sun: a soft disc and a wide glow around it.
+        float facing = max(dot(dir, uSunDir), 0.0);
+        float disc = smoothstep(1.0 - uSunSize * 0.002, 1.0 - uSunSize * 0.0015, facing);
+        float glow = pow(facing, 12.0) * uSunGlow * 0.35 + pow(facing, 160.0) * uSunGlow;
+        colour += uSunColour * (disc * 3.0 + glow);
+        gl_FragColor = vec4(colour, 1.0);
       }
     `,
   });
@@ -55,5 +70,18 @@ export function buildSky(): THREE.Mesh {
   mesh.name = 'sky';
   mesh.frustumCulled = false;
   mesh.renderOrder = -1;
+  setSky(mesh, LIGHTING_PRESETS.floodlitNight);
   return mesh;
+}
+
+/** Repaint a dome for a map's time of day. */
+export function setSky(mesh: THREE.Mesh, preset: LightingPreset): void {
+  const u = (mesh.material as THREE.ShaderMaterial).uniforms;
+  (u.uTop.value as THREE.Color).setHex(preset.sky.skyTop);
+  (u.uBottom.value as THREE.Color).setHex(preset.sky.skyBottom);
+  const [x, y, z] = preset.keyOffset;
+  (u.uSunDir.value as THREE.Vector3).set(x, y, z).normalize();
+  (u.uSunColour.value as THREE.Color).setHex(preset.sun?.colour ?? 0);
+  u.uSunSize.value = preset.sun?.size ?? 0;
+  u.uSunGlow.value = preset.sun?.glow ?? 0;
 }
