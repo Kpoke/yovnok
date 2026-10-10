@@ -37,6 +37,7 @@ import {
   SOLIDS,
   SOLO_SPAWN_RADIUS,
   SPAWN,
+  refreshSolids,
   SPAWNS,
   spawnRing,
   terrainHeightAt,
@@ -112,6 +113,7 @@ const FLAT_ARENA: Solid[] = [
 
 function useArena(arena: Solid[]): void {
   SOLIDS.splice(0, SOLIDS.length, ...arena);
+  refreshSolids();
 }
 
 /** Inject a temporary ramp for a test, and remove it afterwards. */
@@ -129,10 +131,12 @@ function withTestRamp<T>(
     color: 0,
   };
   SOLIDS.push(solid);
+  refreshSolids();
   try {
     return fn();
   } finally {
     SOLIDS.pop();
+    refreshSolids();
   }
 }
 
@@ -888,6 +892,7 @@ console.log('\n=== 23. the car collides as a box, and cars ram (DESIGN.md §3.1)
   // A rotated box overlapping a wall must be pushed fully clear.
   const wall: Solid = { kind: 'box', min: { x: 1.1, y: 0, z: -5 }, max: { x: 3, y: 6, z: 5 }, color: 0 };
   SOLIDS.push(wall);
+  refreshSolids();
   const wedged = createVehicle(0, 2, 0, Math.PI / 4, TEST_SPEC);
   stepVehicle(wedged, NEUTRAL_INPUT, DT);
   const wedgedLeft = obbOverlap(carObb(wedged), solidObb(wall));
@@ -897,6 +902,7 @@ console.log('\n=== 23. the car collides as a box, and cars ram (DESIGN.md §3.1)
     `residual ${wedgedLeft ? wedgedLeft.depth.toFixed(4) : 0}`,
   );
   SOLIDS.pop();
+  refreshSolids();
 
   /** Two cars along z, with given yaws, velocities and separation. */
   const ram = (yawB: number, velA: number, velB: number, zB = -3.5) => {

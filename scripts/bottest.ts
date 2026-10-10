@@ -17,7 +17,7 @@
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
 import { VEHICLE_CLASSES } from '../src/shared/config';
-import { SOLIDS, type Solid } from '../src/shared/arena';
+import { refreshSolids, SOLIDS, type Solid } from '../src/shared/arena';
 import { createVehicle, stepVehicle } from '../src/shared/vehicle';
 import { seatById } from '../src/shared/crews';
 import { createBotMemory, decideBot, type BotEnemy, type BotSkill } from '../src/server/bot';
@@ -40,6 +40,7 @@ const FLAT: Solid[] = [
 /** The real arena, kept so the navigation tests can put it back. */
 const REAL_ARENA: Solid[] = [...SOLIDS];
 SOLIDS.splice(0, SOLIDS.length, ...FLAT);
+refreshSolids();
 
 const bot = createVehicle(0, 1, 0, 0, VEHICLE_CLASSES.solo);
 const seat = seatById('solo', 'seat.driver')!;
@@ -128,9 +129,11 @@ const decide = (
   // picks a side and the bot does not drive into it.
   const wall: Solid = { kind: 'box', min: { x: -60, y: 0, z: -14 }, max: { x: 60, y: 6, z: -10 }, color: 0 };
   SOLIDS.push(wall);
+  refreshSolids();
   const intent = decide(ahead);
   check('a wall ahead turns the bot aside', Math.abs(intent.input.steer) > 0.4, `steer ${intent.input.steer.toFixed(2)}`);
   SOLIDS.pop();
+  refreshSolids();
 }
 
 {
@@ -321,6 +324,7 @@ const decide = (
 // Real arena for the driving tests: open ground tells us nothing about
 // navigation, which is the whole point.
 SOLIDS.splice(0, SOLIDS.length, ...REAL_ARENA);
+refreshSolids();
 {
   const drive = (
     x: number,
@@ -409,9 +413,11 @@ SOLIDS.splice(0, SOLIDS.length, ...REAL_ARENA);
   );
 }
 SOLIDS.splice(0, SOLIDS.length, ...FLAT);
+refreshSolids();
 
 // Restore the real arena for anything after (none, but be tidy).
 SOLIDS.splice(0, SOLIDS.length, ...FLAT);
+refreshSolids();
 
 // ---------------------------------------------------------------------- 2. room
 

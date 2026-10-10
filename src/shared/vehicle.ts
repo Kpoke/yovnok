@@ -23,7 +23,7 @@ import {
   type Vec3,
   vec3,
 } from './math';
-import { isBlockingAt, SOLIDS, surfaceTopAt, terrainHeightAt, type Solid } from './arena';
+import { gripAt, isBlockingAt, solidsNear, surfaceTopAt, terrainHeightAt, type Solid } from './arena';
 import {
   copyComponents,
   createComponents,
@@ -279,9 +279,11 @@ export function obbOverlap(a: Obb, b: Obb): { nx: number; nz: number; depth: num
 function resolveCollisions(s: VehicleState): void {
   const bottom = carBottom(s);
   const car = carObb(s);
+  // Only the solids near the car can touch it (broadphase grid, arena.ts).
+  const near = solidsNear(car.cx, car.cz);
 
-  for (let j = 0; j < SOLIDS.length; j++) {
-    const solid = SOLIDS[j];
+  for (let j = 0; j < near.length; j++) {
+    const solid = near[j];
     const nearX = clamp(car.cx, solid.min.x, solid.max.x);
     const nearZ = clamp(car.cz, solid.min.z, solid.max.z);
     if (!isBlockingAt(solid, nearX, nearZ, bottom, VEHICLE.stepUp)) continue;
@@ -502,7 +504,9 @@ export function stepVehicle(s: VehicleState, input: VehicleInput, dt: number): v
   // simulates bit-identically to before this existed.
   const engine = engineOutput(s.components.engine);
   const topSpeedFactor = engineTopSpeed(s.components.engine);
-  const traction = gripFactor(s.components);
+  // The ground's grip (snow, ice) times the tyres' condition. 1 on the stadium,
+  // so a healthy car there simulates bit-identically.
+  const traction = gripFactor(s.components) * gripAt(s.pos.x, s.pos.z);
   const drive = driveFactor(s.components);
 
   if (s.onGround) {

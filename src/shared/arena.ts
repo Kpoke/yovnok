@@ -10,24 +10,18 @@
  * A solid is either a flat-topped `box` or a `ramp` whose top slopes linearly
  * along one axis.
  *
- * SYMMETRY IS GENERATED, NOT HAND-AUTHORED. The layout is written once as a
- * single quadrant (`WEDGE`) and replicated by rotating it 90° three times. That
- * matters because "fair by construction" is a design pillar (DESIGN.md §2): a
- * hand-placed map drifts out of symmetry the moment someone nudges one block,
- * and asymmetric cover is exactly the kind of thing that quietly decides
- * matches. `simcheck` asserts the generated field is genuinely 4-fold symmetric.
- *
- * Arena *layout* tuning — sightlines, pickup timings — is deliberately NOT this
- * milestone. M3 gives the arena a designed symmetric *shape*; the competitive
- * layout gets tuned at M7 against real weapons and turret traverse.
- *
- * The M12 pass adds the first **authored content** on that shape — verticality
- * (a drivable mesa), landmarks (a scrapyard crane, a lakebed dam) and roads —
- * still written in the one quadrant, so it stays symmetric by construction.
+ * Every map lives in `maps/` (written with `maps/kit.ts`, symmetric by
+ * construction). ONE map is active at a time in a process: the queries below
+ * read `SOLIDS`, which `useMap` swaps. The client switches when its match's
+ * map changes; the server switches before stepping each room (rooms run one
+ * after another on one thread, so they never see each other's map).
  */
 
-import { HAZARD, PALETTE } from './config';
+import { HAZARD } from './config';
 import type { Vec3 } from './math';
+import { DEFAULT_MAP, type MapId } from './mapIds';
+import { MAPS, type ArenaMap } from './maps';
+import { terrainTop } from './terrainTop';
 
 export type Solid = {
   kind: 'box' | 'ramp';
@@ -59,214 +53,92 @@ export type Solid = {
    * tyres and crates. The collision is still exactly this box.
    */
   prop?: 'barriers' | 'nest';
+  /** Ice: drivable ground with little grip (see `gripAt`). */
+  ice?: boolean;
 };
 
-const box = (min: Vec3, max: Vec3, color: number): Solid => ({ kind: 'box', min, max, color });
+export { ARENA_HALF, STADIUM_HALF, STADIUM_WALL } from './maps/kit';
+export type { ArenaMap } from './maps';
+export { MAPS } from './maps';
 
-const ramp = (
-  min: Vec3,
-  max: Vec3,
-  along: 'x' | 'z',
-  hStart: number,
-  hEnd: number,
-  color: number,
-): Solid => ({ kind: 'ramp', min, max, along, hStart, hEnd, color });
+/** The active map. */
+export let MAP: ArenaMap = MAPS[DEFAULT_MAP];
+/** The active map's solids: what every query below tests against. */
+export let SOLIDS: Solid[] = MAP.solids;
+/** The active map's repair crate positions. */
+export let REPAIR_CRATES: ReadonlyArray<{ x: number; z: number }> = MAP.crates;
 
-// ---------------------------------------------------------------------- arena
-
-/**
- * Half-extent of the playable floor: 800 m across (M11).
- *
- * Grown from 340 m for battle royale: a field of ~30 cars needs ground that
- * crossing costs time, and enough separation that the field does not start on
- * top of itself. It is where interest management (M10) finally earns its keep —
- * at 340 m almost every car was inside the interest radius anyway.
- *
- * The layout is still FAIR BY CONSTRUCTION: one quadrant, rotated four times.
- * Zone character (cover density, hazards) varies by distance from the centre,
- * which is symmetric by the same argument.
- */
-export const ARENA_HALF = 400;
+// ------------------------------------------------------------- broadphase
 
 /**
- * The stadium: a concrete barrier ring at this half-extent bounds the playable
- * floor (the televised arena), with the stands outside it. Everything beyond
- * is set dressing; the outer ARENA_HALF walls remain as a backstop.
+ * A uniform grid over the map: each cell lists the solids within `GRID_MARGIN`
+ * of it, in map order. Point queries (ground height, walls near a car, ice,
+ * hazards) read one cell instead of every solid — a forest has hundreds — and
+ * because the order is the map's, results are identical to a full scan.
  */
-export const STADIUM_HALF = 235;
-/** Barrier height: tall enough that no ramp launch clears it. */
-export const STADIUM_WALL = 4.5;
+const GRID_CELL = 16;
+const GRID_MARGIN = 6;
+const GRID_HALF = 420;
+const GRID_N = Math.ceil((GRID_HALF * 2) / GRID_CELL);
+const grids = new WeakMap<ArenaMap, Solid[][]>();
+let GRID: Solid[][] = gridFor(MAP);
 
-/**
- * Rotate a solid 90° about the arena centre.
- *
- * The mapping is `(x, z) -> (z, -x)`, which is a pure quarter turn. A box stays
- * an axis-aligned box (its width and depth simply swap). A ramp swaps its slope
- * axis — and, when going from `x` to `z`, also swaps which end is high, because
- * the rotation reverses the direction of the z axis.
- */
-function rotate90(s: Solid): Solid {
-  const ax = { x: s.min.x, z: s.min.z };
-  const bx = { x: s.max.x, z: s.max.z };
-  // (x, z) -> (z, -x)
-  const a = { x: ax.z, z: -ax.x };
-  const b = { x: bx.z, z: -bx.x };
-
-  const min: Vec3 = { x: Math.min(a.x, b.x), y: s.min.y, z: Math.min(a.z, b.z) };
-  const max: Vec3 = { x: Math.max(a.x, b.x), y: s.max.y, z: Math.max(a.z, b.z) };
-
-  if (s.kind === 'box') return { ...s, min, max };
-
-  // x -> z reverses the slope direction, so the ends swap. z -> x does not.
-  const becameZ = s.along === 'x';
-  return {
-    ...s,
-    min,
-    max,
-    along: becameZ ? 'z' : 'x',
-    hStart: becameZ ? s.hEnd : s.hStart,
-    hEnd: becameZ ? s.hStart : s.hEnd,
-  };
-}
-
-/** A feature and its three rotational copies. */
-function repeat4(features: Solid[]): Solid[] {
-  const out: Solid[] = [];
-  for (const feature of features) {
-    let current = feature;
-    for (let quarter = 0; quarter < 4; quarter++) {
-      out.push(current);
-      current = rotate90(current);
-    }
+function gridFor(map: ArenaMap): Solid[][] {
+  let grid = grids.get(map);
+  if (grid) return grid;
+  grid = Array.from({ length: GRID_N * GRID_N }, () => [] as Solid[]);
+  const cell = (v: number): number => Math.max(0, Math.min(GRID_N - 1, Math.floor((v + GRID_HALF) / GRID_CELL)));
+  for (const s of map.solids) {
+    const x0 = cell(s.min.x - GRID_MARGIN);
+    const x1 = cell(s.max.x + GRID_MARGIN);
+    const z0 = cell(s.min.z - GRID_MARGIN);
+    const z1 = cell(s.max.z + GRID_MARGIN);
+    for (let ix = x0; ix <= x1; ix++) for (let iz = z0; iz <= z1; iz++) grid[ix * GRID_N + iz].push(s);
   }
-  return out;
+  grids.set(map, grid);
+  return grid;
 }
 
 /**
- * One quadrant of the map. Everything here is replicated by rotation, so this
- * is the only place layout is authored.
+ * Rebuild the active map's grid after changing `SOLIDS` in place (tests swap
+ * in their own test grounds and walls).
  */
-const WEDGE: Solid[] = [
-  // ---- inner ring: the objective's doorstep -----------------------------
-  // Ramp up onto the central platform, from this quadrant's side.
-  ramp({ x: -6, y: 0, z: 11 }, { x: 6, y: 3.4, z: 23 }, 'z', 3.4, 0, PALETTE.ramp),
-  // Cover close to the pad, so the fight over the centre has something to use.
-  box({ x: 30, y: 0, z: 30 }, { x: 44, y: 5, z: 44 }, PALETTE.block),
+export function refreshSolids(): void {
+  grids.delete(MAP);
+  GRID = gridFor(MAP);
+}
 
-  // ---- middle ring: room to manoeuvre ----------------------------------
-  // Launch ramp, off the cardinal axes so it does not fight the centre ramps.
-  ramp({ x: 62, y: 0, z: 16 }, { x: 78, y: 3.6, z: 32 }, 'z', 3.6, 0, PALETTE.ramp),
-  // A second, opposite ramp so both approaches to the middle can be launched.
-  ramp({ x: 16, y: 0, z: 96 }, { x: 32, y: 3.6, z: 112 }, 'x', 3.6, 0, PALETTE.ramp),
-  // Flanking blocks: cover that gives a second angle on the centre approach,
-  // sized to break line of sight for a CAR rather than a person.
-  box({ x: 54, y: 0, z: 56 }, { x: 68, y: 5.5, z: 70 }, PALETTE.block),
-  box({ x: 20, y: 0, z: 74 }, { x: 34, y: 3.4, z: 88 }, PALETTE.block),
+/** The solids within a few metres of a point, in map order. */
+export function solidsNear(x: number, z: number): readonly Solid[] {
+  const ix = Math.floor((x + GRID_HALF) / GRID_CELL);
+  const iz = Math.floor((z + GRID_HALF) / GRID_CELL);
+  if (ix < 0 || iz < 0 || ix >= GRID_N || iz >= GRID_N) return SOLIDS;
+  return GRID[ix * GRID_N + iz];
+}
 
-  // ---- outer ring: the landmarks ---------------------------------------
-  // Tall and unmistakable — the thing you navigate by.
-  box({ x: 120, y: 0, z: 120 }, { x: 138, y: 11, z: 138 }, PALETTE.block),
-  // Outer cover on both flanks of the quadrant, so the rim is not a race track.
-  box({ x: 114, y: 0, z: 40 }, { x: 130, y: 4.5, z: 56 }, PALETTE.block),
-  box({ x: 40, y: 0, z: 114 }, { x: 56, y: 4.5, z: 130 }, PALETTE.block),
+/** Make a map the active one (cheap: it swaps references). */
+export function useMap(id: MapId): ArenaMap {
+  const map = MAPS[id] ?? MAPS[DEFAULT_MAP];
+  if (map !== MAP) {
+    MAP = map;
+    SOLIDS = map.solids;
+    REPAIR_CRATES = map.crates;
+    GRID = gridFor(map);
+  }
+  return map;
+}
 
-  // Hazard patch. Flat and drivable, and DAMAGING while you are on it
-  // (DESIGN.md §10.3) — which is why it is called out rather than being just
-  // another block. Kept clear of the spawn ring.
-  // Moved in from (80..100): at the smaller duel spawn radius the old patch
-  // overlapped the 8-point spawn ring, which the "no spawn on a hazard" test
-  // caught. A hazard under a spawn is a crew damaged on arrival.
-  { ...box({ x: 40, y: 0, z: 90 }, { x: 60, y: 0.06, z: 110 }, PALETTE.hazard), hazard: true },
-
-  // ---- the far zones (M11) ---------------------------------------------
-  // Everything above sits within ~200 m of the centre. These carry the map out
-  // toward the 360 m spawn ring, and their CHARACTER is the zoning: dunes have
-  // launch ramps, the scrapyard is dense cover, the lakebed is open with a
-  // second hazard. Authored inside one quadrant, so all four are identical.
-  // Corners are kept inside ~320 m so the spawn ring stays clear.
-
-  // Dunes: ramps and low cover, room to run.
-  ramp({ x: 150, y: 0, z: 60 }, { x: 166, y: 3.6, z: 76 }, 'z', 3.6, 0, PALETTE.ramp),
-  box({ x: 190, y: 0, z: 110 }, { x: 214, y: 4, z: 134 }, PALETTE.block),
-  box({ x: 130, y: 0, z: 200 }, { x: 154, y: 4, z: 224 }, PALETTE.block),
-
-  // The stadium edge: one block just inside the barrier. (The old scrapyard,
-  // lakebed hazard and their outer blocks lay beyond STADIUM_HALF and went
-  // with it — see the barrier in SOLIDS.)
-  box({ x: 210, y: 0, z: 190 }, { x: 232, y: 5, z: 212 }, PALETTE.block),
-
-  // ---- authored pass (M12): verticality, landmarks, roads ----------------
-  // The map so far is cover at ground level. This adds the two things it was
-  // missing: somewhere to be TALL, and a route to follow.
-
-  // The mesa: the map's one piece of real high ground. A flat plateau with a
-  // ramp on two sides, so taking the top is a position rather than a dead end.
-  // Drivable on purpose — high ground a car can reach is a fight over it. It
-  // sits in the open pocket between the inner ramps and the dunes, clear of the
-  // 140 m duel spawn ring.
-  box({ x: 150, y: 0, z: 20 }, { x: 188, y: 4.2, z: 56 }, PALETTE.plateau),
-  ramp({ x: 134, y: 0, z: 26 }, { x: 150, y: 4.2, z: 46 }, 'x', 0, 4.2, PALETTE.ramp),
-  ramp({ x: 188, y: 0, z: 26 }, { x: 204, y: 4.2, z: 46 }, 'x', 4.2, 0, PALETTE.ramp),
-
-
-  // Roads. Authored as ground strips ALONG THE AXES, so replicating the
-  // quadrant builds a square ring road and four cardinal spokes. They are
-  // drivable and non-blocking — a route and a sense of place, not obstacles —
-  // and sit 11 mm above the ring so the ground query still prefers them.
-  { ...box({ x: 30, y: -4, z: -6 }, { x: 120, y: 0.05, z: 6 }, PALETTE.road), ground: true },
-
-  // A checkpoint on each spoke road (arena dressing): two staggered lines of
-  // concrete road barriers make a chicane across the 12 m road — weave through
-  // it, or go round on the dirt — and a nest of barrels, tyres and crates sits
-  // beside it. Low (0.85 m) cover: it hides a car's wheels, not its hull.
-  { ...box({ x: 88, y: 0, z: -6 }, { x: 88.7, y: 0.85, z: -1.4 }, PALETTE.block), prop: 'barriers' },
-  { ...box({ x: 97, y: 0, z: 1.4 }, { x: 97.7, y: 0.85, z: 6 }, PALETTE.block), prop: 'barriers' },
-  { ...box({ x: 91, y: 0, z: 8.5 }, { x: 95, y: 1.2, z: 11.5 }, PALETTE.block), prop: 'nest' },
-  { ...box({ x: 120, y: -4, z: -6 }, { x: STADIUM_HALF, y: 0.05, z: 6 }, PALETTE.road), ground: true },
-];
-
-/** A square ground ring, tinted by zone. `half` is its half-extent. */
-const groundRing = (half: number, top: number, color: number): Solid => ({
-  ...box({ x: -half, y: -4, z: -half }, { x: half, y: top, z: half }, color),
-  ground: true,
-});
-
-export const SOLIDS: Solid[] = [
-  // ---- ground: nested zone rings (M11) ----------------------------------
-  // Each ring sits a few MILLIMETRES higher than the one outside it, so the
-  // innermost wins the ground query without z-fighting against its neighbour.
-  // The steps are far below the car's step height, so driving never notices.
-  groundRing(100, 0.04, PALETTE.zoneCentre),
-  groundRing(200, 0.033, PALETTE.zoneDunes),
-  groundRing(280, 0.026, PALETTE.zoneScrapyard),
-  groundRing(340, 0.019, PALETTE.zoneLakebed),
-  groundRing(ARENA_HALF + 12, 0.012, PALETTE.zoneRim),
-
-  // ---- perimeter walls --------------------------------------------------
-  // These MUST overlap at the corners. Meeting edge to edge left an unblocked
-  // diagonal gap at each corner that a car could drive straight through.
-  box({ x: -ARENA_HALF - 4, y: 0, z: -ARENA_HALF - 4 }, { x: ARENA_HALF + 4, y: 16, z: -ARENA_HALF }, PALETTE.wall),
-  box({ x: -ARENA_HALF - 4, y: 0, z: ARENA_HALF }, { x: ARENA_HALF + 4, y: 16, z: ARENA_HALF + 4 }, PALETTE.wall),
-  box({ x: -ARENA_HALF - 4, y: 0, z: -ARENA_HALF - 4 }, { x: -ARENA_HALF, y: 16, z: ARENA_HALF + 4 }, PALETTE.wall),
-  box({ x: ARENA_HALF, y: 0, z: -ARENA_HALF - 4 }, { x: ARENA_HALF + 4, y: 16, z: ARENA_HALF + 4 }, PALETTE.wall),
-
-  // ---- the stadium barrier ----------------------------------------------
-  // The playable arena is the stadium floor inside this concrete ring; the
-  // closing zone starts inside it (ZONE.startRadius 210 m < STADIUM_HALF), and
-  // the stands are drawn outside it (client/buildStadium.ts). Overlapping at the
-  // corners for the same reason as the perimeter walls.
-  box({ x: -STADIUM_HALF - 1.5, y: 0, z: -STADIUM_HALF - 1.5 }, { x: STADIUM_HALF + 1.5, y: STADIUM_WALL, z: -STADIUM_HALF }, PALETTE.wall),
-  box({ x: -STADIUM_HALF - 1.5, y: 0, z: STADIUM_HALF }, { x: STADIUM_HALF + 1.5, y: STADIUM_WALL, z: STADIUM_HALF + 1.5 }, PALETTE.wall),
-  box({ x: -STADIUM_HALF - 1.5, y: 0, z: -STADIUM_HALF - 1.5 }, { x: -STADIUM_HALF, y: STADIUM_WALL, z: STADIUM_HALF + 1.5 }, PALETTE.wall),
-  box({ x: STADIUM_HALF, y: 0, z: -STADIUM_HALF - 1.5 }, { x: STADIUM_HALF + 1.5, y: STADIUM_WALL, z: STADIUM_HALF + 1.5 }, PALETTE.wall),
-
-  // ---- centre: the contested objective ----------------------------------
-  // Centred and square, so it is already symmetric without replication.
-  box({ x: -11, y: 0, z: -11 }, { x: 11, y: 3.4, z: 11 }, PALETTE.pad),
-
-  // ---- the replicated quadrants -----------------------------------------
-  ...repeat4(WEDGE),
-];
+/** Tyre grip at a point on the active map: the map's ground, or ice. */
+export function gripAt(x: number, z: number): number {
+  const near = solidsNear(x, z);
+  for (let i = 0; i < near.length; i++) {
+    const s = near[i];
+    if (s.ice && x >= s.min.x && x <= s.max.x && z >= s.min.z && z <= s.max.z) return ICE_GRIP;
+  }
+  return MAP.grip;
+}
+/** Grip on ice: a car still steers, slowly, and slides a long way. */
+const ICE_GRIP = 0.3;
 
 // ------------------------------------------------------------------- spawns
 
@@ -304,7 +176,8 @@ export function spawnRing(count: number, radius = DUEL_SPAWN_RADIUS): Spawn[] {
     const x = Math.sin(angle) * radius;
     const z = Math.cos(angle) * radius;
     // Forward is (-sin yaw, -cos yaw); aiming it at the origin gives atan2(x, z).
-    return { x, y: 2, z, yaw: Math.atan2(x, z) };
+    // Above whatever ground this map has there (a quarry's top bench is high).
+    return { x, y: terrainTop(SOLIDS, x, z) + 2, z, yaw: Math.atan2(x, z) };
   });
 }
 
@@ -333,26 +206,6 @@ export function spawnForTeam(
 }
 
 /**
- * Repair crate positions: one per quadrant, plus one contested at the centre
- * (DESIGN.md §11 — "scattered + contested central").
- *
- * Rotations of a single authored point, like the arena itself, so they cannot
- * be accidentally placed asymmetrically.
- */
-export const REPAIR_CRATES: ReadonlyArray<{ x: number; z: number }> = (() => {
-  const out: Array<{ x: number; z: number }> = [];
-  // Scaled out with the map (M11): ~232 m from the centre, between the dunes and
-  // the scrapyard, so a crew has to leave the middle to resupply.
-  let point = { x: 100, z: 210 };
-  for (let quarter = 0; quarter < 4; quarter++) {
-    out.push({ x: point.x, z: point.z });
-    point = { x: point.z, z: -point.x };
-  }
-  out.push({ x: 0, z: 0 });
-  return out;
-})();
-
-/**
  * Hazard damage per second at a world point, or 0 on clear ground.
  *
  * Tests the vehicle's centre against the footprint. A graded hazard ("you are
@@ -360,8 +213,9 @@ export const REPAIR_CRATES: ReadonlyArray<{ x: number; z: number }> = (() => {
  * the bad ground or you are not, and the player must be able to tell.
  */
 export function hazardAt(x: number, z: number): number {
-  for (let i = 0; i < SOLIDS.length; i++) {
-    const solid = SOLIDS[i];
+  const near = solidsNear(x, z);
+  for (let i = 0; i < near.length; i++) {
+    const solid = near[i];
     if (!solid.hazard) continue;
     if (x >= solid.min.x && x <= solid.max.x && z >= solid.min.z && z <= solid.max.z) {
       return HAZARD.hullPerSecond;
@@ -393,8 +247,9 @@ export function surfaceTopAt(s: Solid, x: number, z: number): number | null {
  */
 export function terrainHeightAt(x: number, z: number, maxY: number): number {
   let best = -Infinity;
-  for (let i = 0; i < SOLIDS.length; i++) {
-    const top = surfaceTopAt(SOLIDS[i], x, z);
+  const near = solidsNear(x, z);
+  for (let i = 0; i < near.length; i++) {
+    const top = surfaceTopAt(near[i], x, z);
     if (top === null) continue;
     if (top <= maxY + 1e-4 && top > best) best = top;
   }
@@ -421,41 +276,60 @@ export function raycastSolids(
   dz: number,
   maxDistance: number,
 ): number | null {
-  let nearest: number | null = null;
+  // The ray's own bounding box: most solids are rejected by four comparisons.
+  const ex = ox + dx * maxDistance;
+  const ez = oz + dz * maxDistance;
+  const rx0 = Math.min(ox, ex);
+  const rx1 = Math.max(ox, ex);
+  const rz0 = Math.min(oz, ez);
+  const rz1 = Math.max(oz, ez);
+  // Reciprocals once per ray; a zero component is handled by the slab test.
+  const ix = Math.abs(dx) < 1e-9 ? 0 : 1 / dx;
+  const iy = Math.abs(dy) < 1e-9 ? 0 : 1 / dy;
+  const iz = Math.abs(dz) < 1e-9 ? 0 : 1 / dz;
 
+  let nearest: number | null = null;
+  let limit = maxDistance;
   for (let i = 0; i < SOLIDS.length; i++) {
     const s = SOLIDS[i];
+    if (s.max.x < rx0 || s.min.x > rx1 || s.max.z < rz0 || s.min.z > rz1) continue;
     let tMin = 0;
-    let tMax = maxDistance;
-    let hit = true;
-
-    // Slab test, one axis at a time.
-    const axes: Array<[number, number, number, number, number]> = [
-      [ox, dx, s.min.x, s.max.x, 0],
-      [oy, dy, s.min.y, s.max.y, 1],
-      [oz, dz, s.min.z, s.max.z, 2],
-    ];
-
-    for (const [origin, direction, lo, hi] of axes) {
-      if (Math.abs(direction) < 1e-9) {
-        if (origin < lo || origin > hi) {
-          hit = false;
-          break;
-        }
-        continue;
-      }
-      let t1 = (lo - origin) / direction;
-      let t2 = (hi - origin) / direction;
+    let tMax = limit;
+    // Slab test, one axis at a time, without allocating.
+    if (ix === 0) {
+      if (ox < s.min.x || ox > s.max.x) continue;
+    } else {
+      let t1 = (s.min.x - ox) * ix;
+      let t2 = (s.max.x - ox) * ix;
       if (t1 > t2) [t1, t2] = [t2, t1];
       if (t1 > tMin) tMin = t1;
       if (t2 < tMax) tMax = t2;
-      if (tMin > tMax) {
-        hit = false;
-        break;
-      }
+      if (tMin > tMax) continue;
     }
-
-    if (hit && tMin >= 0 && (nearest === null || tMin < nearest)) nearest = tMin;
+    if (iy === 0) {
+      if (oy < s.min.y || oy > s.max.y) continue;
+    } else {
+      let t1 = (s.min.y - oy) * iy;
+      let t2 = (s.max.y - oy) * iy;
+      if (t1 > t2) [t1, t2] = [t2, t1];
+      if (t1 > tMin) tMin = t1;
+      if (t2 < tMax) tMax = t2;
+      if (tMin > tMax) continue;
+    }
+    if (iz === 0) {
+      if (oz < s.min.z || oz > s.max.z) continue;
+    } else {
+      let t1 = (s.min.z - oz) * iz;
+      let t2 = (s.max.z - oz) * iz;
+      if (t1 > t2) [t1, t2] = [t2, t1];
+      if (t1 > tMin) tMin = t1;
+      if (t2 < tMax) tMax = t2;
+      if (tMin > tMax) continue;
+    }
+    if (tMin >= 0 && (nearest === null || tMin < nearest)) {
+      nearest = tMin;
+      limit = tMin;
+    }
   }
 
   return nearest;
