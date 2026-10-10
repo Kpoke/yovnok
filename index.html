@@ -572,6 +572,9 @@
       .menu-item:disabled { opacity: 0.5; cursor: default; }
       .menu-item.danger:hover { color: #ff6b6b; }
       .menu-item.danger::before { background: #ff6b6b; }
+      .play-choices { display: flex; flex-direction: column; gap: 2px; margin: -8px 0 12px 4px; padding-left: 4px; border-left: 2px solid var(--accent); }
+      .play-choices.hidden { display: none; }
+      .menu-item.choice small { display: block; margin-top: 3px; font-size: 9px; letter-spacing: 2px; opacity: 0.6; }
       #join-button small { display: block; margin-top: 2px; font-size: 9px; letter-spacing: 2px; font-weight: 400; opacity: 0.75; }
       .callsign-line { margin-top: 26px; font-size: 10px; letter-spacing: 2px; opacity: 0.55; }
       .callsign-line b { color: #fff; opacity: 1; letter-spacing: 3px; font-weight: 600; }
@@ -1020,8 +1023,11 @@
           <div class="title">YOVNOK</div>
           <div class="sub">twelve armed cars · one survivor</div>
           <nav class="menu">
-            <button id="join-button" class="menu-item primary">PLAY VS BOTS<small>public match · bots fill the empty seats</small></button>
-            <button id="join-private" class="menu-item" data-panel="private">PRIVATE ROOM</button>
+            <button id="join-button" class="menu-item primary">PLAY</button>
+            <div id="play-choices" class="play-choices hidden">
+              <button id="play-bots" class="menu-item choice">VS BOTS<small>public match · bots fill the empty seats</small></button>
+              <button id="join-private" class="menu-item choice" data-panel="private">PRIVATE ROOM<small>friends only · no bots</small></button>
+            </div>
             <button id="join-garage" class="menu-item" data-panel="cosmetics">GARAGE</button>
             <button id="join-settings" class="menu-item" data-panel="settings">SETTINGS</button>
             <button id="join-credits" class="menu-item" data-panel="credits">CREDITS</button>

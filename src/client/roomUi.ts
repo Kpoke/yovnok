@@ -82,8 +82,15 @@ export class RoomUi {
   /** An invite link (`?room=CODE`) opens the drawer with the code filled in. */
   prefill(code: string): void {
     this.codeInput.value = code.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
+    this.showChoices();
     const item = byId('join-private');
     if (!item.classList.contains('open')) item.click();
+  }
+
+  /** Unfold PLAY's choices (the private room lives there). */
+  private showChoices(): void {
+    byId('play-choices').classList.remove('hidden');
+    byId('join-button').classList.add('open');
   }
 
   handlers(h: {
@@ -105,6 +112,7 @@ export class RoomUi {
   /** A refusal from the server, in words. */
   showRefusal(reason: string): void {
     this.setError(REFUSALS[reason] ?? `Could not join (${reason}).`);
+    this.showChoices();
     const item = byId('join-private');
     if (!item.classList.contains('open')) item.click();
   }

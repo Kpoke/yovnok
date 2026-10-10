@@ -43,9 +43,6 @@ const byId = <T extends HTMLElement>(id: string): T => {
   return el as T;
 };
 
-/** The PLAY button: a public match, where bots fill every seat players don't. */
-const PLAY_LABEL = 'PLAY VS BOTS<small>public match · bots fill the empty seats</small>';
-
 export class Hud {
   private speedValue = byId('speed-value');
   private tState = byId('t-state');
@@ -165,7 +162,20 @@ export class Hud {
       this.bannerButton.disabled = true;
       this.onReadyCallback?.();
     });
+    // PLAY opens its two choices (vs bots, private room); while a car is held
+    // it is REJOIN and goes straight back in.
+    const choices = byId('play-choices');
+    const bots = byId<HTMLButtonElement>('play-bots');
+    bots.addEventListener('click', () => {
+      bots.disabled = true;
+      this.onJoinCallback?.();
+    });
     this.joinButton.addEventListener('click', () => {
+      if (!this.joinButton.dataset.rejoin) {
+        const open = choices.classList.toggle('hidden') === false;
+        this.joinButton.classList.toggle('open', open);
+        return;
+      }
       this.joinButton.disabled = true;
       this.onJoinCallback?.();
     });
@@ -279,11 +289,10 @@ export class Hud {
    * `seconds` null restores PLAY.
    */
   setRejoin(seconds: number | null): void {
-    // (PLAY_LABEL: the public match, said plainly — bots fill the field.)
     if (seconds === null) {
       if (this.joinButton.dataset.rejoin) {
         delete this.joinButton.dataset.rejoin;
-        this.joinButton.innerHTML = PLAY_LABEL;
+        this.joinButton.textContent = 'PLAY';
       }
       return;
     }
@@ -339,7 +348,10 @@ export class Hud {
     this.joinPanel.classList.toggle('hidden', !show);
     // The title card owns the screen: no speedo or weapon read-out behind it.
     document.body.classList.toggle('menu', show);
-    if (show) this.joinButton.disabled = false;
+    if (show) {
+      this.joinButton.disabled = false;
+      byId<HTMLButtonElement>('play-bots').disabled = false;
+    }
   }
 
   /**
