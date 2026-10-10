@@ -15,6 +15,7 @@
  * until `init()` is called from the JOIN click.
  */
 
+import { Ambience, type AmbienceKind } from './ambience';
 import { FEEL } from '../shared/config';
 import type { WeaponId } from '../shared/weapons';
 
@@ -114,9 +115,27 @@ export class GameAudio {
     const data = this.noise.getChannelData(0);
     for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
 
+    // The map's background sound, under everything (not compressed with the guns).
+    this.ambience = new Ambience(ctx, this.master);
+    this.ambience.set(this.ambienceKind);
+
     this.startEngine();
     this.startZoneTone();
     void ctx.resume();
+  }
+
+  private ambience: Ambience | null = null;
+  private ambienceKind: AmbienceKind | null = null;
+
+  /** The current map's background sound (kept until audio starts, if it has not). */
+  setAmbience(kind: AmbienceKind | null): void {
+    this.ambienceKind = kind;
+    this.ambience?.set(kind);
+  }
+
+  /** A kill: the crowd (where there is one) roars. */
+  ambienceReact(strength = 1): void {
+    this.ambience?.react(strength);
   }
 
   private async loadSamples(ctx: AudioContext): Promise<void> {

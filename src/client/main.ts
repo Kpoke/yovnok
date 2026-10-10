@@ -17,6 +17,7 @@ import { CAMERA, COMBAT, LIGHTING_PRESETS, TICK, VEHICLE, ZONE } from '../shared
 import { MAPS, SPAWNS, useMap } from '../shared/arena';
 import { DEFAULT_MAP, isMapId, type MapId } from '../shared/mapIds';
 import { World } from './world';
+import { THEMES } from './maps/themes';
 import { localToWorld, NEUTRAL_INPUT, stepVehicle, type VehicleInput } from '../shared/vehicle';
 import { relativeAim, vehiclePointWorld } from '../shared/combat';
 import { WS_PATH } from '../shared/protocol';
@@ -488,9 +489,10 @@ const chase = new CameraRig();
 // Repair crates: positions come from the shared arena, state from snapshots.
 const crates = buildCrates();
 scene.add(crates.group);
-world.onShown = () => {
+world.onShown = (id) => {
   crates.reset();
   skidMarks.clear();
+  audio.setAmbience(THEMES[id].ambience);
 };
 
 // The closing danger zone: a ring the server moves, drawn from the snapshot.
@@ -565,6 +567,8 @@ const seenProjectiles = new Set<number>();
 
 // Audio. Created on the JOIN click — browsers refuse audio before a gesture.
 const audio = new GameAudio();
+// The first map's background sound (later ones follow world.onShown).
+audio.setAmbience(THEMES[world.mapId ?? DEFAULT_MAP].ambience);
 
 // Music: lobby and match playlists (third-party; see ASSETS.md).
 const music = new Music();
@@ -991,6 +995,7 @@ function frame(now: number): void {
       explosions.add(x, y + 0.4, z, 1.15);
       damageFx.wreck(x, y, z);
       world.react({ kind: 'kill', x, z, label: net.names.get(crew) });
+      audio.ambienceReact(crew === net.crewId ? 1.2 : 0.8);
       audio.explosion(x, y + 0.4, z, crew === net.crewId);
       // Shake falls off with distance, so a kill across the map stays calm.
       const distance = Math.hypot(x - local.pos.x, z - local.pos.z);

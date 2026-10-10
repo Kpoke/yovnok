@@ -13,6 +13,7 @@ import type { SurfaceTable } from '../arenaSurfaces';
 import { buildProps } from '../buildProps';
 import { buildStadium } from '../buildStadium';
 import { Weather as WeatherFx } from '../weather';
+import type { AmbienceKind } from '../ambience';
 import { boxes, lampPosts, outerRock, pines, ringPoints, rocks, seeded, solidsOf, water } from './scenery';
 
 export type Weather = 'none' | 'dust' | 'rain' | 'snow' | 'mist';
@@ -44,6 +45,8 @@ export type MapTheme = {
   containers: boolean;
   /** Palette roles drawn by the scenery instead of as plain boxes. */
   skip?: number[];
+  /** The map's background sound. */
+  ambience: AmbienceKind;
   /** Scenery: everything drawn beyond the solids themselves, at a level of detail. */
   dressing: (loader: GLTFLoader, detail: Detail) => Promise<Dressing[]>;
 };
@@ -65,11 +68,13 @@ const matte = (material: string, tile: number, tint?: number) => ({ material, ti
 
 export const THEMES: Record<MapId, MapTheme> = {
   stadium: {
+    ambience: 'crowd',
     containers: true,
     dressing: async (loader, detail) => [buildStadium(detail), { objects: [await buildProps(loader)] }],
   },
 
   canyon: {
+    ambience: 'wind',
     containers: false,
     skip: [PALETTE.rock],
     surfaces: {
@@ -100,6 +105,7 @@ export const THEMES: Record<MapId, MapTheme> = {
   },
 
   dockyard: {
+    ambience: 'rain',
     containers: true,
     surfaces: {
       zoneCentre: { material: 'concrete_floor_worn_001', tile: 7, wet: true },
@@ -191,6 +197,7 @@ export const THEMES: Record<MapId, MapTheme> = {
   },
 
   snowbase: {
+    ambience: 'snow',
     containers: false,
     skip: [PALETTE.landmark],
     surfaces: {
@@ -268,6 +275,7 @@ export const THEMES: Record<MapId, MapTheme> = {
   },
 
   quarry: {
+    ambience: 'machinery',
     containers: false,
     skip: [PALETTE.rock],
     surfaces: {
@@ -317,6 +325,7 @@ export const THEMES: Record<MapId, MapTheme> = {
   },
 
   forest: {
+    ambience: 'forest',
     containers: false,
     skip: [PALETTE.trunk, PALETTE.rock],
     surfaces: {
