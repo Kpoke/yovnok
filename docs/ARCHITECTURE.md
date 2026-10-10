@@ -24,11 +24,26 @@ compiled into both sides, so the client and the server run identical code.
 held by the `RoomManager` until the player presses PLAY (`hello`), then placed:
 
 1. back into the room still holding their car, if they left it moments ago;
-2. otherwise into a room that is in its lobby or countdown and has a seat —
-   the one closest to starting;
+2. otherwise into a public room that is in its lobby or countdown and has a
+   seat — the one closest to starting;
 3. otherwise into a new room (up to `MAX_ROOMS`).
 
-Idle extra rooms close; there is always one.
+`hello` with `room: 'new'` opens a **private room** with a five-letter code;
+`room: '<code>'` joins one. A private room has no bots, needs two players, and
+starts when its host says so (`roomStart`); the host also picks the map
+(`roomMap`). A car held for a player who dropped waits, parked.
+
+**Limits.** At `MAX_PLAYERS` people online, or with every room slot taken by a
+live match, `hello` is answered `busy` and the page retries. Idle extra rooms
+close; there is always one.
+
+**Maps** (`src/shared/maps/`). Each map is data: its solids (written as one
+quadrant and rotated four times, so every map is symmetric), repair crates,
+lighting preset and ground grip. One map is active per process at a time
+(`useMap` in `arena.ts`); each room switches to its own before it steps or
+handles a message. Point queries use a uniform broadphase grid. Public rooms
+pick the next map at the end of a match, so pages can load it during the
+results.
 
 **Simulation.** Each room steps at 60 Hz and sends snapshots at 30 Hz. The
 server is authoritative: it applies every player's inputs, resolves every shot
@@ -63,10 +78,15 @@ snapshots: it rewinds to the acknowledged state and replays unacknowledged
 inputs, smoothing any remaining error away. Other cars are drawn 100 ms in the
 past, interpolated between snapshots.
 
-**Rendering** (three.js, WebGL 2): the floodlit stadium (`buildArena`,
-`buildStadium`, `buildContainers`, `buildProps`), PBR materials with KTX2
-textures, a night HDRI environment, shadows from the floodlight key, and three
-quality presets (`lighting.ts`: Low and Medium draw directly; High adds bloom).
+**Rendering** (three.js, WebGL 2). `World` (`world.ts`) builds the active map:
+the arena from its solids (`buildArena`, `buildContainers`), its theme's
+materials and scenery (`maps/themes.ts`, `maps/scenery.ts`, `buildStadium`,
+`buildProps`), its weather (`weather.ts`), and its time of day — lights, HDRI
+environment, sky and fog (`lighting.ts`, `sky.ts`). Downloads are cached, and the
+next map's start during the results. PBR materials use KTX2 textures; there are
+three quality presets (Low and Medium draw directly; High adds bloom). The
+stadium's crowd is one instanced draw animated on the GPU, reacting to kills
+and blasts.
 Effects are instanced particle pools (`damageFx`, `driveFx`, `explosions`,
 `weaponFx`) and one batched draw for every car's lights (`carLights`).
 
@@ -75,14 +95,17 @@ wheels, turret, guns — loaded through a manifest
 (`public/assets/vehicles/manifest.json`), with level-of-detail switching, a
 livery paint layer and paint finishes, and scorching as the car takes damage.
 
-**Input** (`input.ts`): keyboard and mouse, and the standard-mapping gamepad,
-both producing the same actions. **Audio** (`audio.ts`, `music.ts`): sampled
+**Input** (`input.ts`, `touch.ts`): keyboard and mouse, the standard-mapping
+gamepad, and on-screen touch controls with aim assist, all producing the same
+actions. Touch devices play in landscape and full screen. **Audio** (`audio.ts`, `music.ts`): sampled
 weapons and impacts with positional audio and reverb; a synthesised engine with
 gears, tyre, gravel and wind layers.
 
-**Interface** (`index.html`, `hud.ts`): the stand-by card while assets load, the
-title with the car showcase, garage (paint), settings (callsign, sound,
-quality), credits, the in-game menu (Esc / Start) and the match HUD. The
+**Interface** (`index.html`, `hud.ts`, `roomUi.ts`): the stand-by card while
+assets load, the title with the car showcase, PLAY (vs bots, or a private room
+and its lobby), garage (paint), settings (callsign, sound, quality), credits,
+the waiting card when the server is full, the in-game menu (Esc / Start / ☰)
+and the match HUD. The
 F3 overlay shows frame timing and network ping, jitter and latency.
 
 ## Statistics

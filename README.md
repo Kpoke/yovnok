@@ -1,11 +1,11 @@
 # YOVNOK
 
-**Armed cars, a floodlit stadium, a live broadcast — twelve cars, one survivor.**
+**Armed cars, six arenas, a live broadcast — twelve cars, one survivor.**
 
-YOVNOK is a vehicle-combat battle royale that runs in the browser. You drive and
-shoot at the same time: twin machine guns in the headlights, an RPG on a roof
-turret, a closing ring of danger, and eleven other cars that want you gone.
-Every match is broadcast live.
+YOVNOK is a vehicle-combat battle royale that runs in the browser, on a computer
+or a phone. You drive and shoot at the same time: twin machine guns in the
+headlights, an RPG on a roof turret, a closing ring of danger, and eleven other
+cars that want you gone. Every match is broadcast live.
 
 **Play now: [play.yovnok.com](https://play.yovnok.com)**
 
@@ -18,25 +18,43 @@ free to share — see [Assets and licences](#assets-and-licences).
 
 ## Playing
 
-A desktop browser with WebGL 2 (current Chrome, Edge, Firefox or Safari) and a
-**keyboard and mouse** or a **gamepad**. Phones and touch-only tablets show the
-title but cannot drive yet.
+A browser with WebGL 2 (current Chrome, Edge, Firefox or Safari), played with a
+**keyboard and mouse**, a **gamepad**, or **touch** on a phone or tablet (held
+sideways; add it to the home screen for full screen).
 
-Press **PLAY**. Bots fill whatever seats players do not, so a match starts
-quickly however many people are online, and several matches run at once.
+Press **PLAY**, then:
 
-| | Keyboard + mouse | Gamepad |
-|---|---|---|
-| Throttle · brake / reverse | `W` · `S` | `RT` · `LT` |
-| Steer | `A` / `D` | left stick |
-| Aim | mouse | right stick |
-| Twin machine guns | left click | `RB` |
-| Roof RPG | right click | `LB` |
-| Handbrake | `Space` | `X` |
-| Boost | `Shift` | `B` or `L3` |
-| Reload | `R` | `Y` |
-| Menu | `Esc` | `Start` (D-pad + `A`/`B` to choose) |
-| Performance overlay | `F3` or `` ` `` | — |
+- **VS BOTS** — a public match. Bots fill whatever seats players do not, so a
+  match starts at once; other players arriving together join the same match.
+- **PRIVATE ROOM** — create a room and send friends its five-letter code or
+  invite link. 2–12 players, no bots; the host picks the map and starts.
+
+When the server is at capacity, PLAY shows a waiting card and goes in as soon as
+a seat frees up.
+
+| | Keyboard + mouse | Gamepad | Touch |
+|---|---|---|---|
+| Throttle · brake / reverse | `W` · `S` | `RT` · `LT` | left thumb: stick up · down |
+| Steer | `A` / `D` | left stick | left thumb: stick sideways |
+| Aim | mouse | right stick | right thumb: drag (with aim assist) |
+| Twin machine guns | left click | `RB` | `MG` (slide to aim) |
+| Roof RPG | right click | `LB` | `RPG` |
+| Handbrake | `Space` | `X` | `DRIFT` |
+| Boost | `Shift` | `B` or `L3` | `BOOST` |
+| Reload | `R` | `Y` | `↻` |
+| Menu | `Esc` | `Start` (D-pad + `A`/`B` to choose) | `☰` |
+| Performance overlay | `F3` or `` ` `` | — | — |
+
+**The arenas** (public matches rotate between them after every match):
+
+| Arena | |
+|---|---|
+| The Stadium | floodlit night; container cover, a mesa, a two-deck crowd that cheers the kills |
+| Dusk Canyon | sunset; sandstone mesas, a dry wash, a rock shelf, a tar pit |
+| Rainy Dockyard | night and rain; a maze of container lanes, warehouses, gantry cranes |
+| Snowbound Base | overcast; runways, hangars, banked bunkers, frozen ponds with no grip |
+| Quarry | clear day; an open pit on three levels joined by haul roads |
+| Pine Forest | misty morning; trees to weave through, tracks, a logging camp, a bog |
 
 **In a match**
 - The guns swing ±20° off the nose — aim them mostly by aiming the car. The
@@ -77,7 +95,7 @@ Useful switches (environment variables for the server):
 | `BOTS` | `fill` in solo | `off`, or a number to fill the field to |
 | `SOLO_CARS` | `12` | cars per solo match |
 | `MAX_ROOMS` | `3` | simultaneous matches in one process, public and private |
-| `MAX_PLAYERS` | `20` | players at once; past it, PLAY waits for a seat |
+| `MAX_PLAYERS` | `16` | players at once; past it, PLAY waits for a seat |
 | `REJOIN_SECONDS` | `30` | how long a dropped player's car is held |
 | `ALLOWED_ORIGINS` | *(any)* | comma-separated origins allowed to open sockets |
 | `TRUST_PROXY` | off | `1` behind a reverse proxy (client IP from `X-Forwarded-For`) |
@@ -103,16 +121,17 @@ runs the whole suite — about 400 checks — and the production build:
 | `typecheck` | TypeScript, strict |
 | `licensecheck` | every asset listed, credited and under an allowed licence |
 | `assetcheck` | built models against their size and LOD budget |
-| `simcheck` | driving physics, collision, the arena's invariants |
+| `simcheck` | driving physics, collision, and every map's invariants (spawns, symmetry, crates, reachability) |
 | `combattest`, `weapontest` | hit detection, damage, weapons and their mounts |
 | `matchtest` | the match lifecycle end to end against a real server |
 | `bottest` | bot driving, aiming and weapon discipline |
 | `cosmeticstest` | paints and unlocks are look-only; callsign rules |
-| `roomstest` | several matches at once, rejoin, and abuse cannot crash the server |
+| `roomstest` | several matches at once, rejoin, private rooms, the player limit, and abuse cannot crash the server |
 | `netheadless` | client prediction and reconciliation over a real socket |
 
 Diagnostics that are not pass/fail: `npm run solobench` plays real bot matches
-and reports match length, accuracy and damage by weapon; `scalebench` and
+and reports match length, accuracy and damage by weapon (`DEV_MAP=<map id>` picks
+the arena); `scalebench` and
 `driftbench` measure load and handling.
 
 ---

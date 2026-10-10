@@ -124,7 +124,7 @@ Environment variables of the game container:
 | `PUBLIC_WS_URL` | `wss://ws.<domain>/ws` | Where the page opens the game socket (served by `/config.json`) |
 | `TRUST_PROXY` | `1` | Take the client address from Cloudflare's header |
 | `MAX_ROOMS` | `3` | Simultaneous matches, public and private |
-| `MAX_PLAYERS` | `20` | Players at once across all matches; past it, PLAY shows a waiting card |
+| `MAX_PLAYERS` | `16` | Players at once across all matches; past it, PLAY shows a waiting card |
 | `SOLO_CARS` | `12` | Cars per match (bots fill free seats) |
 | `REJOIN_SECONDS` | `30` | How long a dropped player's car is held |
 | `BANDWIDTH_BUDGET_GB` | `850` | Monthly outbound limit before new players are turned away |
@@ -133,7 +133,7 @@ Environment variables of the game container:
 | `MAX_SOCKETS_PER_IP`, `MAX_CONNECTS_PER_MINUTE` | `6`, `30` | Per-IP limits (on by default in production) |
 | `PORT`, `HOST` | `8787`, `0.0.0.0` | Listening address |
 
-`DEV_ASSIGN`, `DEV_PLACE`, `MATCH_FORCE_LIVE` and `BENCH_STATS` exist for tests
+`DEV_ASSIGN`, `DEV_PLACE`, `DEV_MAP`, `MATCH_FORCE_LIVE` and `BENCH_STATS` exist for tests
 and must not be set in production.
 
 ## Running the production build locally

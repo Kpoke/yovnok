@@ -18,7 +18,7 @@ services:
       # through Cloudflare (half the round trip from West Africa).
       PUBLIC_WS_URL: wss://${WS_DOMAIN}/ws
       MAX_ROOMS: "3"
-      MAX_PLAYERS: "20"
+      MAX_PLAYERS: "16"
       # The hard edge of the $10/month budget: 1,000 GB is the Droplet's
       # allowance; stop admitting new players well before it.
       BANDWIDTH_BUDGET_GB: "850"
