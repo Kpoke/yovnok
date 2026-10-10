@@ -260,8 +260,22 @@ hud.setNames(net.names);
 // Phones and tablets: on-screen controls (touch.ts), played in landscape and
 // full screen. A tablet with a keyboard and mouse attached reports a fine
 // pointer too, and plays as a computer.
-const touchOnly = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
+// Touch mode: a touch-first device from the start, and ANY device the moment
+// its screen is touched (some phones report a fine pointer; a laptop may have a
+// touchscreen). Once on, it stays on for the visit.
+let touchOnly =
+  matchMedia('(pointer: coarse)').matches ||
+  /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints > 0 && !matchMedia('(hover: hover)').matches);
+/** Adds the on-screen controls once input exists (set below, after loading). */
+let attachTouchControls: (() => void) | null = null;
+function enableTouch(): void {
+  touchOnly = true;
+  document.body.classList.add('touch');
+  attachTouchControls?.();
+}
 if (touchOnly) document.body.classList.add('touch');
+window.addEventListener('touchstart', () => enableTouch(), { passive: true, capture: true });
 /** Full screen, and landscape where the browser lets a page lock it (Android). */
 function goFullscreen(): void {
   const root = document.documentElement;
@@ -430,7 +444,10 @@ const remoteLookKeys = new Map<number, string>();
 
 const inputs = new Input();
 inputs.attach(canvas);
-if (touchOnly) inputs.attachTouch();
+attachTouchControls = () => {
+  if (!inputs.touch) inputs.attachTouch();
+};
+if (touchOnly) enableTouch();
 
 /**
  * Aim assist, touch only: a thumb is far less precise than a mouse, so when a
@@ -1145,7 +1162,14 @@ function frame(now: number): void {
   // First-match onboarding: one tip at a time, once per tab.
   if (net.match.phase === 'live') {
     if (!tips.controls) {
-      hud.showTip('WASD drive · mouse aim · left-click fire', 6);
+      hud.showTip(
+        inputs.touch
+          ? 'Left thumb drives · right thumb aims · hold MG to fire'
+          : inputs.padActive
+            ? 'RT drive · right stick aim · RB fire'
+            : 'WASD drive · mouse aim · left-click fire',
+        6,
+      );
       rememberTip('controls');
     } else if (!tips.zone && zone?.shrinking) {
       hud.showTip('The ring is closing — stay inside it', 6);

@@ -697,7 +697,10 @@
       }
 
       /* ---- touch: on-screen controls, landscape only ---- */
-      body.touch { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+      /* Gestures are blocked only on the game itself; menus and panels still scroll. */
+      body.touch { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+      body.touch #game, body.touch #touch { touch-action: none; }
+      body.touch .drawer, body.touch .room-card, body.touch #join, body.touch #pause { touch-action: pan-y; }
       #touch { position: absolute; inset: 0; z-index: 12; pointer-events: none; }
       #touch.hidden { display: none; }
       #touch .touch-zone { position: absolute; top: 0; bottom: 0; pointer-events: auto; }

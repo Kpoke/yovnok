@@ -440,6 +440,7 @@ const server = spawn('npx', ['tsx', 'src/server/server.ts'], {
     // would cull the bots from the observer entirely.
     DEV_PLACE: '0:-60,0,0|1:60,0,0|2:0,60,0|3:0,-60,0',
     MATCH_COUNTDOWN_SECONDS: '1',
+    GATHER_SECONDS: '0',
     MATCH_TIME_SECONDS: '40',
     MATCH_RESULTS_SECONDS: '6',
   },

@@ -163,7 +163,12 @@ export class RoomManager {
   /** A public room (on a random map), or a private one with its code. */
   private open(code?: string): Room {
     const map = code ? undefined : (DEV_MAP ?? MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)]);
-    const room = new Room({ code, map, rotate: !code && !DEV_MAP });
+    const room = new Room({
+      code,
+      map,
+      rotate: !code && !DEV_MAP,
+      othersOnline: () => this.pending.size + this.online - room.playerCount,
+    });
     room.start();
     this.rooms.push(room);
     console.log(`[rooms] opened ${code ? `private room ${code}` : 'a public room'} (${this.rooms.length} running)`);

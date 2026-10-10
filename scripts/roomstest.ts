@@ -33,6 +33,7 @@ const server = spawn('npx', ['tsx', 'src/server/server.ts'], {
     PORT: String(PORT),
     MODE: 'solo',
     MATCH_COUNTDOWN_SECONDS: '1',
+    GATHER_SECONDS: '0',
     SOLO_MIN_PLAYERS: '1',
     // Short, so the idle check below does not wait out a held car (the rejoin
     // step takes about a second).

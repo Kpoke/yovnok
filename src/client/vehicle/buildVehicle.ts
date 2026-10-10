@@ -449,8 +449,9 @@ function underglow(colour: number, spec: VehicleSpec): THREE.Mesh {
     ctx.fillRect(0, 0, 64, 128);
     glowTexture = new THREE.CanvasTexture(canvas);
   }
-  const width = spec.track + 1.6;
-  const length = spec.wheelbase + 2.4;
+  // Inside the car's own footprint: a pool of light under it, not a carpet.
+  const width = spec.halfWidth * 2 * 0.95;
+  const length = spec.wheelbase + 1.2;
   const plane = new THREE.PlaneGeometry(width, length);
   plane.rotateX(-Math.PI / 2);
   const mesh = new THREE.Mesh(

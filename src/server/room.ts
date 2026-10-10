@@ -393,6 +393,13 @@ const ZONE_SEED = process.env.ZONE_SEED === undefined ? null : Number(process.en
  */
 const FORCE_LIVE = process.env.MATCH_FORCE_LIVE === '1';
 
+/**
+ * Public rooms: when anyone else is online (on the title or in another
+ * match), the countdown runs this long, so people pressing PLAY around the same
+ * time land in the same match. Alone on the server, it is the normal countdown.
+ */
+const GATHER_SECONDS = Number(process.env.GATHER_SECONDS ?? 60);
+
 /** A private room's player limits: no bots, so a match needs two people. */
 export const PRIVATE_MIN_PLAYERS = 2;
 export const PRIVATE_MAX_PLAYERS = 12;
@@ -405,6 +412,8 @@ export type RoomOptions = {
   map?: MapId;
   /** Pick a new map after each match (public rooms). */
   rotate?: boolean;
+  /** People online outside this room (title pages and other matches). */
+  othersOnline?: () => number;
 };
 
 export class Room {
@@ -414,6 +423,8 @@ export class Room {
   private mapId: MapId;
   private nextMapId: MapId | null = null;
   private readonly rotate: boolean;
+  private readonly othersOnline: () => number;
+  private baseCountdown = 0;
   /** Private rooms: who picks the map and starts the match. */
   private hostId: number | null = null;
 
@@ -421,6 +432,8 @@ export class Room {
     this.code = options.code ?? null;
     this.mapId = options.map ?? DEFAULT_MAP;
     this.rotate = options.rotate ?? !this.code;
+    this.othersOnline = options.othersOnline ?? (() => 0);
+    this.baseCountdown = this.rules.countdownSeconds;
     this.crates = this.cratesFor(this.mapId);
     this.nextCrateId = this.crates.length;
     if (this.code) {
@@ -2104,6 +2117,20 @@ export class Room {
     if (BENCH_STATS && this.match.phase === 'results' && Object.keys(this.benchStats).length > 0) {
       console.log(`[bench] damage ${JSON.stringify(this.benchStats)}`);
       this.benchStats = {};
+    }
+
+    // Public rooms gather: a long countdown while others are online, so a match
+    // fills with people rather than bots; cut short once every seat is a person.
+    if (!this.isPrivate && this.match.phase === 'lobby') {
+      const gather = GATHER_SECONDS > this.baseCountdown && this.othersOnline() > 0;
+      this.rules = { ...this.rules, countdownSeconds: gather ? GATHER_SECONDS : this.baseCountdown };
+    }
+    if (
+      this.match.phase === 'countdown' &&
+      this.humanCount() >= this.teamCount &&
+      this.match.endsAt - now > this.baseCountdown * 1000
+    ) {
+      this.match.endsAt = now + this.baseCountdown * 1000;
     }
 
     const before = this.match.phase;

@@ -44,6 +44,7 @@ const server = spawn('npx', ['tsx', 'src/server/server.ts'], {
     SOLO_CARS: String(CARS),
     SOLO_MIN_PLAYERS: '2',
     MATCH_COUNTDOWN_SECONDS: '2',
+    GATHER_SECONDS: '0',
     // No clock, matching the mode: a match ends by elimination, and the bench's
     // own cap is what stops a stalemate.
     MATCH_TIME_SECONDS: '0',

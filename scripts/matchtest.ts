@@ -298,6 +298,7 @@ const server = spawn('npx', ['tsx', 'src/server/server.ts'], {
     DEV_ASSIGN: '1',
     // Short clocks so the whole lifecycle runs in seconds.
     MATCH_COUNTDOWN_SECONDS: '1',
+    GATHER_SECONDS: '0',
     MATCH_TIME_SECONDS: '3',
     MATCH_SUDDEN_DEATH_SECONDS: '2',
     MATCH_RESULTS_SECONDS: '3',
@@ -520,6 +521,7 @@ try {
       // put crew 2 296 m from crew 0 — past the interest radius, deliberately.
       DEV_PLACE: '0:0,0,0|1:80,0,0|2:0,80,0',
       MATCH_COUNTDOWN_SECONDS: '1',
+      GATHER_SECONDS: '0',
       MATCH_TIME_SECONDS: '30',
       MATCH_RESULTS_SECONDS: '8',
     },
@@ -612,6 +614,7 @@ try {
       SOLO_CARS: '4',
       SOLO_MIN_PLAYERS: '2',
       MATCH_COUNTDOWN_SECONDS: '1',
+      GATHER_SECONDS: '0',
       MATCH_TIME_SECONDS: '0',
       MATCH_RESULTS_SECONDS: '8',
       // Pinned close (and outside the tiny zone) so interest management does not
@@ -689,6 +692,7 @@ try {
       SOLO_CARS: '2',
       SOLO_MIN_PLAYERS: '2',
       MATCH_COUNTDOWN_SECONDS: '1',
+      GATHER_SECONDS: '0',
       MATCH_TIME_SECONDS: '0',
       // Two crews at opposite corners — ~450 m apart, past the 320 m interest
       // radius, so the server must NOT send each client the other's car.

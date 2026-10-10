@@ -503,7 +503,12 @@ export class Hud {
       this.showBanner('WAITING FOR CREWS', need, null);
     } else if (match.phase === 'countdown') {
       const seconds = Math.max(1, Math.ceil(match.remainingMs / 1000));
-      this.showBanner(String(seconds), 'GET READY', null);
+      // A long countdown is a public match gathering players.
+      if (seconds > 10) {
+        this.showBanner(mmss(match.remainingMs), `WAITING FOR PLAYERS · ${match.players} in · bots fill the rest`, null);
+      } else {
+        this.showBanner(String(seconds), 'GET READY', null);
+      }
     } else if (match.phase === 'results') {
       const outcome = match.winner === null ? 'DRAW' : match.winner === myTeam ? 'VICTORY' : 'DEFEAT';
       const tone = match.winner === null ? '' : match.winner === myTeam ? 'win' : 'loss';
