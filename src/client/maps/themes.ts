@@ -13,20 +13,30 @@ import { buildStadium } from '../buildStadium';
 
 export type Weather = 'none' | 'dust' | 'rain' | 'snow' | 'mist';
 
+/** Something happened in the arena that the scenery may react to. */
+export type WorldEvent = { kind: 'kill' | 'blast'; x: number; z: number; label?: string };
+
+/** A map's scenery: its objects, and optional per-frame and event hooks. */
+export type Dressing = {
+  objects: THREE.Object3D[];
+  update?: (dt: number) => void;
+  react?: (event: WorldEvent) => void;
+};
+
 export type MapTheme = {
   /** Materials by palette role, over the defaults (arenaSurfaces.SURFACES). */
   surfaces?: SurfaceTable;
   /** Draw cover blocks as stacks of shipping containers. */
   containers: boolean;
   /** Scenery: everything drawn beyond the solids themselves. */
-  dressing: (loader: GLTFLoader) => Promise<THREE.Object3D[]>;
+  dressing: (loader: GLTFLoader) => Promise<Dressing[]>;
   weather: Weather;
 };
 
 export const THEMES: Record<MapId, MapTheme> = {
   stadium: {
     containers: true,
-    dressing: async (loader) => [buildStadium(), await buildProps(loader)],
+    dressing: async (loader) => [buildStadium(), { objects: [await buildProps(loader)] }],
     weather: 'none',
   },
 };

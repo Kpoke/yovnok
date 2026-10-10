@@ -15,7 +15,7 @@ import type { MapId } from '../shared/mapIds';
 import { applyArenaSurfaces, loadMaterial, materialsOf, setSurfaces } from './arenaSurfaces';
 import { buildArena } from './buildArena';
 import type { Lighting } from './lighting';
-import { THEMES } from './maps/themes';
+import { THEMES, type Dressing, type WorldEvent } from './maps/themes';
 import { buildSky, setSky } from './sky';
 
 export class World {
@@ -26,6 +26,8 @@ export class World {
   mapId: MapId | null = null;
   private building: MapId | null = null;
   private generation = 0;
+  /** The current map's scenery hooks. */
+  private dressing: Dressing[] = [];
   /** Called once a map is on screen (crates, skid marks… reset). */
   onShown: ((id: MapId) => void) | null = null;
 
@@ -41,6 +43,16 @@ export class World {
   /** True while a map change is still loading. */
   get loading(): boolean {
     return this.building !== null;
+  }
+
+  /** Per frame: animate the scenery (crowd, screens, weather). */
+  update(dt: number): void {
+    for (const d of this.dressing) d.update?.(dt);
+  }
+
+  /** A kill or a blast: the scenery reacts (cheers, pyro, the big screen). */
+  react(event: WorldEvent): void {
+    for (const d of this.dressing) d.react?.(event);
   }
 
   /** Start a map's downloads without showing it. */
@@ -70,14 +82,15 @@ export class World {
     setSurfaces(theme.surfaces);
     const arena = buildArena({ containers: theme.containers });
     const [dressing] = await Promise.all([theme.dressing(this.loader), applyArenaSurfaces(arena, this.loader)]);
+    const objects = dressing.flatMap((d) => d.objects);
     if (generation !== this.generation) {
       dispose(arena);
-      for (const d of dressing) dispose(d);
+      for (const o of objects) dispose(o);
       return;
     }
     // The dressing may also carry arena surfaces (stands, barriers).
     const holder = new THREE.Group();
-    holder.add(...dressing);
+    holder.add(...objects);
     await applyArenaSurfaces(holder, this.loader);
     if (generation !== this.generation) return;
 
@@ -86,7 +99,8 @@ export class World {
       this.group.remove(child);
       dispose(child);
     }
-    this.group.add(arena, ...dressing);
+    this.group.add(arena, ...objects);
+    this.dressing = dressing;
     useMap(id);
     setSurfaces(theme.surfaces);
     this.lighting.applyPreset(preset);

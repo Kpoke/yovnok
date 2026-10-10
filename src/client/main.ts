@@ -720,6 +720,7 @@ function frame(now: number): void {
     // everyone, ours included, since we could not predict where it would land.
     if (shotWeapon.delivery === 'projectile') {
       explosions.add(shot.ex, shot.ey, shot.ez, 0.62);
+      world.react({ kind: 'blast', x: shot.ex, z: shot.ez });
       audio.explosion(shot.ex, shot.ey, shot.ez, false);
       const me = net.renderState;
       const distance = Math.hypot(shot.ex - me.pos.x, shot.ez - me.pos.z);
@@ -921,6 +922,7 @@ function frame(now: number): void {
     if (wasAlive.get(crew) === true && !alive) {
       explosions.add(x, y + 0.4, z, 1.15);
       damageFx.wreck(x, y, z);
+      world.react({ kind: 'kill', x, z, label: net.names.get(crew) });
       audio.explosion(x, y + 0.4, z, crew === net.crewId);
       // Shake falls off with distance, so a kill across the map stays calm.
       const distance = Math.hypot(x - local.pos.x, z - local.pos.z);
@@ -935,6 +937,7 @@ function frame(now: number): void {
     noteDeath(crew, !net.isDead(crew), state.pos.x, state.pos.y, state.pos.z);
   }
   explosions.update(realDt);
+  world.update(realDt);
   damageFx.update(realDt, camera);
   perf.mark('fx');
 
@@ -1222,6 +1225,15 @@ function frame(now: number): void {
 
   perf.mark('hud');
   perf.gpuBegin();
+  // Development only: a fixed camera for scenery screenshots (window.__shotCam).
+  if (import.meta.env.DEV) {
+    const shot = (window as unknown as { __shotCam?: { p: number[]; t: number[] } }).__shotCam;
+    if (shot) {
+      camera.position.set(shot.p[0], shot.p[1], shot.p[2]);
+      camera.lookAt(shot.t[0], shot.t[1], shot.t[2]);
+      lighting.follow(shot.t[0], shot.t[2]);
+    }
+  }
   lighting.render();
   perf.gpuEnd();
   perf.mark('render');
@@ -1248,6 +1260,7 @@ function frame(now: number): void {
 // poking at state from the browser console during development.
 (window as unknown as { __convoy?: unknown }).__convoy = {
   net,
+  world,
   scene,
   camera,
   renderer,
