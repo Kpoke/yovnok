@@ -43,6 +43,9 @@ const byId = <T extends HTMLElement>(id: string): T => {
   return el as T;
 };
 
+/** The PLAY button: a public match, where bots fill every seat players don't. */
+const PLAY_LABEL = 'PLAY VS BOTS<small>public match · bots fill the empty seats</small>';
+
 export class Hud {
   private speedValue = byId('speed-value');
   private tState = byId('t-state');
@@ -276,10 +279,11 @@ export class Hud {
    * `seconds` null restores PLAY.
    */
   setRejoin(seconds: number | null): void {
+    // (PLAY_LABEL: the public match, said plainly — bots fill the field.)
     if (seconds === null) {
       if (this.joinButton.dataset.rejoin) {
         delete this.joinButton.dataset.rejoin;
-        this.joinButton.textContent = 'PLAY';
+        this.joinButton.innerHTML = PLAY_LABEL;
       }
       return;
     }
