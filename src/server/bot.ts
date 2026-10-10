@@ -354,8 +354,13 @@ function applyZoneSafety(
   state: VehicleState,
   zone: ZoneState | null,
   profile: BotProfile,
+  memory: BotMemory,
+  time: number,
 ): void {
   if (!zone) return;
+  // Backing out of a corner comes first: forcing the throttle here used to
+  // pin a wedged car against a rock until the zone killed it.
+  if (time < memory.reversingUntil) return;
 
   const distance = Math.hypot(state.pos.x - zone.x, state.pos.z - zone.z);
   // A worse driver reacts later: `zoneReaction` below 1 nudges only once the
@@ -364,7 +369,10 @@ function applyZoneSafety(
   if (distance <= safeInner) return;
 
   const yawToCentre = Math.atan2(-(zone.x - state.pos.x), -(zone.z - state.pos.z));
-  const error = wrapAngle(yawToCentre - state.yaw);
+  let error = wrapAngle(yawToCentre - state.yaw);
+  // The way in may be through a mesa or a hangar: go round, not into it.
+  const probe = BOT.probeDistance;
+  if (clearance(state, state.yaw + error, probe) < Math.min(probe * 0.6, 18)) error = chooseHeading(state, error, probe);
   const inward = clamp(-error * BOT.steerGain * profile.steerGain, -1, 1);
   const span = Math.max(1, zone.radius - safeInner);
   const urgency = clamp((distance - safeInner) / span, 0, 1);
@@ -474,7 +482,7 @@ export function decideBot(s: BotSenses): BotIntent {
     memory.stuckFor = 0;
     input.throttle = -0.2;
     input.handbrake = true;
-    applyZoneSafety(input, state, zone, profile);
+    applyZoneSafety(input, state, zone, profile, memory, time);
     return { input, aimYaw, aimPitch, fire };
   }
 
@@ -692,6 +700,6 @@ export function decideBot(s: BotSenses): BotIntent {
     if (memory.burst <= 0) memory.burstUntil = time + profile.burstPause;
   }
 
-  applyZoneSafety(input, state, zone, profile);
+  applyZoneSafety(input, state, zone, profile, memory, time);
   return { input, aimYaw, aimPitch, fire, fireSecondary, target: aimTarget, secondaryTarget: rocketTarget };
 }
