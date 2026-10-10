@@ -228,14 +228,17 @@ function tint(
   const finishKey = liveryBody
     ? `${liveryBody.roughness}:${liveryBody.metalness}:${liveryBody.clearcoat}:${liveryBody.sheen}`
     : '';
-  const key = `${target.getHexString()}:${body?.getHexString() ?? ''}:${strength}:${finishKey}`;
+  // The pattern (and its accent colour) is part of the paint too.
+  const pattern = (liveryBody?.userData.pattern as { kind: number; accent: THREE.Color } | undefined) ?? null;
+  const patternKey = pattern ? `${pattern.kind}:${pattern.accent.getHexString()}` : '';
+  const key = `${target.getHexString()}:${body?.getHexString() ?? ''}:${strength}:${finishKey}:${patternKey}`;
   let byColour = tints.get(material);
   if (!byColour) tints.set(material, (byColour = new Map()));
   let tinted = byColour.get(key);
   if (!tinted) {
     const copy = source.clone();
     copy.color.copy(target);
-    if (body) applyPaint(copy, body.clone(), strength);
+    if (body) applyPaint(copy, body.clone(), strength, pattern);
     if (liveryBody) applyFinish(copy, liveryBody);
     byColour.set(key, (tinted = copy));
   }
@@ -274,13 +277,47 @@ function noTransmission(material: THREE.Material): void {
  * Material.clone() does not carry `onBeforeCompile` — anything that clones a
  * painted material must copy it across (see `copyPaint`).
  */
-export function applyPaint(material: THREE.MeshStandardMaterial, colour: THREE.Color, strength: number): void {
-  material.userData.paint = { colour, strength };
+export function applyPaint(
+  material: THREE.MeshStandardMaterial,
+  colour: THREE.Color,
+  strength: number,
+  pattern: { kind: number; accent: THREE.Color } | null = null,
+): void {
+  material.userData.paint = { colour, strength, pattern };
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uPaint = { value: colour };
     shader.uniforms.uPaintStrength = { value: strength };
+    shader.uniforms.uPattern = { value: pattern?.kind ?? 0 };
+    shader.uniforms.uAccent = { value: pattern?.accent ?? new THREE.Color(0, 0, 0) };
+    // The car's own coordinates (metres, x across, y up, -z forward: the asset
+    // pipeline normalises every part to that), for the pattern.
+    shader.vertexShader = shader.vertexShader
+      .replace('void main() {', 'varying vec3 vCarPos;\nvoid main() {')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCarPos = position;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('void main() {', 'uniform vec3 uPaint;\nuniform float uPaintStrength;\nvoid main() {')
+      .replace(
+        'void main() {',
+        `uniform vec3 uPaint;
+        uniform float uPaintStrength;
+        uniform int uPattern;
+        uniform vec3 uAccent;
+        varying vec3 vCarPos;
+        float paintHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float paintNoise(vec2 p) {
+          vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(paintHash(i), paintHash(i + vec2(1.0, 0.0)), f.x), mix(paintHash(i + vec2(0.0, 1.0)), paintHash(i + vec2(1.0, 1.0)), f.x), f.y);
+        }
+        // 1 where the accent colour goes, 0 where the livery shows.
+        float paintMask(vec3 p) {
+          if (uPattern == 1) { float x = abs(p.x); return step(0.12, x) * step(x, 0.36); } // twin stripes
+          if (uPattern == 2) { return step(0.5, fract((p.x + p.z * 0.9 + p.y * 0.6) * 1.25)) * step(p.y, 0.55); } // hazard, low on the body
+          if (uPattern == 3) { return step(0.62, paintNoise(p.xz * 1.7 + p.y * 0.8)) + step(0.7, paintNoise(p.zx * 3.1 + 7.0)) * 0.6; } // camo
+          if (uPattern == 4) { float w = p.z * 2.2 + sin(p.y * 6.0 + abs(p.x) * 4.0) * 0.35; return step(0.72, fract(w)) * step(0.15, abs(p.x)); } // tiger
+          if (uPattern == 5) { return mod(floor(p.x * 2.5) + floor(p.z * 2.5), 2.0); } // checker
+          return 0.0;
+        }
+        void main() {`,
+      )
       .replace(
         '#include <map_fragment>',
         `#include <map_fragment>
@@ -288,7 +325,8 @@ export function applyPaint(material: THREE.MeshStandardMaterial, colour: THREE.C
           float lum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
           // The brawler's texture is dark (lum ~0.1–0.3): lift it so the paint
           // comes out at full colour, with the texture's detail as variation.
-          vec3 painted = uPaint * clamp(0.35 + lum * 2.8, 0.3, 1.2);
+          vec3 base = mix(uPaint, uAccent, clamp(paintMask(vCarPos), 0.0, 1.0));
+          vec3 painted = base * clamp(0.35 + lum * 2.8, 0.3, 1.2);
           diffuseColor.rgb = mix(diffuseColor.rgb, painted, uPaintStrength);
         }`,
       );
@@ -298,8 +336,10 @@ export function applyPaint(material: THREE.MeshStandardMaterial, colour: THREE.C
 
 /** Carry a material's paint onto a clone of it. */
 export function copyPaint(from: THREE.Material, to: THREE.MeshStandardMaterial): void {
-  const paint = from.userData.paint as { colour: THREE.Color; strength: number } | undefined;
-  if (paint) applyPaint(to, paint.colour, paint.strength);
+  const paint = from.userData.paint as
+    | { colour: THREE.Color; strength: number; pattern: { kind: number; accent: THREE.Color } | null }
+    | undefined;
+  if (paint) applyPaint(to, paint.colour, paint.strength, paint.pattern);
 }
 
 /**

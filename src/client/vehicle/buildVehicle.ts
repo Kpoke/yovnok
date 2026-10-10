@@ -23,12 +23,16 @@ import { damageOf, type DamageAnchors } from '../damageFx';
 import { copyPaint } from './gltfPartLibrary';
 import type { LightAnchors } from '../carLights';
 import {
+  ACCENTS,
   clampLook,
   DEFAULT_LOOK,
+  GLOWS,
   LIVERIES,
+  loadoutOf,
   WHEELS,
   type CosmeticLook,
 } from '../../shared/cosmetics';
+import { buildGun } from './guns';
 import { seatsFor } from '../../shared/crews';
 import { componentIntegrity, type ComponentId } from '../../shared/components';
 import type { VehicleInput, VehicleState } from '../../shared/vehicle';
@@ -111,6 +115,10 @@ export function buildVehicle(
   const livery = LIVERIES[skin.livery];
   const wheelStyle = WHEELS[skin.wheels];
   const materials: VehicleMaterials = createMaterials(livery.body, livery.finish, wheelStyle.hub);
+  // The pattern rides on the body material into the paint layer (gltfPartLibrary.tint).
+  if (skin.pattern > 0) {
+    materials.body.userData.pattern = { kind: skin.pattern, accent: new THREE.Color(ACCENTS[skin.accent].colour) };
+  }
   const root = new THREE.Group();
   // Yaw, then pitch, then roll — the order a vehicle reads in.
   root.rotation.order = 'YXZ';
@@ -205,21 +213,34 @@ export function buildVehicle(
   // can traverse and elevate about the point it is bolted on at.
   const weaponPivots: THREE.Group[][] = [];
   const gunSeat = seatsFor(spec.id).find((seat) => seat.mounted);
-  for (const weapon of gunSeat?.mounted ?? []) {
+  // The guns chosen in the garage (primary on the bumpers, secondary on the roof).
+  const chosen = gunSeat?.mounted?.length === 2 ? loadoutOf(skin) : null;
+  (gunSeat?.mounted ?? []).forEach((weapon, slot) => {
     const pivots: THREE.Group[] = [];
+    const id = chosen?.[slot] ?? weapon.weapon;
     weapon.mounts.forEach((mount, index) => {
       const pivot = new THREE.Group();
       pivot.rotation.order = 'YXZ';
       pivot.position.set(mount.pivot[0], mount.pivot[1], mount.pivot[2]);
       pivot.name = `${weapon.part}.${index}`;
       root.add(pivot);
-      const built = library.create({ kind: weapon.part, cls: spec.id }, materials);
-      pivot.add(built.group);
-      if (weapon.part === 'turret') parts.set('turret', { id: 'turret', group: built.group, sockets: built.sockets });
+      // A gun with its own model (the .50s, the RPG), or one built from shapes.
+      const custom = id !== weapon.weapon ? buildGun(id, mount.muzzle) : null;
+      if (custom) {
+        pivot.add(custom);
+      } else {
+        const built = library.create({ kind: weapon.part, cls: spec.id }, materials);
+        pivot.add(built.group);
+        if (weapon.part === 'turret') parts.set('turret', { id: 'turret', group: built.group, sockets: built.sockets });
+      }
       pivots.push(pivot);
     });
     weaponPivots.push(pivots);
-  }
+  });
+
+  // Underglow: a neon pool of light under the car (additive, no real light).
+  const glow = GLOWS[skin.glow];
+  if (glow.colour) root.add(underglow(glow.colour, spec));
   const setWeaponAims = (aims: ReadonlyArray<{ yaw: number; pitch: number }>): void => {
     aims.forEach((aim, i) => {
       for (const pivot of weaponPivots[i] ?? []) {
@@ -410,4 +431,44 @@ export function buildVehicle(
     },
     dispose,
   };
+}
+
+/** A soft glow texture, shared by every car's underglow. */
+let glowTexture: THREE.Texture | null = null;
+function underglow(colour: number, spec: VehicleSpec): THREE.Mesh {
+  if (!glowTexture) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d')!;
+    const g = ctx.createRadialGradient(32, 64, 4, 32, 64, 60);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0.45)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 128);
+    glowTexture = new THREE.CanvasTexture(canvas);
+  }
+  const width = spec.track + 1.6;
+  const length = spec.wheelbase + 2.4;
+  const plane = new THREE.PlaneGeometry(width, length);
+  plane.rotateX(-Math.PI / 2);
+  const mesh = new THREE.Mesh(
+    plane,
+    new THREE.MeshBasicMaterial({
+      map: glowTexture,
+      color: colour,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: true,
+    }),
+  );
+  // Just above the ground under the car (the root sits at ride height).
+  mesh.position.y = -spec.rideHeight + 0.06;
+  mesh.renderOrder = 2;
+  mesh.name = 'underglow';
+  mesh.raycast = () => {};
+  return mesh;
 }

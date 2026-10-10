@@ -10,6 +10,9 @@
  */
 
 import {
+  ACCENTS,
+  GLOWS,
+  GUN_CHOICES,
   LIVERIES,
   WHEELS,
   shopCatalog,
@@ -25,11 +28,25 @@ const KIND_LABELS: Record<CosmeticKind, string> = {
   livery: 'PAINT',
   wheels: 'WHEELS',
   roof: 'ROOF',
+  pattern: 'PATTERN',
+  accent: 'PATTERN COLOUR',
+  glow: 'UNDERGLOW',
+  primary: 'BUMPER GUNS',
+  secondary: 'ROOF WEAPON',
 };
 
+const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
 function swatchColour(entry: ShopEntry): string | null {
-  if (entry.kind === 'livery') return `#${LIVERIES[entry.index].body.toString(16).padStart(6, '0')}`;
-  if (entry.kind === 'wheels') return `#${WHEELS[entry.index].hub.toString(16).padStart(6, '0')}`;
+  if (entry.kind === 'livery') return hex(LIVERIES[entry.index].body);
+  if (entry.kind === 'wheels') return hex(WHEELS[entry.index].hub);
+  if (entry.kind === 'accent') return hex(ACCENTS[entry.index].colour);
+  if (entry.kind === 'glow') return GLOWS[entry.index].colour ? hex(GLOWS[entry.index].colour) : null;
+  return null;
+}
+
+/** A gun's one-line description, under its name. */
+function blurb(entry: ShopEntry): string | null {
+  if (entry.kind === 'primary' || entry.kind === 'secondary') return GUN_CHOICES[entry.kind][entry.index]?.blurb ?? null;
   return null;
 }
 
@@ -45,9 +62,9 @@ export class Garage {
     this.profile = profile;
     this.stats = root.querySelector('#cos-stats') as HTMLElement;
 
-    // Paint only (see main.ts `paintOnly`): wheel styles and roof kits do
-    // nothing on the realistic cars, so they are not offered.
-    for (const kind of ['livery'] as CosmeticKind[]) {
+    // Wheel styles and roof kits do nothing on the realistic cars (see main.ts
+    // `paintOnly`), so they are not offered.
+    for (const kind of ['livery', 'pattern', 'accent', 'glow', 'primary', 'secondary'] as CosmeticKind[]) {
       const row = root.querySelector(`#cos-${kind}`) as HTMLElement;
       if (row) this.rows.set(kind, row);
     }
@@ -103,6 +120,14 @@ export class Garage {
       const name = document.createElement('span');
       name.textContent = entry.name;
       button.appendChild(name);
+      const about = blurb(entry);
+      if (about) {
+        button.classList.add('gun');
+        const line = document.createElement('small');
+        line.className = 'cos-about';
+        line.textContent = about;
+        button.appendChild(line);
+      }
       const need = document.createElement('small');
       need.className = 'cos-need';
       button.appendChild(need);

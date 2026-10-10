@@ -65,9 +65,18 @@ a seat frees up.
 - Close or reload the tab mid-match and a bot keeps your car going for 30
   seconds — come back in time and **REJOIN** puts you back behind the wheel.
 
-**Your callsign and paint** live in your browser: pick a callsign under
-Settings, and unlock paints in the Garage by playing (matches, kills, wins).
-There are no accounts yet.
+**The garage.** Paint, a pattern (stripes, hazard, camo, tiger, checker) in a
+colour of your choice, and underglow — some unlocked by playing (matches, kills,
+wins). And your guns, all open from the start:
+
+| Bumper guns | | Roof weapon | |
+|---|---|---|---|
+| Twin .50 | a steady stream, all-rounder | RPG | one heavy rocket, big splash |
+| Scattergun | seven pellets a shot, deadly up close, nothing past 70 m | Swarm | four rockets at once, fanned out |
+| Lancer | slow, heavy, pin-point rail shots at long range | | |
+
+Your callsign, look and loadout live in your browser; there are no accounts
+yet.
 
 ---
 

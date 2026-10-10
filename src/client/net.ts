@@ -56,7 +56,7 @@ import {
 } from '../shared/combat';
 import { COMBAT } from '../shared/config';
 import { DEFAULT_LOADOUT, weaponInSlot, WEAPONS, type WeaponId } from '../shared/weapons';
-import { DEFAULT_LOOK, packLook } from '../shared/cosmetics';
+import { DEFAULT_LOOK, packLook, loadoutOf, unpackLook } from '../shared/cosmetics';
 import type {
   BoardRow,
   ClientMessage,
@@ -526,7 +526,13 @@ export class NetClient {
         // What we hold follows from the seat: a car-mounted gun, or the
         // personal default for a window. Same rule the server applied.
         const seatDef = seatById(msg.cls, msg.seat);
-        this.loadout = seatDef?.mounted ? mountedLoadout(seatDef) : [...DEFAULT_LOADOUT];
+        // The car's guns are the ones chosen in the garage (in the look), as
+        // the server armed it.
+        this.loadout = seatDef?.mounted
+          ? seatDef.mounted.length === 2
+            ? loadoutOf(unpackLook(this.look))
+            : mountedLoadout(seatDef)
+          : [...DEFAULT_LOADOUT];
         this.barrels = [0, 0, 0];
         this.nextFireAt = [0, 0, 0];
         this.onStatus(this.conditioned ? 'in game (simulated network)' : 'in game');

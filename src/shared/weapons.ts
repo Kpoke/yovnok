@@ -14,7 +14,7 @@
  * compensation, projectiles are simulated and need replication.
  */
 
-export type WeaponId = 'rifle' | 'marksman' | 'launcher' | 'mg' | 'rocket';
+export type WeaponId = 'rifle' | 'marksman' | 'launcher' | 'mg' | 'rocket' | 'scatter' | 'lancer' | 'swarm';
 
 export type WeaponDef = {
   id: WeaponId;
@@ -41,6 +41,10 @@ export type WeaponDef = {
   /** Projectile: splash damage radius in metres, 0 for none. */
   splash: number;
   automatic: boolean;
+  /** Hitscan: rays per shot (a shotgun's pellets), each doing `damage`. */
+  pellets?: number;
+  /** Projectile: rockets per shot, fanned out by `spread`. */
+  salvo?: number;
 };
 
 export const WEAPONS: Record<WeaponId, WeaponDef> = {
@@ -113,6 +117,62 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     splash: 8,
     automatic: false,
   },
+  /**
+   * Twin scatterguns (a primary): a fistful of pellets, deadly up close and
+   * harmless past ~70 m. The brawler's choice — ram, then finish.
+   */
+  scatter: {
+    id: 'scatter',
+    name: 'Scattergun',
+    delivery: 'hitscan',
+    damage: 9,
+    pellets: 7,
+    rate: 2.4,
+    magazine: 16,
+    reloadSeconds: 2.6,
+    spread: 0.06,
+    range: 70,
+    speed: 0,
+    splash: 0,
+    automatic: true,
+  },
+  /**
+   * Twin lancers (a primary): slow, heavy, pin-point rail shots at long range.
+   * Every miss costs you; every hit takes a twenty-fourth of a hull.
+   */
+  lancer: {
+    id: 'lancer',
+    name: 'Lancer',
+    delivery: 'hitscan',
+    damage: 50,
+    rate: 1.3,
+    magazine: 8,
+    reloadSeconds: 3,
+    spread: 0.0015,
+    range: 340,
+    speed: 0,
+    splash: 0,
+    automatic: true,
+  },
+  /**
+   * Swarm pod (a secondary, on the roof): four smaller rockets at once, fanned
+   * out. Easier to land than the RPG, less in each.
+   */
+  swarm: {
+    id: 'swarm',
+    name: 'Swarm',
+    delivery: 'projectile',
+    damage: 70,
+    salvo: 4,
+    rate: 0.4,
+    magazine: 1,
+    reloadSeconds: 4,
+    spread: 0.045,
+    range: 300,
+    speed: 64,
+    splash: 5,
+    automatic: false,
+  },
   launcher: {
     id: 'launcher',
     name: 'Launcher',
@@ -128,6 +188,10 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     automatic: false,
   },
 };
+
+/** The car's weapon choices: primaries (bumper guns) and secondaries (roof). */
+export const PRIMARIES: readonly WeaponId[] = ['mg', 'scatter', 'lancer'];
+export const SECONDARIES: readonly WeaponId[] = ['rocket', 'swarm'];
 
 /** Slot order a player cycles through. Slot 0 is what they spawn holding. */
 export const DEFAULT_LOADOUT: WeaponId[] = ['rifle', 'launcher'];

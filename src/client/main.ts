@@ -370,7 +370,7 @@ let profile = loadProfile();
 // an old saved choice cannot leave the car in a state the garage cannot show.
 const paintOnly = (look: CosmeticLook): CosmeticLook => ({ ...look, wheels: 0, roof: 0 });
 profile = setLook(profile, paintOnly(profile.look));
-const lookKey = (l: ReturnType<typeof unpackLook>): string => `${l.livery}/${l.wheels}/${l.roof}`;
+const lookKey = (l: ReturnType<typeof unpackLook>): string => String(packLook(l));
 net.look = packLook(profile.look);
 let localLookKey = lookKey(profile.look);
 
@@ -743,6 +743,13 @@ function frame(now: number): void {
           tracers.add(o, e);
           // Where a predicted round would land; the server's verdict follows.
           if (length < weapon.range - 0.5) weaponFx.impact(e, o, predicted.hitCrew !== null);
+          // A scattergun's other pellets: drawn round the first (the server
+          // decides what each one hits).
+          for (let k = 1; k < (weapon.pellets ?? 1); k++) {
+            const j = (): number => (Math.random() * 2 - 1) * weapon.spread;
+            const reach = Math.min(length, weapon.range);
+            tracers.add(o, { x: o.x + (dir.x + j()) * reach, y: o.y + (dir.y + j()) * reach, z: o.z + (dir.z + j()) * reach });
+          }
         }
         audio.shot(o.x, o.y, o.z, true, weapon.id);
         addShake(heavy ? 0.35 : 0.035);
@@ -768,8 +775,9 @@ function frame(now: number): void {
       if (distance < 45) addShake(0.4 * (1 - distance / 45));
     } else if (!mine) {
       // Everyone else's gun is placed in the world, which is the whole point of
-      // the positional mix. Ours already sounded at the trigger.
-      audio.shot(shot.ox, shot.oy, shot.oz, false, shot.weapon);
+      // the positional mix. Ours already sounded at the trigger. (One bang per
+      // scattergun shot, not one per pellet.)
+      if (Math.random() < 1 / (shotWeapon.pellets ?? 1)) audio.shot(shot.ox, shot.oy, shot.oz, false, shot.weapon);
     }
     if (mine) {
       // Ours: already drawn from prediction. The server's event is used only as

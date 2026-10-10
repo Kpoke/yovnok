@@ -48,6 +48,11 @@ export function loadProfile(): Profile {
         livery: num(parsed.look?.livery, DEFAULT_LOOK.livery),
         wheels: num(parsed.look?.wheels, DEFAULT_LOOK.wheels),
         roof: num(parsed.look?.roof, DEFAULT_LOOK.roof),
+        pattern: num(parsed.look?.pattern, DEFAULT_LOOK.pattern),
+        accent: num(parsed.look?.accent, DEFAULT_LOOK.accent),
+        glow: num(parsed.look?.glow, DEFAULT_LOOK.glow),
+        primary: num(parsed.look?.primary, DEFAULT_LOOK.primary),
+        secondary: num(parsed.look?.secondary, DEFAULT_LOOK.secondary),
       }),
     };
   } catch {

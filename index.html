@@ -661,6 +661,9 @@
       }
       .cos-option.locked { opacity: 0.5; cursor: default; }
       .cos-need { font-size: 9px; letter-spacing: 1px; opacity: 0.85; }
+      .cos-option.gun { flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+      .cos-about { font-size: 9px; letter-spacing: 0.5px; opacity: 0.6; }
+      .drawer .cos-head.cos-sub { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--edge); }
       .cos-need:empty { display: none; }
       .cos-swatch { width: 10px; height: 10px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, 0.4); }
       .set-line { display: flex; gap: 6px; align-items: center; }
@@ -1113,6 +1116,12 @@
           <div id="cosmetics" class="drawer hidden">
             <div class="cos-head"><span>GARAGE</span><span id="cos-stats">0 matches · 0 kills · 0 wins</span></div>
             <div class="cos-row"><span class="cos-label">PAINT</span><div class="cos-options" id="cos-livery"></div></div>
+            <div class="cos-row"><span class="cos-label">PATTERN</span><div class="cos-options" id="cos-pattern"></div></div>
+            <div class="cos-row"><span class="cos-label">PATTERN COLOUR</span><div class="cos-options" id="cos-accent"></div></div>
+            <div class="cos-row"><span class="cos-label">UNDERGLOW</span><div class="cos-options" id="cos-glow"></div></div>
+            <div class="cos-head cos-sub"><span>GUNS</span><span>every gun is open</span></div>
+            <div class="cos-row"><span class="cos-label">BUMPER GUNS</span><div class="cos-options" id="cos-primary"></div></div>
+            <div class="cos-row"><span class="cos-label">ROOF WEAPON</span><div class="cos-options" id="cos-secondary"></div></div>
           </div>
           <div id="private" class="drawer hidden">
             <div class="cos-head"><span>PRIVATE ROOM</span><span>2–12 players · no bots</span></div>

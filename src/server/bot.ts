@@ -23,7 +23,7 @@ import { raycastSolids } from '../shared/arena';
 import { clamp, wrapAngle } from '../shared/math';
 import { aimAnglesAt, type CombatVehicle } from '../shared/combat';
 import { withinArc, type SeatDef } from '../shared/crews';
-import { WEAPONS } from '../shared/weapons';
+import { WEAPONS, type WeaponId } from '../shared/weapons';
 import type { ZoneState } from '../shared/zone';
 import type { VehicleInput, VehicleState } from '../shared/vehicle';
 
@@ -118,6 +118,8 @@ export type BotSenses = {
   repairs?: ReadonlyArray<{ x: number; z: number }>;
   /** Override the room's difficulty for this bot. Tests use it; play does not. */
   skill?: BotSkill;
+  /** The guns this car actually carries, by slot (defaults to the seat's own). */
+  loadout?: readonly WeaponId[];
 };
 
 export type BotIntent = {
@@ -671,7 +673,11 @@ export function decideBot(s: BotSenses): BotIntent {
     const primary = seat.mounted?.find((w) => w.trigger === 'primary');
     const secondary = seat.mounted?.find((w) => w.trigger === 'secondary');
     const primaryArc = primary?.yawArc ?? seat.arc;
-    const primaryRange = primary ? BOT.mgFireRange : BOT.maxFireRange;
+    // Each gun at its own range: a scattergun is pointless past ~70 m.
+    const primaryWeapon = s.loadout?.[0] ?? primary?.weapon;
+    const primaryRange = primary
+      ? Math.min(BOT.mgFireRange, (primaryWeapon ? WEAPONS[primaryWeapon].range : BOT.mgFireRange) * 0.9)
+      : BOT.maxFireRange;
     const canSee = !reacting && bestDistance < BOT.maxFireRange;
 
     if (angles && canSee && burstReady && primaryArc && withinArc(primaryArc, aimYaw) && bestDistance < primaryRange) {
@@ -679,7 +685,7 @@ export function decideBot(s: BotSenses): BotIntent {
     }
 
     if (canSee && secondary && time >= memory.rocketReadyAt) {
-      const speed = Math.max(1, WEAPONS[secondary.weapon].speed);
+      const speed = Math.max(1, WEAPONS[s.loadout?.[1] ?? secondary.weapon].speed);
       if (bestDistance > BOT.rocketMinRange && bestDistance < BOT.rocketMaxRange) {
         // Lead by the rocket's flight time — at 78 m/s a car at 30 m/s moves
         // most of its own length every 0.1 s, and a rocket that does not lead

@@ -60,6 +60,7 @@ import {
   fireInterval,
   weaponInSlot,
   type AmmoState,
+  type WeaponDef,
   type WeaponId,
   scheduleShot,
 } from '../shared/weapons';
@@ -105,7 +106,7 @@ import {
   type ZoneRules,
   type ZoneState,
 } from '../shared/zone';
-import { botLook, DEFAULT_LOOK, packLook, unpackLook } from '../shared/cosmetics';
+import { botLook, DEFAULT_LOOK, loadoutOf, packLook, unpackLook, type CosmeticLook } from '../shared/cosmetics';
 import { createBotMemory, decideBot, type BotEnemy, type BotMemory } from './bot';
 import { botCallsign, callsignAllowed, sanitiseCallsign } from '../shared/callsign';
 import { record } from './stats';
@@ -682,7 +683,7 @@ export class Room {
     const seat = seatsFor(crew.cls)[0].id;
     const id = this.nextPlayerId++;
     const seatDef = seatById(crew.cls, seat);
-    const loadout = seatDef?.mounted ? mountedLoadout(seatDef) : [...DEFAULT_LOADOUT];
+    const loadout = seatDef?.mounted ? armedLoadout(seatDef, botLook(id)) : [...DEFAULT_LOADOUT];
 
     const bot: Player = {
       id,
@@ -774,6 +775,7 @@ export class Room {
         zone: this.zone,
         hullFraction: crew.hull / COMBAT.maxHull,
         repairs,
+        loadout: bot.loadout,
       });
 
       bot.aimYaw = intent.aimYaw;
@@ -962,7 +964,8 @@ export class Room {
     // loadout, so client and server agree on what is held without sending it.
     const seatDef = seatById(crew.cls, seat);
     if (seatDef?.mounted) {
-      player.loadout = mountedLoadout(seatDef);
+      // The car's guns are the player's choice (carried in the look).
+      player.loadout = armedLoadout(seatDef, unpackLook(player.look));
       player.ammo = createAmmoState(player.loadout);
     }
 
@@ -1511,9 +1514,34 @@ export class Room {
       pitch = clamp(aim.pitch, -1.2, 1.2);
     }
 
-    // Spread, applied as small jitter on the aim rather than a cone offset.
-    const yaw = crew.state.yaw + aimYaw + (Math.random() * 2 - 1) * weapon.spread;
-    const shotPitch = pitch + (Math.random() * 2 - 1) * weapon.spread;
+    // One trigger pull: a single ray or rocket, a shotgun's pellets, or a
+    // rocket pod's salvo (fanned evenly across the spread).
+    const count = weapon.delivery === 'hitscan' ? (weapon.pellets ?? 1) : (weapon.salvo ?? 1);
+    for (let k = 0; k < count; k++) {
+      const fan = weapon.salvo && count > 1 ? ((k / (count - 1)) * 2 - 1) * weapon.spread : 0;
+      this.resolveShot(player, crew, weapon, muzzle, aimYaw + fan, pitch, rtt);
+    }
+
+    // Auto-reload once the magazine runs dry, so an empty gun never silently
+    // does nothing when the player pulls the trigger.
+    if (player.ammo.rounds[slot] <= 0) this.beginReload(player, slot);
+  }
+
+  /** One ray or one projectile of a shot (see handleFire). */
+  private resolveShot(
+    player: Player,
+    crew: Crew,
+    weapon: WeaponDef,
+    muzzle: { x: number; y: number; z: number },
+    aimYaw: number,
+    pitch: number,
+    rtt: number,
+  ): void {
+    // Spread, applied as small jitter on the aim rather than a cone offset (a
+    // salvo is already fanned across it, so its rockets wobble only a little).
+    const jitter = weapon.salvo ? weapon.spread * 0.3 : weapon.spread;
+    const yaw = crew.state.yaw + aimYaw + (Math.random() * 2 - 1) * jitter;
+    const shotPitch = pitch + (Math.random() * 2 - 1) * jitter;
     const cosPitch = Math.cos(shotPitch);
     const dx = -Math.sin(yaw) * cosPitch;
     const dy = Math.sin(shotPitch);
@@ -1597,10 +1625,6 @@ export class Room {
         life: 6,
       });
     }
-
-    // Auto-reload once the magazine runs dry, so an empty gun never silently
-    // does nothing when the player pulls the trigger.
-    if (player.ammo.rounds[slot] <= 0) this.beginReload(player, slot);
   }
 
   /**
@@ -2578,4 +2602,16 @@ function sanitise(raw: unknown): InputCmd | null {
     handbrake: c.handbrake,
     boost: c.boost,
   };
+}
+
+/**
+ * A mounted seat's weapons: its mounts, armed with the guns the look chose (a
+ * primary on the bumper mounts, a secondary on the roof). Seats whose mounts
+ * do not match that shape keep the guns they were built with.
+ */
+function armedLoadout(seat: SeatDef, look: CosmeticLook): WeaponId[] {
+  const built = mountedLoadout(seat);
+  const mounted = seat.mounted ?? [];
+  if (mounted.length !== 2 || mounted[0].trigger !== 'primary' || mounted[1].trigger !== 'secondary') return built;
+  return loadoutOf(look);
 }

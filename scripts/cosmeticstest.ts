@@ -21,7 +21,12 @@ import {
   EMPTY_PROFILE,
   entryAt,
   isUnlocked,
+  ACCENTS,
+  GLOWS,
+  GUN_CHOICES,
   LIVERIES,
+  loadoutOf,
+  PATTERNS,
   packLook,
   progressToward,
   recordMatch,
@@ -128,20 +133,31 @@ const profile = (overrides: Partial<Profile> = {}): Profile => ({
   check('a negative kill count cannot reduce the total', negative.kills === start.kills);
 }
 
+// ------------------------------------------------------------ the full look
+
+{
+  // Every field survives the wire, including the guns.
+  const look = { livery: 3, wheels: 0, roof: 0, pattern: 4, accent: 6, glow: 3, primary: 2, secondary: 1 };
+  const back = unpackLook(packLook(look));
+  check('a full look survives packing', JSON.stringify(back) === JSON.stringify(look), JSON.stringify(back));
+  check('the look arms the car', loadoutOf(look).join(',') === 'lancer,swarm', loadoutOf(look).join(','));
+  check('an old look (no new fields) is valid', loadoutOf(unpackLook(5)).join(',') === 'mg,rocket');
+}
+
 // ------------------------------------------------------------ shop catalog
 
 {
   const catalog = shopCatalog(profile({ matches: 99, kills: 99, wins: 99 }));
-  const total = LIVERIES.length + WHEELS.length + ROOFS.length;
+  const lists = [LIVERIES, WHEELS, ROOFS, PATTERNS, GLOWS, GUN_CHOICES.primary, GUN_CHOICES.secondary];
+  const total = lists.reduce((n, l) => n + l.length, 0) + ACCENTS.length;
   check('the catalog lists every cosmetic', catalog.length === total, `${catalog.length} entries`);
   check('with everything earned, everything is unlocked', catalog.every((e) => e.unlocked));
 
   const fresh = shopCatalog(EMPTY_PROFILE);
   const defaults = fresh.filter((e) => e.requirement === 'unlocked').length;
   const expectedDefaults =
-    LIVERIES.filter((l) => l.unlock.type === 'default').length +
-    WHEELS.filter((w) => w.unlock.type === 'default').length +
-    ROOFS.filter((r) => r.unlock.type === 'default').length;
+    lists.reduce((n, l) => n + l.filter((e: { unlock: { type: string } }) => e.unlock.type === 'default').length, 0) +
+    ACCENTS.length;
   check('a fresh profile has exactly the default set', defaults === expectedDefaults, `${defaults} free`);
 }
 

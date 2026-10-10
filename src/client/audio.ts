@@ -312,8 +312,37 @@ export class GameAudio {
     const ctx = this.ctx;
     if (!ctx || !this.noise || !this.sfx || !this.enabled) return;
     const now = ctx.currentTime;
-    if (weapon === 'rocket' || weapon === 'launcher') {
+    if (weapon === 'rocket' || weapon === 'launcher' || weapon === 'swarm') {
       this.launch(x, y, z, local, now);
+      return;
+    }
+    if (weapon === 'scatter' || weapon === 'lancer') {
+      if (now < this.nextGunAt) return;
+      this.nextGunAt = now + 0.02;
+      const scatter = weapon === 'scatter';
+      // The recorded report, pitched down: a shotgun's boom, a rail's crack.
+      this.sample('mg-shot', x, y, z, local, local ? 1 : 0.7, scatter ? 0.62 : 0.8, local ? 0.22 : 0.35);
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      if (scatter) {
+        // A long, low thump.
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(95, now);
+        osc.frequency.exponentialRampToValueAtTime(38, now + 0.18);
+        gain.gain.setValueAtTime(local ? 0.95 : 0.45, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      } else {
+        // An electric zip, high to low.
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(2200, now);
+        osc.frequency.exponentialRampToValueAtTime(180, now + 0.26);
+        gain.gain.setValueAtTime(local ? 0.16 : 0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+      }
+      osc.connect(gain);
+      this.route(gain, x, y, z, local, now);
+      osc.start(now);
+      osc.stop(now + 0.3);
       return;
     }
     if (weapon === 'mg') {
