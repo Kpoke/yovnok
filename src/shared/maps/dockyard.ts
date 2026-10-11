@@ -6,7 +6,7 @@
 
 import type { Solid } from '../arena';
 import { PALETTE } from '../config';
-import { CENTRE_PAD, CENTRE_RAMP, hazard } from './common';
+import { CENTRE_PAD, CENTRE_RAMP } from './common';
 import { box, boundary, points4, ramp, repeat4, STADIUM_HALF, strip, zoneGround } from './kit';
 import type { ArenaMap } from './types';
 
@@ -37,8 +37,6 @@ const WEDGE: Solid[] = [
   // The loading dock: a raised quay with a ramp up.
   box({ x: 56, y: 0, z: 190 }, { x: 92, y: 2.2, z: 226 }, PALETTE.plateau),
   ramp({ x: 60, y: 0, z: 176 }, { x: 88, y: 2.2, z: 190 }, 'z', 0, 2.2, PALETTE.ramp),
-  // An oil spill: slick, and it burns.
-  hazard(box({ x: 112, y: 0, z: 160 }, { x: 126, y: 0.06, z: 174 }, PALETTE.hazard)),
 ];
 
 export const DOCKYARD: ArenaMap = {

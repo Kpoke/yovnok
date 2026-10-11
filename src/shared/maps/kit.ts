@@ -4,7 +4,7 @@
  *
  * SYMMETRY IS GENERATED, NOT HAND-AUTHORED. Each map writes ONE quadrant and
  * `repeat4` replicates it by rotating 90° three times, so every map is fair by
- * construction (cover, ramps and hazards are identical from every spawn).
+ * construction (cover and ramps are identical from every spawn).
  * `simcheck` asserts the generated fields are genuinely 4-fold symmetric.
  */
 
@@ -103,11 +103,14 @@ export function zoneGround(): Solid[] {
  * The world's outer walls and the playable boundary. Both MUST overlap at the
  * corners: meeting edge to edge left an unblocked diagonal gap at each corner
  * that a car could drive straight through.
+ *
+ * @param ground  the height of the playable ground along the edge: the wall
+ *   stands STADIUM_WALL above it (the quarry's rim is a 10 m bench).
  */
-export function boundary(): Solid[] {
+export function boundary(ground = 0): Solid[] {
   const A = ARENA_HALF;
   const S = STADIUM_HALF;
-  const W = STADIUM_WALL;
+  const W = ground + STADIUM_WALL;
   return [
     box({ x: -A - 4, y: 0, z: -A - 4 }, { x: A + 4, y: 16, z: -A }, PALETTE.wall),
     box({ x: -A - 4, y: 0, z: A }, { x: A + 4, y: 16, z: A + 4 }, PALETTE.wall),

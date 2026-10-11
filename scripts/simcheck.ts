@@ -17,7 +17,6 @@
  */
 
 import {
-  HAZARD,
   MATCH,
   maxHullOf,
   PALETTE,
@@ -31,7 +30,6 @@ import { canRepair } from '../src/shared/repair';
 import { COMBAT_TEST_CREWS } from './testPlacement';
 import {
   ARENA_HALF,
-  hazardAt,
   isBlockingAt,
   raycastSolids,
   REPAIR_CRATES,
@@ -748,9 +746,6 @@ console.log('\n=== 23. repair crates ===');
   }
   check('no crate is buried in geometry', buried === 0, `${buried} blocked`);
 
-  const onHazard = REPAIR_CRATES.filter((c) => hazardAt(c.x, c.z) > 0).length;
-  check('no crate sits on damaging ground', onHazard === 0, `${onHazard} on hazard`);
-
   const nearSpawn = REPAIR_CRATES.filter((c) =>
     SPAWNS.some((spawn) => Math.hypot(spawn.x - c.x, spawn.z - c.z) < 25),
   ).length;
@@ -782,47 +777,6 @@ console.log('\n=== 23. repair crates ===');
     REPAIR.capacitySeconds >= 4 && REPAIR.hullPerSecond * REPAIR.capacitySeconds > 0,
     `${REPAIR.capacitySeconds}s of charge heals ${(REPAIR.hullPerSecond * REPAIR.capacitySeconds).toFixed(0)} hull`,
   );
-}
-
-console.log('\n=== 22. hazard patches are damaging ground ===');
-{
-  useArena(REAL_ARENA);
-
-  // The hazard is authored in one quadrant and replicated, so all four copies
-  // must be equally dangerous — an asymmetric hazard would decide matches.
-  // The middle-ring hazard patch, sampled across its four rotational copies.
-  // (The lakebed hazard lay outside the stadium barrier and was removed.)
-  const spots = [
-    { x: 50, z: 100, label: 'quadrant +x +z' },
-    { x: 100, z: -50, label: 'quadrant +x -z' },
-    { x: -50, z: -100, label: 'quadrant -x -z' },
-    { x: -100, z: 50, label: 'quadrant -x +z' },
-  ];
-  let damaging = 0;
-  for (const spot of spots) {
-    if (hazardAt(spot.x, spot.z) > 0) damaging++;
-  }
-  check('every rotational copy of the hazard is damaging', damaging === 4, `${damaging}/4`);
-
-  check(
-    'clear ground is not',
-    hazardAt(0, 0) === 0 && hazardAt(SPAWNS[0].x, SPAWNS[0].z) === 0,
-    'centre and spawn ring are safe',
-  );
-  check(
-    'the damage is gradual, not a kill',
-    hazardAt(50, 100) > 0 && hazardAt(50, 100) < 1000,
-    `${hazardAt(50, 100)} hull/s`,
-  );
-  check(
-    'and hazards alone cannot finish a vehicle',
-    HAZARD.hullFloor > 0,
-    `floor is ${(HAZARD.hullFloor * 100).toFixed(0)}% hull`,
-  );
-
-  // No spawn may sit on hazard ground, or a crew would be damaged on arrival.
-  const onHazard = SPAWNS.filter((spawn) => hazardAt(spawn.x, spawn.z) > 0).length;
-  check('no spawn sits on a hazard', onHazard === 0, `${onHazard} spawns affected`);
 }
 
 console.log('\n=== 21. component damage degrades the car ===');
@@ -1169,7 +1123,7 @@ for (const id of MAP_IDS) {
   for (const spawn of ring) {
     const s = createVehicle(spawn.x, spawn.y, spawn.z, spawn.yaw, spec);
     run(s, 120, {});
-    if (Math.hypot(s.pos.x - spawn.x, s.pos.z - spawn.z) >= 2 || !s.onGround || hazardAt(s.pos.x, s.pos.z) > 0) blocked++;
+    if (Math.hypot(s.pos.x - spawn.x, s.pos.z - spawn.z) >= 2 || !s.onGround) blocked++;
   }
   check(`${map.name}: all ${ring.length} spawns clear`, blocked === 0, `${blocked} blocked`);
 
@@ -1187,8 +1141,42 @@ for (const id of MAP_IDS) {
     if (!Number.isFinite(ground)) buried++;
     else for (const solid of SOLIDS) if (isBlockingAt(solid, crate.x, crate.z, ground, VEHICLE.stepUp)) buried++;
   }
-  const onHazard = REPAIR_CRATES.filter((c) => hazardAt(c.x, c.z) > 0).length;
-  check(`${map.name}: crates reachable and off hazards`, buried === 0 && onHazard === 0, `${buried} buried, ${onHazard} on hazard`);
+  check(`${map.name}: crates reachable`, buried === 0, `${buried} buried`);
+
+  // The boundary stands a full wall above the ground next to it everywhere,
+  // or a raised edge (the quarry's rim) lets a car drive straight over it.
+  let low = 0;
+  for (let t = -STADIUM_HALF + 2; t <= STADIUM_HALF - 2; t += 2) {
+    for (const [x, z, wx, wz] of [
+      [STADIUM_HALF - 1, t, STADIUM_HALF + 0.75, t],
+      [t, STADIUM_HALF - 1, t, STADIUM_HALF + 0.75],
+    ]) {
+      const wall = terrainHeightAt(wx, wz, 100);
+      const ground = terrainHeightAt(x, z, 100);
+      if (wall - ground < STADIUM_WALL - 0.5) low++;
+    }
+  }
+  check(`${map.name}: the boundary wall is full height above the edge`, low === 0, `${low} low spots`);
+
+  // Off every ramp at full boost, no car leaves the arena.
+  let launched = 0;
+  for (const r of SOLIDS.filter((s) => s.along)) {
+    const up = (r.hEnd ?? 0) > (r.hStart ?? 0) ? 1 : -1;
+    const dx = r.along === 'x' ? up : 0;
+    const dz = r.along === 'z' ? up : 0;
+    const sx = r.along === 'x' ? (up > 0 ? r.min.x : r.max.x) - dx * 40 : (r.min.x + r.max.x) / 2;
+    const sz = r.along === 'z' ? (up > 0 ? r.min.z : r.max.z) - dz * 40 : (r.min.z + r.max.z) / 2;
+    if (Math.abs(sx) > STADIUM_HALF - 5 || Math.abs(sz) > STADIUM_HALF - 5) continue;
+    const s = createVehicle(sx, terrainHeightAt(sx, sz, 40) + 1.2, sz, Math.atan2(-dx, -dz), spec);
+    for (let t = 0; t < 60 * 8; t++) {
+      stepVehicle(s, input({ throttle: 1, boost: true }), DT);
+      if (Math.max(Math.abs(s.pos.x), Math.abs(s.pos.z)) > STADIUM_HALF) {
+        launched++;
+        break;
+      }
+    }
+  }
+  check(`${map.name}: no ramp launches a car out of the arena`, launched === 0, `${launched} escaped`);
 
   // From each cardinal spawn, full throttle straight at the middle gets there.
   let reached = 0;

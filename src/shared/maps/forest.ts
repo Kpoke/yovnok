@@ -6,7 +6,7 @@
 
 import type { Solid } from '../arena';
 import { PALETTE } from '../config';
-import { CENTRE_PAD, CENTRE_RAMP, hazard } from './common';
+import { CENTRE_PAD, CENTRE_RAMP } from './common';
 import { box, boundary, points4, ramp, repeat4, STADIUM_HALF, strip, zoneGround } from './kit';
 import type { ArenaMap } from './types';
 
@@ -36,8 +36,6 @@ const FEATURES: Solid[] = [
   box({ x: 160, y: 0, z: 110 }, { x: 161.3, y: 1.1, z: 122 }, PALETTE.log),
   box({ x: 100, y: 0, z: 200 }, { x: 112, y: 1.1, z: 201.3 }, PALETTE.log),
   box({ x: 205, y: 0, z: 70 }, { x: 206.3, y: 1.1, z: 82 }, PALETTE.log),
-  // The bog.
-  hazard(box({ x: 140, y: 0, z: 140 }, { x: 160, y: 0.06, z: 160 }, PALETTE.hazard)),
 ];
 
 /** The 12 solo spawn points (r 180, every 30°): trees keep clear of them. */
@@ -66,7 +64,7 @@ function trees(): Solid[] {
     for (const s of SPAWN_POINTS) if (Math.hypot(x - s.x, z - s.z) < 18) return false;
     for (const c of crates) if (Math.hypot(x - c.x, z - c.z) < 12) return false;
     for (const f of FEATURES) {
-      if (f.ground && !f.hazard) continue;
+      if (f.ground) continue;
       if (x > f.min.x - 7 && x < f.max.x + 7 && z > f.min.z - 7 && z < f.max.z + 7) return false;
     }
     for (const p of placed) if (Math.hypot(x - p.x, z - p.z) < 10) return false;

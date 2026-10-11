@@ -65,7 +65,7 @@ a seat frees up.
 | Arena | |
 |---|---|
 | The Stadium | floodlit night; container cover, a mesa, a two-deck crowd that cheers the kills |
-| Dusk Canyon | sunset; sandstone mesas, a dry wash, a rock shelf, a tar pit |
+| Dusk Canyon | sunset; sandstone mesas, a dry wash, a rock shelf |
 | Rainy Dockyard | night and rain; a maze of container lanes, warehouses, gantry cranes |
 | Snowbound Base | overcast; runways, hangars, banked bunkers, frozen ponds with no grip |
 | Quarry | clear day; an open pit on three levels joined by haul roads |

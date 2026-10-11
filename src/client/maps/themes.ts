@@ -90,7 +90,6 @@ export const THEMES: Record<MapId, MapTheme> = {
       ramp: matte('red_laterite_soil_stones', 6),
       wall: { material: 'sandstone_cracks', tile: 8, tint: 0xd09070 },
       pad: { material: 'sandstone_cracks', tile: 6, tint: 0xe8b090 },
-      hazard: { material: 'brown_mud_03', tile: 4, tint: 0x302018, wet: true },
     },
     dressing: async (loader, detail) => [
       {
@@ -125,7 +124,6 @@ export const THEMES: Record<MapId, MapTheme> = {
       plateau: { material: 'concrete_floor_worn_001', tile: 6, wet: true },
       landmark: { material: 'rusty_metal_02', tile: 3 },
       building: { material: 'corrugated_iron', tile: 6, tint: 0x7f8f9d },
-      hazard: { material: 'brown_mud_03', tile: 4, tint: 0x15161a, glossy: true },
     },
     dressing: async (_loader, detail) => {
       const yellow = new THREE.MeshStandardMaterial({ color: 0xd4a017, metalness: 0.5, roughness: 0.5 });
@@ -325,7 +323,6 @@ export const THEMES: Record<MapId, MapTheme> = {
       wall: { material: 'rock_boulder_dry', tile: 8, tint: 0xb8b0a4 },
       landmark: { material: 'rusty_metal_02', tile: 3 },
       pad: { material: 'concrete_floor_worn_001', tile: 6 },
-      hazard: { material: 'brown_mud_03', tile: 4, tint: 0x6a5a40, wet: true },
     },
     dressing: async (loader, detail) => {
       const steel = new THREE.MeshStandardMaterial({ color: 0x6b5a48, metalness: 0.5, roughness: 0.6 });
@@ -382,7 +379,6 @@ export const THEMES: Record<MapId, MapTheme> = {
       log: { material: 'bark_brown_02', tile: 2, tint: 0xc8b090 },
       building: { material: 'corrugated_iron', tile: 6, tint: 0x8a7a68 },
       pad: { material: 'concrete_floor_worn_001', tile: 6, tint: 0xb0a890 },
-      hazard: { material: 'brown_mud_03', tile: 4, tint: 0x4a3a26, wet: true },
     },
     dressing: async (loader, detail) => {
       const rand = seeded(21);

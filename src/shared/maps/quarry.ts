@@ -6,7 +6,7 @@
 
 import type { Solid } from '../arena';
 import { PALETTE } from '../config';
-import { CENTRE_PAD, CENTRE_RAMP, hazard } from './common';
+import { CENTRE_PAD, CENTRE_RAMP } from './common';
 import { box, boundary, points4, ramp, repeat4, STADIUM_HALF, strip, zoneGround } from './kit';
 import type { ArenaMap } from './types';
 
@@ -30,12 +30,11 @@ const WEDGE: Solid[] = [
   strip({ x: 14, y: -4, z: -7 }, { x: 72, y: 0.05, z: 7 }, PALETTE.road),
   strip({ x: BENCH1_FROM, y: BENCH1 - 1, z: -7 }, { x: BENCH2_FROM, y: BENCH1 + 0.05, z: 7 }, PALETTE.road),
   strip({ x: BENCH2_FROM, y: BENCH2 - 1, z: -7 }, { x: S, y: BENCH2 + 0.05, z: 7 }, PALETTE.road),
-  // Pit floor: the crusher, spoil heaps, conveyor legs, a sludge pond.
+  // Pit floor: the crusher, spoil heaps, conveyor legs.
   box({ x: 30, y: 0, z: 40 }, { x: 46, y: 9, z: 56 }, PALETTE.landmark),
   box({ x: 60, y: 0, z: 20 }, { x: 80, y: 6, z: 32 }, PALETTE.rock),
   box({ x: 20, y: 0, z: 70 }, { x: 21.5, y: 8, z: 71.5 }, PALETTE.landmark),
   box({ x: 20, y: 0, z: 88 }, { x: 21.5, y: 8, z: 89.5 }, PALETTE.landmark),
-  hazard(box({ x: 50, y: 0, z: 80 }, { x: 70, y: 0.06, z: 96 }, PALETTE.hazard)),
   // On the bench: gravel piles and a parked dump truck.
   box({ x: 120, y: BENCH1, z: 120 }, { x: 136, y: BENCH1 + 4, z: 136 }, PALETTE.rock),
   box({ x: 140, y: BENCH1, z: 20 }, { x: 150, y: BENCH1 + 4.5, z: 28 }, PALETTE.landmark),
@@ -48,6 +47,6 @@ export const QUARRY: ArenaMap = {
   blurb: 'Day · an open pit, three levels of haul roads',
   lighting: 'clearDay',
   grip: 0.95,
-  solids: [...zoneGround(), ...boundary(), CENTRE_PAD, ...repeat4(WEDGE)],
+  solids: [...zoneGround(), ...boundary(BENCH2), CENTRE_PAD, ...repeat4(WEDGE)],
   crates: [...points4(100, 210), { x: 0, z: 0 }],
 };

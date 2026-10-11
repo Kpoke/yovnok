@@ -1,12 +1,12 @@
 /**
  * DUSK CANYON — a dry wash at sunset. Tall sandstone mesas break the sight
  * lines, a drivable rock shelf is the high ground, boulders give low cover, the
- * dry riverbed crosses the map, and a tar pit punishes a bad line.
+ * dry riverbed crosses the map.
  */
 
 import type { Solid } from '../arena';
 import { PALETTE } from '../config';
-import { CENTRE_PAD, CENTRE_RAMP, hazard } from './common';
+import { CENTRE_PAD, CENTRE_RAMP } from './common';
 import { box, boundary, points4, ramp, repeat4, STADIUM_HALF, strip, zoneGround } from './kit';
 import type { ArenaMap } from './types';
 
@@ -34,8 +34,6 @@ const WEDGE: Solid[] = [
   box({ x: 60, y: 0, z: 190 }, { x: 66, y: 2.5, z: 197 }, PALETTE.rock),
   // A launch ramp out of the wash.
   ramp({ x: 196, y: 0, z: 62 }, { x: 212, y: 3.6, z: 78 }, 'x', 0, 3.6, PALETTE.ramp),
-  // Tar pit: drivable, and it burns.
-  hazard(box({ x: 44, y: 0, z: 140 }, { x: 60, y: 0.06, z: 156 }, PALETTE.hazard)),
 ];
 
 export const CANYON: ArenaMap = {

@@ -17,7 +17,6 @@
  * after another on one thread, so they never see each other's map).
  */
 
-import { HAZARD } from './config';
 import type { Vec3 } from './math';
 import { DEFAULT_MAP, type MapId } from './mapIds';
 import { MAPS, type ArenaMap } from './maps';
@@ -37,11 +36,6 @@ export type Solid = {
   hStart?: number;
   /** Top height at the `max` end of that axis. */
   hEnd?: number;
-  /**
-   * Damaging ground (DESIGN.md §10.3). A flag rather than a colour comparison:
-   * the palette is presentation, this is gameplay.
-   */
-  hazard?: boolean;
   /**
    * Ground (M10/M11). Floor rings are tinted per zone and built individually
    * rather than merged into the block batches, because they carry a texture.
@@ -72,8 +66,7 @@ export let REPAIR_CRATES: ReadonlyArray<{ x: number; z: number }> = MAP.crates;
 
 /**
  * A uniform grid over the map: each cell lists the solids within `GRID_MARGIN`
- * of it, in map order. Point queries (ground height, walls near a car, ice,
- * hazards) read one cell instead of every solid — a forest has hundreds — and
+ * of it, in map order. Point queries (ground height, walls near a car, ice) read one cell instead of every solid — a forest has hundreds — and
  * because the order is the map's, results are identical to a full scan.
  */
 const GRID_CELL = 16;
@@ -203,25 +196,6 @@ export function spawnForTeam(
   const ring = spawnRing(teamCount, radius);
   const index = ((team % ring.length) + ring.length) % ring.length;
   return ring[index];
-}
-
-/**
- * Hazard damage per second at a world point, or 0 on clear ground.
- *
- * Tests the vehicle's centre against the footprint. A graded hazard ("you are
- * half on it") would be nicer and is not worth the ambiguity: you are either in
- * the bad ground or you are not, and the player must be able to tell.
- */
-export function hazardAt(x: number, z: number): number {
-  const near = solidsNear(x, z);
-  for (let i = 0; i < near.length; i++) {
-    const solid = near[i];
-    if (!solid.hazard) continue;
-    if (x >= solid.min.x && x <= solid.max.x && z >= solid.min.z && z <= solid.max.z) {
-      return HAZARD.hullPerSecond;
-    }
-  }
-  return 0;
 }
 
 // ------------------------------------------------------------------- queries

@@ -36,19 +36,10 @@ const WEDGE: Solid[] = [
   box({ x: 114, y: 0, z: 40 }, { x: 130, y: 4.5, z: 56 }, PALETTE.block),
   box({ x: 40, y: 0, z: 114 }, { x: 56, y: 4.5, z: 130 }, PALETTE.block),
 
-  // Hazard patch. Flat and drivable, and DAMAGING while you are on it
-  // (DESIGN.md §10.3) — which is why it is called out rather than being just
-  // another block. Kept clear of the spawn ring.
-  // Moved in from (80..100): at the smaller duel spawn radius the old patch
-  // overlapped the 8-point spawn ring, which the "no spawn on a hazard" test
-  // caught. A hazard under a spawn is a crew damaged on arrival.
-  { ...box({ x: 40, y: 0, z: 90 }, { x: 60, y: 0.06, z: 110 }, PALETTE.hazard), hazard: true },
-
   // ---- the far zones (M11) ---------------------------------------------
   // Everything above sits within ~200 m of the centre. These carry the map out
   // toward the 360 m spawn ring, and their CHARACTER is the zoning: dunes have
-  // launch ramps, the scrapyard is dense cover, the lakebed is open with a
-  // second hazard. Authored inside one quadrant, so all four are identical.
+  // launch ramps, the scrapyard is dense cover, the lakebed is open. Authored inside one quadrant, so all four are identical.
   // Corners are kept inside ~320 m so the spawn ring stays clear.
 
   // Dunes: ramps and low cover, room to run.
@@ -57,7 +48,7 @@ const WEDGE: Solid[] = [
   box({ x: 130, y: 0, z: 200 }, { x: 154, y: 4, z: 224 }, PALETTE.block),
 
   // The stadium edge: one block just inside the barrier. (The old scrapyard,
-  // lakebed hazard and their outer blocks lay beyond STADIUM_HALF and went
+  // lakebed and their outer blocks lay beyond STADIUM_HALF and went
   // with it — see the barrier in SOLIDS.)
   box({ x: 210, y: 0, z: 190 }, { x: 232, y: 5, z: 212 }, PALETTE.block),
 

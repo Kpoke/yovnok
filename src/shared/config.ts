@@ -82,7 +82,7 @@ export const REPAIR = {
  *
  * The reason a last-car-standing match can be trusted to END: it forces every
  * survivor into a shrinking circle, so the final cars meet instead of circling a
- * 340 m arena forever. Unlike a hazard, the zone CAN destroy a car — that is its
+ * 340 m arena forever. The zone CAN destroy a car — that is its
  * job, not a side effect.
  *
  * Schedule is hold-then-shrink, repeated `phases` times: the radius steps from
@@ -109,21 +109,6 @@ export const ZONE = {
   damagePerSecond: 35,
   /** Extra damage per second added each phase, so the end is decisive. */
   damagePerPhase: 30,
-} as const;
-
-/**
- * Hazards (DESIGN.md §10.3).
- *
- * "Damaging but not instantly lethal" is a real constraint, not flavour: in a
- * crew game one driver's mistake must not instantly kill three teammates. So a
- * hazard costs hull over time and CANNOT by itself finish a vehicle — the floor
- * below stops it. What it really costs is position, which is the point.
- */
-export const HAZARD = {
-  /** Hull lost per second while a vehicle sits on a hazard patch. */
-  hullPerSecond: 55,
-  /** Hazards alone can never take a vehicle below this fraction of max hull. */
-  hullFloor: 0.2,
 } as const;
 
 /**
@@ -733,7 +718,6 @@ export const PALETTE = {
   block: 0x59636f,
   pad: 0x5f7d69,
   /** Hazard zone. Flat and drivable now; damaging from M6. */
-  hazard: 0x7a4234,
 
   /**
    * Zone ground tints (M10/M11). Nested floor rings, each a little higher than

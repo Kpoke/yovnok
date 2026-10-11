@@ -20,12 +20,11 @@
  */
 
 import type { WebSocket } from 'ws';
-import { COMBAT, HAZARD, MATCH, maxHullOf, NET, REPAIR, TICK, VEHICLE_CLASSES, type VehicleClassId } from '../shared/config';
+import { COMBAT, MATCH, maxHullOf, NET, REPAIR, TICK, VEHICLE_CLASSES, type VehicleClassId } from '../shared/config';
 import { FORMATS, isFormatId, type FormatId } from '../shared/formats';
 import {
   ARENA_HALF,
   DUEL_SPAWN_RADIUS,
-  hazardAt,
   MAPS,
   raycastSolids,
   SOLO_SPAWN_RADIUS,
@@ -2231,7 +2230,6 @@ export class Room {
     this.stepReloads();
     if (live) {
       this.stepProjectiles(TICK.dt);
-      this.stepHazards(TICK.dt);
       this.stepZone(now);
       this.stepRepairs(TICK.dt);
     }
@@ -2419,29 +2417,10 @@ export class Room {
   }
 
   /**
-   * Damaging ground (DESIGN.md §10.3).
-   *
-   * Hull only, and deliberately never lethal on its own. A hazard is a position
-   * tax: it makes the ground you are standing on cost something, so sitting
-   * still in a bad spot is punished and driving out of it is the answer. One
-   * driver's mistake must not wipe a four-person crew instantly.
-   */
-  private stepHazards(dt: number): void {
-    const floor = COMBAT.maxHull * HAZARD.hullFloor; // (a fixed floor, the same for every vehicle)
-    for (const crew of this.crews.values()) {
-      const rate = hazardAt(crew.state.pos.x, crew.state.pos.z);
-      if (rate <= 0) continue;
-      if (crew.hull <= floor) continue;
-      damageHull(crew, rate * dt);
-      if (crew.hull < floor) crew.hull = floor;
-    }
-  }
-
-  /**
    * The closing danger zone (DESIGN.md §2.2).
    *
    * Solo only. Every car outside the safe circle takes hull damage that grows
-   * each phase, and — unlike a hazard — the zone CAN destroy a car. That is the
+   * each phase, and the zone CAN destroy a car. That is the
    * point: it is what guarantees a last-car-standing match reaches an end
    * instead of the final two circling a 340 m arena. A zone kill credits no one.
    */

@@ -18,7 +18,7 @@ export type Surface = {
   material: string;
   /** Metres per texture repeat. Ground wants big repeats, a concrete block small. */
   tile: number;
-  /** Optional colour multiplier, e.g. to make a hazard read as a hazard. */
+  /** Optional colour multiplier. */
   tint?: number;
   /** Multiply by per-vertex colour (container paint, one colour per box). */
   vertexColors?: boolean;
@@ -59,7 +59,6 @@ export const SURFACES: SurfaceTable = {
   plateau: { material: 'concrete_wall_008', tile: 6, tint: 0xc9c2b8 },
   ramp: { material: 'metal_plate', tile: 3 },
   landmark: { material: 'rusty_metal_02', tile: 3 },
-  hazard: { material: 'brown_mud_03', tile: 4, tint: 0xb07a5a, matte: true },
   // Roles the other maps use; each map's theme may override them.
   rock: { material: 'rock_boulder_dry', tile: 9 },
   ice: { material: 'snow_02', tile: 8, tint: 0xa9c8e6, glossy: true },
