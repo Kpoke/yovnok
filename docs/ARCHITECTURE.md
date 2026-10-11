@@ -35,7 +35,7 @@ starts when its host says so (`roomStart`); the host also picks the map
 
 **Formats** (`src/shared/formats.ts`). Every room runs a battle royale in one
 format: solo (12 armed brawlers), duos (6 two-seat cars) or squads (3
-four-seat trucks). Public matchmaking keeps formats apart; bots fill every free
+four-seat SUVs). Public matchmaking keeps formats apart; bots fill every free
 seat, drivers first, and a joining person takes a bot's seat in the car with the
 most people. In the crewed formats the driver drives and window gunners fire
 personal weapons (`crews.ts` seats); gunners can be knocked out for

@@ -166,9 +166,10 @@ export function buildVehicle(
   // chassis box, so its engine sits lower than the cars'.
   const engineY = spec.id === 'suv' ? 0.0 : spec.id === 'solo' ? -0.25 : 0.14;
   const engine = attach('engine', library.create({ kind: 'engine', cls: spec.id }, materials), 0, engineY, engineZ);
-  // The solo car's bonnet is closed: its engine can never be seen, and it was
-  // six meshes — twelve draw calls a car with the shadow pass — for nothing.
-  if (spec.id === 'solo') engine.visible = false;
+  // Every car has a closed bonnet (the realistic bodies): the engine can never
+  // be seen — on the duo car and the squad truck it stood up through the bonnet
+  // as a block — and it was twelve draw calls a car with the shadow pass.
+  engine.visible = false;
 
   // ---- wheels ----------------------------------------------------------
   const wheelY = -(spec.rideHeight - spec.wheelRadius);

@@ -69,8 +69,13 @@ export function partKey(request: PartRequest): string {
  * socket list rather than trusting this by eye.
  */
 export function allPartRequests(): PartRequest[] {
+  return (Object.keys(VEHICLE_CLASSES) as VehicleClassId[]).flatMap(partRequestsFor);
+}
+
+/** Every part one vehicle class can be built from (loaded when that class is needed). */
+export function partRequestsFor(cls: VehicleClassId): PartRequest[] {
   const requests: PartRequest[] = [];
-  for (const cls of Object.keys(VEHICLE_CLASSES) as VehicleClassId[]) {
+  {
     requests.push({ kind: 'chassis', cls }, { kind: 'engine', cls });
     // Every cosmetic variant is a distinct part, so the asset warm-up can see
     // them all: a player wearing wheel style 3 must not pop in a plain wheel.

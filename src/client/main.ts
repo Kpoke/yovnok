@@ -13,10 +13,10 @@
 import { createGltfLoader } from './assetLoaders';
 import type { CreditsSection } from '../shared/credits';
 import * as THREE from 'three';
-import { CAMERA, COMBAT, LIGHTING_PRESETS, maxHullOf, TICK, VEHICLE, ZONE } from '../shared/config';
+import { CAMERA, COMBAT, LIGHTING_PRESETS, maxHullOf, TICK, VEHICLE, ZONE, type VehicleClassId } from '../shared/config';
 import { MAPS, SPAWNS, useMap } from '../shared/arena';
 import { DEFAULT_MAP, isMapId, type MapId } from '../shared/mapIds';
-import type { FormatId } from '../shared/formats';
+import { FORMATS, type FormatId } from '../shared/formats';
 import { World } from './world';
 import { THEMES } from './maps/themes';
 import { localToWorld, NEUTRAL_INPUT, stepVehicle, type VehicleInput } from '../shared/vehicle';
@@ -44,7 +44,7 @@ import { GameAudio } from './audio';
 import { Music } from './music';
 import { buildVehicle, type VehicleRig } from './vehicle/buildVehicle';
 import { GltfPartLibrary, toLod } from './vehicle/gltfPartLibrary';
-import { allPartRequests, proceduralPartLibrary, type PartLibrary } from './vehicle/partLibrary';
+import { partRequestsFor, proceduralPartLibrary, type PartLibrary } from './vehicle/partLibrary';
 import { CameraRig } from './camera';
 import { RoomUi } from './roomUi';
 import { Hud } from './hud';
@@ -306,10 +306,14 @@ function startJoin(room?: string, format: FormatId | null = 'solo'): void {
   setSound(true); // carry the menu's music into the lobby
   loadingSince = performance.now();
   hud.setLoading(0, 'loading');
-  void assetsReady.then(() => {
-    hud.setLoading(1, room ? 'opening the room' : 'joining the broadcast');
-    net.join(room, format);
-  });
+  // The format's vehicle downloads before we join (solo's is already here).
+  const vehicle = format ? FORMATS[format].vehicle : null;
+  void assetsReady
+    .then(() => (vehicle ? loadClass(vehicle) : undefined))
+    .then(() => {
+      hud.setLoading(1, room ? 'opening the room' : 'joining the broadcast');
+      net.join(room, format);
+    });
 }
 hud.onJoin((format) => startJoin(undefined, format));
 
@@ -424,7 +428,23 @@ const world = new World(scene, lighting, gltfLoader);
 // and the first map.
 // (Development: ?map=<id> shows that map on the title, to look at it.)
 const previewMap = import.meta.env.DEV ? new URLSearchParams(location.search).get('map') : null;
-await Promise.all([partLibrary.prepare(allPartRequests()), world.show(isMapId(previewMap) ? previewMap : DEFAULT_MAP)]);
+/**
+ * Vehicle classes load when needed: the title and solo use only the brawler;
+ * the duos car and squads SUV load when you join (or meet) them.
+ */
+const classLoads = new Map<VehicleClassId, Promise<void>>();
+const classReady = new Set<VehicleClassId>();
+function loadClass(cls: VehicleClassId): Promise<void> {
+  let pending = classLoads.get(cls);
+  if (!pending) {
+    pending = partLibrary.prepare(partRequestsFor(cls)).then(() => {
+      classReady.add(cls);
+    });
+    classLoads.set(cls, pending);
+  }
+  return pending;
+}
+await Promise.all([loadClass(net.local.spec.id), loadClass('solo'), world.show(isMapId(previewMap) ? previewMap : DEFAULT_MAP)]);
 assetsLoaded = true;
 hud.setStandby(1, 'going live');
 markAssetsReady();
@@ -863,7 +883,8 @@ function frame(now: number): void {
 
   // If the server assigned a different class (or corrected ours), swap the
   // local rig so the mesh matches the collider we are actually predicting with.
-  if (net.local.spec.id !== localCarClass || lookKey(profile.look) !== localLookKey) {
+  if (!classReady.has(net.local.spec.id)) void loadClass(net.local.spec.id);
+  else if (net.local.spec.id !== localCarClass || lookKey(profile.look) !== localLookKey) {
     scene.remove(localCar.root);
     localCar.dispose();
     localCar = buildVehicle(net.local.spec, profile.look, partLibrary);
@@ -916,6 +937,12 @@ function frame(now: number): void {
     let rig = remoteCars.get(id);
     const look = unpackLook(net.remoteLooks.get(id) ?? 0);
     const key = lookKey(look);
+    // A class not loaded yet (a new format): wait for it rather than draw a placeholder.
+    if (!classReady.has(state.spec.id)) {
+      void loadClass(state.spec.id);
+      if (rig) rig.root.visible = false;
+      continue;
+    }
     if (!rig || rig.spec.id !== state.spec.id || remoteLookKeys.get(id) !== key) {
       // New crew, a class change, or new paint: rebuild with all of it.
       if (rig) {

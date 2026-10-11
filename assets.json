@@ -193,7 +193,9 @@
         "assets-src/vehicles/brawler/chassis.glb",
         "assets-src/vehicles/brawler/wheel.glb",
         "public/assets/vehicles/brawler/chassis.glb",
-        "public/assets/vehicles/brawler/wheel.glb"
+        "public/assets/vehicles/brawler/wheel.glb",
+        "assets-src/vehicles/brawler/chassis-plain.glb",
+        "public/assets/vehicles/brawler/chassis-plain.glb"
       ],
       "kind": "model",
       "title": "Armored car (death race)",
@@ -201,7 +203,7 @@
       "authorUrl": "https://sketchfab.com/jaack",
       "source": "https://sketchfab.com/3d-models/armored-car-death-race-ea76bac506f04676b8514951b67994f8",
       "license": "CC-BY-4.0",
-      "changes": "Turned to face -Z and converted from centimetres to metres; split into a body and one wheel (mirrored in game for the right side); the modelled hood guns removed; the model's 4096 px source textures used (flipped to glTF's convention, AO/roughness/metalness packed into an ORM map); LODs generated; recompressed (KTX2, meshopt). Tinted with the player's livery colour in game. Built by scripts/prep/brawler.ts and scripts/assetbuild.ts."
+      "changes": "Turned to face -Z and converted from centimetres to metres; split into a body and one wheel (mirrored in game for the right side); the modelled hood guns removed; the model's 4096 px source textures used (flipped to glTF's convention, AO/roughness/metalness packed into an ORM map); LODs generated; recompressed (KTX2, meshopt). Tinted with the player's livery colour in game. A second body for the duos car has its bonnet gun bracket removed too (scripts/prep/brawler-plain.ts). Built by scripts/prep/brawler.ts and scripts/assetbuild.ts."
     },
     {
       "files": [
@@ -806,6 +808,22 @@
       "source": "https://polyhaven.com/a/rock_moss_set_01",
       "license": "CC0-1.0",
       "changes": "Poly Haven 1K glTF, simplified with LODs and KTX2 textures by scripts/assetbuild.ts; arena set dressing."
+    },
+    {
+      "files": [
+        "assets-src/vehicles/suv/original/generic-cars.glb",
+        "assets-src/vehicles/suv/chassis.glb",
+        "assets-src/vehicles/suv/wheel.glb",
+        "public/assets/vehicles/suv/chassis.glb",
+        "public/assets/vehicles/suv/wheel.glb"
+      ],
+      "kind": "model",
+      "title": "Generic passenger car pack",
+      "author": "comrade1280",
+      "authorUrl": "https://sketchfab.com/comrade1280",
+      "source": "https://sketchfab.com/3d-models/generic-passenger-car-pack-20f9af9b8a404d5cb022ac6fe87f21f5",
+      "license": "CC-BY-4.0",
+      "changes": "Only the SUV is used: separated from the pack into a body and one wheel (mirrored in game for the right side), turned to face -Z, scaled to the game's squad vehicle wheelbase and set on its ride height; LODs generated; recompressed (KTX2, meshopt). Tinted with the player's livery colour in game. Built by scripts/prep/suv.ts and scripts/assetbuild.ts."
     }
   ]
 }

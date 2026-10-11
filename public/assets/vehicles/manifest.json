@@ -27,7 +27,7 @@
       "scale": 0.85
     },
     "coupe/chassis": {
-      "file": "brawler/chassis.glb",
+      "file": "brawler/chassis-plain.glb",
       "paint": [
         "Car01"
       ],
@@ -37,14 +37,14 @@
       "file": "brawler/wheel.glb"
     },
     "suv/chassis": {
-      "file": "armored/chassis.glb",
+      "file": "suv/chassis.glb",
       "paint": [
-        "exterior"
+        "Body_7"
       ],
-      "paintStrength": 0.7
+      "paintStrength": 0.75
     },
     "suv/wheel": {
-      "file": "armored/wheel.glb"
+      "file": "suv/wheel.glb"
     }
   }
 }

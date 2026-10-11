@@ -485,21 +485,21 @@ export const VEHICLE_CLASSES: Record<VehicleClassId, VehicleSpec> = {
     wheelbase: 2.74,
   },
   /**
-   * The SQUADS truck: the armoured truck without its roof station — a driver
-   * and three window gunners. 1.6× the hull, and slower
+   * The SQUADS vehicle: a plain SUV — a driver and three window gunners.
+   * 1.6× the hull, and slower
    * to pull and to turn, so four guns in one target stays fair.
    */
   suv: {
     id: 'suv',
-    label: 'Squad truck',
-    // The armoured model was prepared to this body (its mirrors and bumpers
-    // stand a little proud of it).
+    label: 'Squad SUV',
+    // A plain SUV (scripts/prep/suv.ts), scaled to this wheelbase; its own
+    // track and wheels.
     halfWidth: 1.0,
     halfLength: 2.45,
     boxHeight: 1.85,
-    wheelRadius: 0.45,
+    wheelRadius: 0.41,
     rideHeight: 1.05,
-    track: 1.72,
+    track: 1.58,
     wheelbase: 2.95,
     hullScale: 1.6,
     power: 0.82,

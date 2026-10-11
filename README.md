@@ -26,8 +26,8 @@ Press **PLAY**, then:
 
 - **SOLO** — twelve armed cars, every car for itself.
 - **DUOS** — six cars, each a driver and a gunner leaning out of the window.
-- **SQUADS** — three armoured trucks, each a driver and three window gunners.
-  The truck carries 1.6× the armour but pulls and turns slower.
+- **SQUADS** — three SUVs, each a driver and three window gunners.
+  The SUV carries 1.6× the armour but pulls and turns slower.
 
 Every mode is a battle royale: the ring closes, the last car standing wins.
 Bots fill whatever seats players do not (people are seated together). Alone on
