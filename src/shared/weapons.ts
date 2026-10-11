@@ -14,7 +14,16 @@
  * compensation, projectiles are simulated and need replication.
  */
 
-export type WeaponId = 'rifle' | 'marksman' | 'launcher' | 'mg' | 'rocket' | 'scatter' | 'lancer' | 'swarm';
+export type WeaponId =
+  | 'rifle'
+  | 'marksman'
+  | 'shotgun'
+  | 'launcher'
+  | 'mg'
+  | 'rocket'
+  | 'scatter'
+  | 'lancer'
+  | 'swarm';
 
 export type WeaponDef = {
   id: WeaponId;
@@ -173,6 +182,22 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     splash: 5,
     automatic: false,
   },
+  /** A gunner's pump shotgun: a handful of pellets, close range. */
+  shotgun: {
+    id: 'shotgun',
+    name: 'Shotgun',
+    delivery: 'hitscan',
+    damage: 13,
+    pellets: 6,
+    rate: 1.3,
+    magazine: 6,
+    reloadSeconds: 2.6,
+    spread: 0.055,
+    range: 55,
+    speed: 0,
+    splash: 0,
+    automatic: false,
+  },
   launcher: {
     id: 'launcher',
     name: 'Launcher',
@@ -192,6 +217,9 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
 /** The car's weapon choices: primaries (bumper guns) and secondaries (roof). */
 export const PRIMARIES: readonly WeaponId[] = ['mg', 'scatter', 'lancer'];
 export const SECONDARIES: readonly WeaponId[] = ['rocket', 'swarm'];
+/** A window gunner's choice of personal primary; the launcher is always second. */
+export const GUNNER_PRIMARIES: readonly WeaponId[] = ['rifle', 'shotgun', 'marksman'];
+export const GUNNER_SECONDARY: WeaponId = 'launcher';
 
 /** Slot order a player cycles through. Slot 0 is what they spawn holding. */
 export const DEFAULT_LOADOUT: WeaponId[] = ['rifle', 'launcher'];

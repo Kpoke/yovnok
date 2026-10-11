@@ -56,7 +56,8 @@ import {
 } from '../shared/combat';
 import { COMBAT } from '../shared/config';
 import { DEFAULT_LOADOUT, weaponInSlot, WEAPONS, type WeaponId } from '../shared/weapons';
-import { DEFAULT_LOOK, packLook, loadoutOf, unpackLook } from '../shared/cosmetics';
+import { DEFAULT_LOOK, gunnerLoadoutOf, packLook, loadoutOf, unpackLook } from '../shared/cosmetics';
+import type { FormatId } from '../shared/formats';
 import type {
   BoardRow,
   ClientMessage,
@@ -452,8 +453,41 @@ export class NetClient {
 
   /** Join the lobby. The only thing that turns a connection into a seat. */
   /** @param room a private room: `new` to create one, or its code */
-  join(room?: string): void {
+  /**
+   * What a seat holds (the server's rule): the car's guns from the garage, a
+   * window gunner's own weapons from the garage, or nothing for a driver.
+   */
+  private loadoutForSeat(cls: VehicleClassId, seat: SeatId): WeaponId[] {
+    const seatDef = seatById(cls, seat);
+    if (seatDef?.mounted) return seatDef.mounted.length === 2 ? loadoutOf(unpackLook(this.look)) : mountedLoadout(seatDef);
+    if (seatDef && !seatDef.drives) return gunnerLoadoutOf(unpackLook(this.look));
+    return [...DEFAULT_LOADOUT];
+  }
+
+  /** The format a public match is asked for (solo, duos, squads). */
+  private formatRequest: FormatId | null = 'solo';
+
+  /** Gunner: move to the next free window of the car. */
+  requestSeat(): void {
+    if (this.socket?.readyState === 1) this.socket.send(JSON.stringify({ t: 'seat', seat: 'next' } satisfies ClientMessage));
+  }
+
+  /** Private room: the host's format; anyone's seat. */
+  sendRoomFormat(format: FormatId): void {
+    if (this.socket?.readyState === 1) this.socket.send(JSON.stringify({ t: 'roomFormat', format } satisfies ClientMessage));
+  }
+
+  sendRoomSeat(crew: number, seat: SeatId): void {
+    if (this.socket?.readyState === 1) this.socket.send(JSON.stringify({ t: 'roomSeat', crew, seat } satisfies ClientMessage));
+  }
+
+  /**
+   * @param room a private room: `new` to create one, or its code
+   * @param format a public match's format
+   */
+  join(room?: string, format: FormatId | null = 'solo'): void {
     if (this.connected) return;
+    this.formatRequest = format;
     this.roomRequest = room;
     this.rejected = null;
     this.wantJoin = true;
@@ -492,6 +526,7 @@ export class NetClient {
       token: this.sessionToken,
       client: this.clientInfo,
       room: this.roomRequest,
+      format: this.formatRequest ?? undefined,
     };
     socket.send(JSON.stringify(hello));
   }
@@ -525,14 +560,7 @@ export class NetClient {
         this.renderLocal.spec = VEHICLE_CLASSES[msg.cls];
         // What we hold follows from the seat: a car-mounted gun, or the
         // personal default for a window. Same rule the server applied.
-        const seatDef = seatById(msg.cls, msg.seat);
-        // The car's guns are the ones chosen in the garage (in the look), as
-        // the server armed it.
-        this.loadout = seatDef?.mounted
-          ? seatDef.mounted.length === 2
-            ? loadoutOf(unpackLook(this.look))
-            : mountedLoadout(seatDef)
-          : [...DEFAULT_LOADOUT];
+        this.loadout = this.loadoutForSeat(msg.cls, msg.seat);
         this.barrels = [0, 0, 0];
         this.nextFireAt = [0, 0, 0];
         this.onStatus(this.conditioned ? 'in game (simulated network)' : 'in game');
@@ -602,6 +630,18 @@ export class NetClient {
       }
       case 'leave': {
         this.members.delete(msg.id);
+        break;
+      }
+      case 'seat': {
+        // A gunner moved to another window (ours, or a crewmate).
+        const member = this.members.get(msg.id);
+        if (member) member.seat = msg.seat;
+        if (msg.id === this.playerId) {
+          this.seat = msg.seat;
+          this.loadout = this.loadoutForSeat(this.vehicleClass, msg.seat);
+          this.barrels = [0, 0, 0];
+          this.nextFireAt = [0, 0, 0];
+        }
         break;
       }
       case 'reject': {
@@ -701,7 +741,8 @@ export class NetClient {
   /** Slot the player is firing with a given trigger: mounted by trigger, else held. */
   slotFor(trigger: 'primary' | 'secondary'): number | null {
     const mounted = this.mounted;
-    if (!mounted) return trigger === 'primary' ? this.self.slot : null;
+    // A window gunner: left trigger the primary, right trigger the launcher.
+    if (!mounted) return trigger === 'primary' ? 0 : this.loadout.length > 1 ? 1 : null;
     const index = mounted.findIndex((m) => m.trigger === trigger);
     return index >= 0 ? index : null;
   }
@@ -949,6 +990,17 @@ export class NetClient {
   driverMember(crew: number): MemberSnapshot | undefined {
     for (const m of this.members.values()) if (m.crew === crew && m.seat === 'seat.driver') return m;
     return undefined;
+  }
+
+  /** Each living window gunner's aim (car-relative yaw), by seat. */
+  gunnerAimsOf(crew: number): Map<string, number> {
+    const aims = new Map<string, number>();
+    for (const m of this.members.values()) {
+      if (m.crew !== crew || !m.alive) continue;
+      // Our own aim is the live one, not the last snapshot's.
+      aims.set(m.seat, m.id === this.playerId ? this.aimYaw : m.aimYaw);
+    }
+    return aims;
   }
 
   occupantsOf(crew: number): Set<string> {

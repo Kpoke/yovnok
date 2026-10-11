@@ -374,6 +374,52 @@ export function buildWheel(spec: VehicleSpec, m: VehicleMaterials, style?: Wheel
 
 // --------------------------------------------------------------------- seat
 
+const cloth = new THREE.MeshStandardMaterial({ color: 0x2f353c, roughness: 0.9 });
+const glove = new THREE.MeshStandardMaterial({ color: 0x17191c, roughness: 0.8 });
+const skin = new THREE.MeshStandardMaterial({ color: 0xc08a64, roughness: 0.7 });
+const visor = new THREE.MeshStandardMaterial({ color: 0x0b0f14, roughness: 0.1, metalness: 0.4 });
+const gunMetal = new THREE.MeshStandardMaterial({ color: 0x23272c, roughness: 0.45, metalness: 0.7 });
+
+/** A capsule between two points (an arm). */
+function limb(a: THREE.Vector3, b: THREE.Vector3, radius: number): THREE.BufferGeometry {
+  const length = Math.max(0.01, a.distanceTo(b) - radius * 2);
+  const g = new THREE.CapsuleGeometry(radius, length, 3, 8);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()));
+  g.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+  return g;
+}
+
+/**
+ * A window gunner leaning out with a rifle: about 1.2 m from waist to helmet,
+ * origin at the waist under the head, facing -Z (the rig turns it to the aim).
+ */
+function gunnerFigure(m: VehicleMaterials): THREE.Group {
+  const g = new THREE.Group();
+  const mesh = (geometry: THREE.BufferGeometry, material: THREE.Material): THREE.Mesh => {
+    const out = new THREE.Mesh(geometry, material);
+    out.castShadow = true;
+    g.add(out);
+    return out;
+  };
+  const torso = mesh(new THREE.CapsuleGeometry(0.16, 0.3, 3, 10), cloth);
+  torso.position.set(0, 0.12, 0.04);
+  torso.rotation.x = -0.25;
+  mesh(new THREE.SphereGeometry(0.11, 12, 10).translate(0, 0.41, -0.01), skin);
+  // Helmet in the car's livery; a dark visor.
+  mesh(new THREE.SphereGeometry(0.13, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55).translate(0, 0.43, 0), m.body);
+  mesh(new THREE.BoxGeometry(0.17, 0.05, 0.05).translate(0, 0.41, -0.1), visor);
+  const V = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, y, z);
+  mesh(limb(V(-0.15, 0.26, -0.02), V(-0.02, 0.2, -0.36), 0.045), cloth);
+  mesh(limb(V(0.15, 0.26, -0.02), V(0.05, 0.22, -0.14), 0.045), cloth);
+  mesh(new THREE.SphereGeometry(0.045, 8, 6).translate(-0.02, 0.2, -0.38), glove);
+  // The rifle: receiver, barrel, stock, magazine.
+  mesh(new THREE.BoxGeometry(0.06, 0.09, 0.5).translate(0.03, 0.24, -0.3), gunMetal);
+  mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.28, 8).rotateX(Math.PI / 2).translate(0.03, 0.25, -0.69), gunMetal);
+  mesh(new THREE.BoxGeometry(0.05, 0.08, 0.18).translate(0.03, 0.22, -0.02), gunMetal);
+  mesh(new THREE.BoxGeometry(0.04, 0.14, 0.06).rotateX(0.25).translate(0.03, 0.15, -0.3), gunMetal);
+  return g;
+}
+
 /**
  * One crew position.
  *
@@ -407,24 +453,19 @@ export function buildSeat(side: SeatSide, armed: boolean, m: VehicleMaterials): 
     //
     // Kept SMALL and tight to the glass. An earlier version drew it at the
     // camera offset, which put two boxes floating half a metre off each flank.
+    // The figure turns about its head's vertical axis to face where the
+    // gunner aims (`setGunnerAims`); its helmet wears the car's livery, so
+    // teams read at a glance.
     const head = HEAD_OFFSET[side];
-    const headMesh = add(group, new THREE.BoxGeometry(0.3, 0.3, 0.28), m.metal, head[0], head[1], head[2]);
-    const torsoMesh = add(
-      group,
-      new THREE.BoxGeometry(0.42, 0.34, 0.3),
-      m.seat,
-      head[0] * 0.86,
-      head[1] - 0.3,
-      head[2],
-    );
-    // Named so the rig can show them only while someone is actually sitting
+    const figure = gunnerFigure(m);
+    figure.position.set(head[0], head[1] - 0.42, head[2]);
+    // Named so the rig can show it only while someone is actually sitting
     // there — an empty seat must not look occupied, or "you can see which
     // windows are occupied" (§3.2) stops being true.
-    headMesh.name = 'occupant';
-    torsoMesh.name = 'occupant';
+    figure.name = 'occupant';
     // Hidden until told otherwise: an empty car should look empty.
-    headMesh.visible = false;
-    torsoMesh.visible = false;
+    figure.visible = false;
+    group.add(figure);
     socket(group, sockets, 'windowHead', head[0], head[1], head[2]);
   }
 

@@ -34,6 +34,7 @@ const KIND_LABELS: Record<CosmeticKind, string> = {
   decal: 'DOOR DECAL',
   primary: 'BUMPER GUNS',
   secondary: 'ROOF WEAPON',
+  gunner: 'WINDOW GUN',
 };
 
 const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
@@ -47,7 +48,9 @@ function swatchColour(entry: ShopEntry): string | null {
 
 /** A gun's one-line description, under its name. */
 function blurb(entry: ShopEntry): string | null {
-  if (entry.kind === 'primary' || entry.kind === 'secondary') return GUN_CHOICES[entry.kind][entry.index]?.blurb ?? null;
+  if (entry.kind === 'primary' || entry.kind === 'secondary' || entry.kind === 'gunner') {
+    return GUN_CHOICES[entry.kind][entry.index]?.blurb ?? null;
+  }
   return null;
 }
 
@@ -64,7 +67,7 @@ export class Garage {
     this.profile = profile;
     this.stats = root.querySelector('#cos-stats') as HTMLElement;
 
-    for (const kind of ['livery', 'pattern', 'accent', 'wheels', 'roof', 'decal', 'glow', 'primary', 'secondary'] as CosmeticKind[]) {
+    for (const kind of ['livery', 'pattern', 'accent', 'wheels', 'roof', 'decal', 'glow', 'primary', 'secondary', 'gunner'] as CosmeticKind[]) {
       const row = root.querySelector(`#cos-${kind}`) as HTMLElement;
       if (row) this.rows.set(kind, row);
     }

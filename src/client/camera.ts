@@ -117,23 +117,38 @@ export class CameraRig {
     dt: number,
     obstacles: THREE.Object3D[],
   ): void {
-    // Rigid, not damped. A head in a window moves with the car; smoothing here
-    // would slide the camera off its own window in every corner.
-    const anchor = seatPointWorld(state, seat, WINDOW_EYE_OFFSET[seat.side]);
-    this.desired.set(anchor.x, anchor.y, anchor.z);
+    // Over the shoulder (the gunner leaning out of the window, as in a
+    // third-person shooter): behind and above the head along the aim, a little
+    // to the outside, so you see yourself, your side of the car and the target.
+    // Rigid, not damped: a lagging camera is a crosshair that lies.
+    const head = seatPointWorld(state, seat, WINDOW_EYE_OFFSET[seat.side]);
+    const yaw = state.yaw + aimYaw;
+    const cosPitch = Math.cos(aimPitch);
+    const fx = -Math.sin(yaw) * cosPitch;
+    const fz = -Math.cos(yaw) * cosPitch;
+    // Outward on the gunner's own side of the car (its local ±x), so the
+    // camera is beside the vehicle rather than over its roof, whichever way
+    // the gun points.
+    const side = seat.side === 'right' ? 1 : -1;
+    const ox = Math.cos(state.yaw) * side;
+    const oz = -Math.sin(state.yaw) * side;
+    const back = CAMERA.gunnerDistance;
+    this.desired.set(
+      head.x - fx * back + ox * CAMERA.gunnerShoulder,
+      head.y + CAMERA.gunnerHeight + Math.sin(aimPitch) * back * 0.5,
+      head.z - fz * back + oz * CAMERA.gunnerShoulder,
+    );
 
-    // If the car is pressed against a wall, the window itself is inside it. Pull
-    // the view in toward the car rather than rendering the inside of a wall.
-    this.focal.set(state.pos.x, state.pos.y + CAMERA.lookAtHeight, state.pos.z);
-    this.avoidGeometry(this.focal, obstacles, 0.5);
+    // Pressed against a wall: pull the view in toward the head rather than
+    // rendering the inside of the wall.
+    this.focal.set(head.x, head.y + 0.2, head.z);
+    this.avoidGeometry(this.focal, obstacles, 0.6);
 
     camera.position.copy(this.desired);
 
     // Look along the aim. Aim yaw is car-relative — it is clamped to the
     // window's arc — so the gaze turns with the car, which is correct: the arc
     // is exactly what this window can reach.
-    const yaw = state.yaw + aimYaw;
-    const cosPitch = Math.cos(aimPitch);
     // LOOK PITCH CONVENTION: positive means the player moved the mouse DOWN, so
     // the view pitches down. Every camera must agree or the look inverts when
     // you change seat — which is exactly the bug this negates. The chase camera

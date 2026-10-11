@@ -6,6 +6,8 @@
 
 import { MAPS } from '../shared/arena';
 import { MAP_IDS, type MapId } from '../shared/mapIds';
+import { FORMAT_IDS, FORMATS, type FormatId } from '../shared/formats';
+import type { SeatId } from '../shared/crews';
 import type { RoomState } from './net';
 
 const byId = <T extends HTMLElement = HTMLElement>(id: string): T => {
@@ -33,6 +35,11 @@ export class RoomUi {
   private startButton = byId<HTMLButtonElement>('room-start');
   private wait = byId('room-wait');
   private mapButtons = new Map<MapId, HTMLButtonElement>();
+  private formatButtons = new Map<FormatId, HTMLButtonElement>();
+  private formats = byId('room-formats');
+  private cars = byId('room-cars');
+  private onPickFormat: ((format: FormatId) => void) | null = null;
+  private onSit: ((crew: number, seat: SeatId) => void) | null = null;
   private shownKey = '';
   private visible = false;
 
@@ -65,6 +72,25 @@ export class RoomUi {
     this.startButton.addEventListener('click', () => this.onStart?.());
     byId('room-leave').addEventListener('click', () => this.onLeave?.());
 
+    for (const id of FORMAT_IDS) {
+      const button = document.createElement('button');
+      button.className = 'map-option format-option';
+      const name = document.createElement('b');
+      name.textContent = FORMATS[id].name.toUpperCase();
+      const blurb = document.createElement('span');
+      blurb.textContent = FORMATS[id].blurb;
+      button.append(name, blurb);
+      button.addEventListener('click', () => this.onPickFormat?.(id));
+      this.formats.appendChild(button);
+      this.formatButtons.set(id, button);
+    }
+    // Seat picker: one click sits you there (team formats).
+    this.cars.addEventListener('click', (e) => {
+      const seat = (e.target as HTMLElement).closest<HTMLButtonElement>('.seat-option');
+      if (!seat || seat.disabled) return;
+      this.onSit?.(Number(seat.dataset.crew), seat.dataset.seat as SeatId);
+    });
+
     for (const id of MAP_IDS) {
       const button = document.createElement('button');
       button.className = 'map-option';
@@ -96,9 +122,13 @@ export class RoomUi {
   handlers(h: {
     join: (room: string) => void;
     pickMap: (map: MapId) => void;
+    pickFormat: (format: FormatId) => void;
+    sit: (crew: number, seat: SeatId) => void;
     start: () => void;
     leave: () => void;
   }): void {
+    this.onPickFormat = h.pickFormat;
+    this.onSit = h.sit;
     this.onJoinRoom = h.join;
     this.onPickMap = h.pickMap;
     this.onStart = h.start;
@@ -149,14 +179,46 @@ export class RoomUi {
       button.classList.toggle('selected', id === room.map);
       button.disabled = !room.host;
     }
+    for (const [id, button] of this.formatButtons) {
+      button.classList.toggle('selected', id === room.format);
+      button.disabled = !room.host;
+    }
+    // The cars and their seats (duos, squads): tap a free seat to sit in it.
+    this.cars.classList.toggle('hidden', room.cars.length === 0);
+    this.cars.replaceChildren(
+      ...room.cars.map((car) => {
+        const row = document.createElement('div');
+        row.className = 'car-row';
+        const label = document.createElement('span');
+        label.className = 'cos-label';
+        label.textContent = `${room.format === 'squads' ? 'TRUCK' : 'CAR'} ${car.crew + 1}`;
+        row.appendChild(label);
+        for (const seat of car.seats) {
+          const b = document.createElement('button');
+          b.className = 'chip seat-option';
+          if (seat.me) b.classList.add('on');
+          b.dataset.crew = String(car.crew);
+          b.dataset.seat = seat.seat;
+          b.disabled = seat.name !== null;
+          const role = seat.seat === 'seat.driver' ? 'DRIVER' : 'GUNNER';
+          b.textContent = seat.name ? `${role} · ${seat.name}` : `${role} · free`;
+          row.appendChild(b);
+        }
+        return row;
+      }),
+    );
     const short = room.min - room.players.length;
+    const occupiedCars = room.cars.filter((c) => c.seats.some((s) => s.name)).length;
+    const needCars = room.cars.length > 0 && occupiedCars < 2;
     this.startButton.classList.toggle('hidden', !room.host);
-    this.startButton.disabled = short > 0;
-    this.startButton.textContent = short > 0 ? `NEED ${short} MORE` : 'START MATCH';
+    this.startButton.disabled = short > 0 || needCars;
+    this.startButton.textContent = short > 0 ? `NEED ${short} MORE` : needCars ? 'NEED 2 CARS' : 'START MATCH';
     this.wait.textContent = room.host
       ? short > 0
         ? 'Waiting for friends to join. Share the code or the link.'
-        : 'Pick a map and start whenever you are ready.'
+        : needCars
+          ? 'Team match: at least two cars need someone in them.'
+          : 'Pick a map and start whenever you are ready.'
       : `Waiting for ${room.hostName || 'the host'} to start the match.`;
   }
 

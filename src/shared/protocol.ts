@@ -28,6 +28,7 @@ import type { Components } from './components';
 import type { MatchSnapshot } from './match';
 import type { ZoneState } from './zone';
 import type { MapId } from './mapIds';
+import type { FormatId } from './formats';
 
 /** A single tick of input, tagged so the server can acknowledge it. */
 export type InputCmd = VehicleInput & { seq: number };
@@ -256,7 +257,12 @@ export type ServerMessage =
       map: MapId;
       min: number;
       max: number;
+      format: FormatId;
+      /** Team formats: every car and who sits where (null: an empty seat). */
+      cars: Array<{ crew: number; seats: Array<{ seat: SeatId; name: string | null; me: boolean }> }>;
     }
+  /** Someone changed seat (a gunner moving to another window). */
+  | { t: 'seat'; id: number; seat: SeatId }
   /** Callsign per crew, sent whenever it changes (joins, leaves, bots). */
   | { t: 'roster'; names: Record<number, string> }
   | { t: 'join'; id: number; crew: number; seat: SeatId }
@@ -333,7 +339,15 @@ export type ClientMessage =
        * one. Absent: a public match.
        */
       room?: string;
+      /** A public match's format (solo, duos, squads). Default solo. */
+      format?: FormatId;
     }
+  /** Gunner: move to another (non-driver) seat of the same car. */
+  | { t: 'seat'; seat: SeatId | 'next' }
+  /** Private room, host only: the format for the next match. */
+  | { t: 'roomFormat'; format: FormatId }
+  /** Private room, in the lobby: sit in this car and seat. */
+  | { t: 'roomSeat'; crew: number; seat: SeatId }
   /** Private room, host only: the map for the next match. */
   | { t: 'roomMap'; map: MapId }
   /** Private room, host only: start the match (2+ players). */

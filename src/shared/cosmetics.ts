@@ -15,7 +15,7 @@
  * purpose: there is nothing to cheat for.
  */
 
-import { PRIMARIES, SECONDARIES, type WeaponId } from './weapons';
+import { GUNNER_PRIMARIES, GUNNER_SECONDARY, PRIMARIES, SECONDARIES, type WeaponId } from './weapons';
 
 export type Finish = 'gloss' | 'matte' | 'chrome' | 'pearl';
 
@@ -166,6 +166,8 @@ export type CosmeticLook = {
   decal: number;
   /** Race number on the doors, 0 = none, else 1–99. */
   number: number;
+  /** A window gunner's primary: index into `GUNNER_PRIMARIES` (team formats). */
+  gunner: number;
 };
 
 export const DEFAULT_LOOK: CosmeticLook = {
@@ -179,6 +181,7 @@ export const DEFAULT_LOOK: CosmeticLook = {
   secondary: 0,
   decal: 0,
   number: 0,
+  gunner: 0,
 };
 
 /** Clamp every index into range, so a stale profile cannot crash a render. */
@@ -194,7 +197,13 @@ export function clampLook(look: Partial<CosmeticLook>): CosmeticLook {
     secondary: clampIndex(look.secondary ?? 0, SECONDARIES.length),
     decal: clampIndex(look.decal ?? 0, DECALS.length),
     number: clampIndex(look.number ?? 0, 100),
+    gunner: clampIndex(look.gunner ?? 0, GUNNER_PRIMARIES.length),
   };
+}
+
+/** A window gunner's personal weapons: the chosen primary and the launcher. */
+export function gunnerLoadoutOf(look: CosmeticLook): WeaponId[] {
+  return [GUNNER_PRIMARIES[clampLook(look).gunner], GUNNER_SECONDARY];
 }
 
 /** The guns a look arms the car with: [primary, secondary]. */
@@ -232,7 +241,7 @@ export function packLook(look: Partial<CosmeticLook>): number {
       ((l.primary & 0x3) << 27) |
       ((l.secondary & 0x3) << 29)) >>>
     0;
-  const high = (l.decal & 0xf) | ((l.number & 0x7f) << 4);
+  const high = (l.decal & 0xf) | ((l.number & 0x7f) << 4) | ((l.gunner & 0x3) << 11);
   return low + high * HIGH;
 }
 
@@ -243,6 +252,7 @@ export function unpackLook(packed: number): CosmeticLook {
   return clampLook({
     decal: high & 0xf,
     number: (high >> 4) & 0x7f,
+    gunner: (high >> 11) & 0x3,
     livery: n & 0xff,
     wheels: (n >> 8) & 0xf,
     roof: (n >> 12) & 0xf,
@@ -266,6 +276,7 @@ export function botLook(id: number): CosmeticLook {
     roof: (a * 5 + 1) % ROOFS.length,
     decal: a % 2 === 0 ? 1 : (a * 3) % DECALS.length,
     number: ((a * 37) % 98) + 1,
+    gunner: (a * 5) % GUNNER_PRIMARIES.length,
     // Some bots wear a pattern; guns vary too, so the field is not all MGs.
     pattern: a % 3 === 0 ? 0 : (a * 7 + 1) % PATTERNS.length,
     accent: (a * 5 + 2) % ACCENTS.length,
@@ -307,10 +318,17 @@ export type CosmeticKind =
   | 'glow'
   | 'decal'
   | 'primary'
-  | 'secondary';
+  | 'secondary'
+  | 'gunner';
 
 /** The garage's gun choices, described. Sidegrades: all open from the start. */
-export const GUN_CHOICES: Record<'primary' | 'secondary', readonly { name: string; blurb: string; unlock: UnlockRule }[]> = {
+export const GUN_CHOICES: Record<'primary' | 'secondary' | 'gunner', readonly { name: string; blurb: string; unlock: UnlockRule }[]> = {
+  // Duos and squads: what you hold leaning out of the window (+ a launcher).
+  gunner: [
+    { name: 'Assault Rifle', blurb: 'fast, steady, any range', unlock: { type: 'default' } },
+    { name: 'Shotgun', blurb: 'six pellets, close range', unlock: { type: 'default' } },
+    { name: 'Marksman', blurb: 'slow, hard-hitting, long range', unlock: { type: 'default' } },
+  ],
   primary: [
     { name: 'Twin .50', blurb: 'a steady stream, all-rounder', unlock: { type: 'default' } },
     { name: 'Scattergun', blurb: 'brutal up close, nothing past 70 m', unlock: { type: 'default' } },
@@ -354,6 +372,7 @@ function listOf(kind: CosmeticKind): readonly { name: string; unlock: UnlockRule
       return DECALS;
     case 'primary':
     case 'secondary':
+    case 'gunner':
       return GUN_CHOICES[kind];
   }
 }
@@ -426,7 +445,7 @@ export function shopCatalog(profile: Profile): ShopEntry[] {
       });
     });
   };
-  for (const kind of ['livery', 'wheels', 'roof', 'pattern', 'accent', 'glow', 'decal', 'primary', 'secondary'] as const) {
+  for (const kind of ['livery', 'wheels', 'roof', 'pattern', 'accent', 'glow', 'decal', 'primary', 'secondary', 'gunner'] as const) {
     add(kind, listOf(kind));
   }
   return out;

@@ -31,7 +31,7 @@ const THROTTLE_RATE = 5;
  *   X           handbrake        B / L3   boost               Y   reload
  *   Start       menu             D-pad + A / B   move and choose in menus
  */
-const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9, L3: 10, UP: 12, DOWN: 13 } as const;
+const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9, L3: 10, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 } as const;
 const PAD_DEADZONE = 0.14;
 /** Full-deflection aim speed, rad/s. A response curve keeps fine aim near centre. */
 const PAD_AIM_YAW = 2.6;
@@ -70,6 +70,8 @@ export class Input {
   private firing2 = false;
   private fire2Pressed = false;
   private reloadRequested = false;
+  /** A gunner asked to move to the next window (F, D-pad, the SEAT button). */
+  private seatRequested = false;
   private switchRequested: number | null = null;
 
   /** Gamepad state, refreshed by `poll` once a frame. */
@@ -105,6 +107,7 @@ export class Input {
       if (e.repeat) return;
       this.keys.add(e.code);
       if (e.code === 'KeyR') this.reloadRequested = true;
+      if (e.code === 'KeyF') this.seatRequested = true;
       if (e.code === 'Digit1') this.switchRequested = 0;
       if (e.code === 'Digit2') this.switchRequested = 1;
       if (e.code === 'Digit3') this.switchRequested = 2;
@@ -192,6 +195,7 @@ export class Input {
     if (pressed(PAD.RB)) this.firePressed = true;
     if (pressed(PAD.LB)) this.fire2Pressed = true;
     if (pressed(PAD.Y)) this.reloadRequested = true;
+    if (pressed(PAD.LEFT) || pressed(PAD.RIGHT)) this.seatRequested = true;
     if (pressed(PAD.START)) this.menuPressed = true;
     if (pressed(PAD.UP)) this.navQueue.push('up');
     if (pressed(PAD.DOWN)) this.navQueue.push('down');
@@ -318,6 +322,14 @@ export class Input {
     const value = this.reloadRequested || (this.touch?.reloadPressed ?? false);
     this.reloadRequested = false;
     if (this.touch) this.touch.reloadPressed = false;
+    return value;
+  }
+
+  /** True once after a change-seat request. */
+  consumeSeat(): boolean {
+    const value = this.seatRequested || (this.touch?.seatPressed ?? false);
+    this.seatRequested = false;
+    if (this.touch) this.touch.seatPressed = false;
     return value;
   }
 

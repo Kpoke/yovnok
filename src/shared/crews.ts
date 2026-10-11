@@ -169,12 +169,13 @@ const deg = (d: number): number => (d * Math.PI) / 180;
 
 /** One gunner per class in the coupe; three in the SUV. */
 const COUPE_SEATS: SeatDef[] = [
-  { id: 'seat.driver', drives: true, side: 'left', mount: [-0.42, -0.06, 0.15], arc: null },
+  // The duo car is the brawler's body, without its guns: seats where its own are.
+  { id: 'seat.driver', drives: true, side: 'left', mount: [-0.38, -0.3, 0.2], arc: null },
   {
     id: 'seat.frontRight',
     drives: false,
     side: 'right',
-    mount: [0.42, -0.06, 0.15],
+    mount: [0.38, -0.3, 0.2],
     // Front passenger (right side): forward, round the right flank, to the
     // right-rear quarter. Right is negative here — see the convention above.
     arc: [deg(-155), deg(5)],

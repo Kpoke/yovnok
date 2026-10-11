@@ -39,6 +39,7 @@ export class TouchControls {
   fire2Pressed = false;
   reloadPressed = false;
   menuPressed = false;
+  seatPressed = false;
   /** Seconds since a finger last touched the controls (aim assist eases off when idle). */
   lastTouch = 0;
 
@@ -64,7 +65,8 @@ export class TouchControls {
       <button class="touch-btn fire2" data-act="fire2">RPG</button>
       <button class="touch-btn boost" data-act="boost">BOOST</button>
       <button class="touch-btn drift" data-act="drift">DRIFT</button>
-      <button class="touch-btn reload" data-act="reload">↻</button>`;
+      <button class="touch-btn reload" data-act="reload">↻</button>
+      <button class="touch-btn seat" data-act="seat">SEAT</button>`;
     document.querySelector('.hud')?.appendChild(this.root);
     this.stickBase = this.root.querySelector('.stick-base')!;
     this.stickKnob = this.root.querySelector('.stick-knob')!;
@@ -91,6 +93,7 @@ export class TouchControls {
           if (act === 'drift') this.state.handbrake = true;
           if (act === 'reload') this.reloadPressed = true;
           if (act === 'menu') this.menuPressed = true;
+          if (act === 'seat') this.seatPressed = true;
         },
         opts,
       );
@@ -109,6 +112,22 @@ export class TouchControls {
     window.addEventListener('touchend', (e) => this.end(e), opts);
     window.addEventListener('touchcancel', (e) => this.end(e), opts);
   }
+
+  /**
+   * The controls for the seat: a driver (stick, drift, boost; no guns), a
+   * window gunner (no stick: aim, FIRE, LAUNCH, SEAT), or the solo car (all).
+   */
+  setRole(role: 'solo' | 'driver' | 'gunner'): void {
+    if (role === this.role) return;
+    this.role = role;
+    this.root.dataset.role = role;
+    const fire = this.root.querySelector('.touch-btn.fire');
+    const fire2 = this.root.querySelector('.touch-btn.fire2');
+    if (fire) fire.textContent = role === 'gunner' ? 'FIRE' : 'MG';
+    if (fire2) fire2.textContent = role === 'gunner' ? 'LAUNCH' : 'RPG';
+    this.releaseAll();
+  }
+  private role: 'solo' | 'driver' | 'gunner' = 'solo';
 
   /** Show the controls (in a live match) or hide them, releasing everything. */
   setVisible(visible: boolean): void {

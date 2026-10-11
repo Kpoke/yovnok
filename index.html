@@ -732,6 +732,12 @@
       #touch .drift { right: calc(max(24px, env(safe-area-inset-right)) + 110px); bottom: 96px; width: 56px; height: 56px; font-size: 10px; }
       #touch .reload { right: calc(max(24px, env(safe-area-inset-right)) + 94px); bottom: 164px; width: 44px; height: 44px; font-size: 18px; }
       #touch .menu { left: max(14px, env(safe-area-inset-left)); top: 12px; width: 44px; height: 44px; border-radius: 8px; font-size: 20px; }
+      #touch .seat { right: calc(max(24px, env(safe-area-inset-right)) + 108px); bottom: 26px; width: 58px; height: 58px; font-size: 10px; display: none; }
+      /* A driver has no guns; a gunner has no wheel. */
+      #touch[data-role='driver'] .fire, #touch[data-role='driver'] .fire2, #touch[data-role='driver'] .reload { display: none; }
+      #touch[data-role='gunner'] .touch-zone.left, #touch[data-role='gunner'] .boost, #touch[data-role='gunner'] .drift { display: none; }
+      #touch[data-role='gunner'] .seat { display: flex; }
+      #touch[data-role='gunner'] .touch-zone.right { width: 100%; }
       /* On touch, the desktop-only cues go. */
       body.touch #prompt, body.touch .hero-hint, body.touch #controls-hint { display: none !important; }
 
@@ -787,7 +793,7 @@
       #room-players { margin: 0; padding: 0; list-style: none; font-size: 13px; line-height: 2; letter-spacing: 1px; }
       #room-players li.host::after { content: '  HOST'; font-size: 9px; letter-spacing: 2px; color: var(--accent); }
       #room-players li.me { color: var(--accent); }
-      #room-maps { display: grid; gap: 6px; }
+      #room-maps { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
       .map-option {
         display: grid; gap: 2px; text-align: left; padding: 8px 12px; font: inherit; color: #e8edf2; cursor: pointer;
         background: rgba(255, 255, 255, 0.05); border: 1px solid var(--edge); border-radius: 4px; pointer-events: auto;
@@ -799,6 +805,12 @@
       .map-option:disabled { cursor: default; }
       .map-option:disabled:not(.selected) { opacity: 0.45; }
       .room-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+      .room-formats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+      #room-cars { display: grid; gap: 8px; margin-top: 16px; }
+      #room-cars.hidden { display: none; }
+      .car-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      .car-row .cos-label { width: 64px; margin: 0; }
+      .seat-option:disabled { opacity: 0.6; cursor: default; }
       .room-actions .menu-item { width: auto; }
       .room-actions .hidden { display: none; }
       @media (max-width: 760px), (max-height: 520px) {
@@ -1001,6 +1013,10 @@
       body:not(.debug-on) .debug { display: none; }
       body.menu #speed, body.menu #combat, body.menu #controls,
       body.menu #prompt, body.menu #crosshair { display: none; }
+      /* A window gunner neither drives nor sees the driver's gauges. */
+      .gunner-only { display: none; }
+      body.gunner .gunner-only { display: inline; }
+      body.gunner .drive-only, body.gunner #speed, body.gunner #controls { display: none; }
       #combat .bar.hull > i { background: linear-gradient(90deg, #e5484d, #74d680); }
       #combat .hidden { display: none; }
       #prompt small {
@@ -1111,7 +1127,9 @@
           <nav class="menu">
             <button id="join-button" class="menu-item primary">PLAY</button>
             <div id="play-choices" class="play-choices hidden">
-              <button id="play-bots" class="menu-item choice">VS BOTS<small>public match · bots fill the empty seats</small></button>
+              <button class="menu-item choice play-format" data-format="solo">SOLO<small>every car for itself · bots fill the field</small></button>
+              <button class="menu-item choice play-format" data-format="duos">DUOS<small>a driver and a gunner per car</small></button>
+              <button class="menu-item choice play-format" data-format="squads">SQUADS<small>a driver and three gunners per truck</small></button>
               <button id="join-private" class="menu-item choice" data-panel="private">PRIVATE ROOM<small>friends only · no bots</small></button>
             </div>
             <button id="join-garage" class="menu-item" data-panel="cosmetics">GARAGE</button>
@@ -1135,8 +1153,10 @@
             </div>
             <div class="cos-row"><span class="cos-label">UNDERGLOW</span><div class="cos-options" id="cos-glow"></div></div>
             <div class="cos-head cos-sub"><span>GUNS</span><span>every gun is open</span></div>
+            <div class="drawer-note">Solo: your car's guns. Duos and squads: what you fire from the window.</div>
             <div class="cos-row"><span class="cos-label">BUMPER GUNS</span><div class="cos-options" id="cos-primary"></div></div>
             <div class="cos-row"><span class="cos-label">ROOF WEAPON</span><div class="cos-options" id="cos-secondary"></div></div>
+            <div class="cos-row"><span class="cos-label">WINDOW GUN · DUOS AND SQUADS (+ A GRENADE LAUNCHER)</span><div class="cos-options" id="cos-gunner"></div></div>
           </div>
           <div id="private" class="drawer hidden">
             <div class="cos-head"><span>PRIVATE ROOM</span><span>2–12 players · no bots</span></div>
@@ -1243,10 +1263,13 @@
               <ol id="room-players"></ol>
             </div>
             <div>
+              <span class="cos-label">MODE</span>
+              <div id="room-formats" class="room-formats"></div>
               <span class="cos-label">MAP</span>
               <div id="room-maps"></div>
             </div>
           </div>
+          <div id="room-cars" class="hidden"></div>
           <div class="room-actions">
             <button id="room-start" class="menu-item primary">START MATCH</button>
             <button id="room-leave" class="menu-item danger">LEAVE ROOM</button>
@@ -1264,7 +1287,7 @@
       <div id="hitmarker"></div>
 
       <div id="prompt">
-        CLICK TO DRIVE
+        <span class="drive-only">CLICK TO DRIVE</span><span class="gunner-only">CLICK TO AIM</span>
         <small>mouse to look · esc to release</small>
       </div>
     </div>

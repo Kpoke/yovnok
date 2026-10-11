@@ -73,6 +73,7 @@ type Client = {
   room: { code: string; host: boolean; players: string[]; map: string } | null;
   map: string | null;
   roster: Record<string, string> | null;
+  seat: string | null;
 };
 
 function connect(): Promise<Client> {
@@ -88,6 +89,7 @@ function connect(): Promise<Client> {
       room: null,
       map: null,
       roster: null,
+      seat: null,
     };
     ws.on('message', (data) => {
       const m = JSON.parse(String(data));
@@ -99,13 +101,14 @@ function connect(): Promise<Client> {
       else if (m.t === 'room') c.room = m;
       else if (m.t === 'map') c.map = m.id;
       else if (m.t === 'roster') c.roster = m.names;
+      else if (m.t === 'seat' && c.welcome && m.id === (c.welcome as { id?: number }).id) c.seat = m.seat;
     });
     ws.once('open', () => resolve(c));
     ws.once('error', reject);
   });
 }
-const hello = (c: Client, token: string, room?: string, name = 'tester'): void =>
-  c.ws.send(JSON.stringify({ t: 'hello', cls: 'solo', name, token, room }));
+const hello = (c: Client, token: string, room?: string, name = 'tester', format?: string): void =>
+  c.ws.send(JSON.stringify({ t: 'hello', cls: 'solo', name, token, room, format }));
 const health = async (): Promise<{ rooms: number; phases: string[] }> =>
   (await (await fetch(`http://localhost:${PORT}/healthz`)).json()) as { rooms: number; phases: string[] };
 
@@ -159,6 +162,34 @@ try {
   await until(() => back.welcome !== null, 10_000);
   check('REJOIN hands back the car', back.welcome?.resumed === true, JSON.stringify(back.welcome));
   check('the same car', back.welcome?.crew === crewBefore, `crew ${back.welcome?.crew} (was ${crewBefore})`);
+
+  console.log('\n=== team formats ===');
+  {
+    const d1 = await connect();
+    hello(d1, 'token-squad-0001', undefined, 'SQ1', 'squads');
+    await until(() => d1.welcome !== null, 10_000);
+    const w1 = d1.welcome as { crew: number; seat?: string; cls?: string } | null;
+    check('squads: a truck, and the first person drives it', w1?.cls === 'suv' && w1?.seat === 'seat.driver', JSON.stringify(w1));
+    const d2 = await connect();
+    hello(d2, 'token-squad-0002', undefined, 'SQ2', 'squads');
+    await until(() => d2.welcome !== null, 10_000);
+    const w2 = d2.welcome as { crew: number; seat?: string } | null;
+    check('the next person rides in the same truck, at a window', w2?.crew === w1?.crew && w2?.seat !== 'seat.driver', JSON.stringify(w2));
+    await sleep(1200);
+    check('bots fill the other seats: three trucks in the field', Object.keys(d2.roster ?? {}).length === 3, JSON.stringify(d2.roster));
+    d2.ws.send(JSON.stringify({ t: 'seat', seat: 'next' }));
+    await until(() => d2.seat !== null, 5000);
+    check('a gunner can move to another window', d2.seat !== null && d2.seat !== w2?.seat && d2.seat !== 'seat.driver', String(d2.seat));
+    d2.ws.send(JSON.stringify({ t: 'seat', seat: 'seat.driver' }));
+    await sleep(800);
+    check('but not into the driver seat', d2.seat !== 'seat.driver', String(d2.seat));
+    const solo = await connect();
+    hello(solo, 'token-solo-00099', undefined, 'SOLO', 'solo');
+    await until(() => solo.welcome !== null || solo.busy !== null, 10_000);
+    check('solo players are matched apart from squads', (solo.welcome as { cls?: string } | null)?.cls === 'solo', JSON.stringify(solo.welcome));
+    for (const c of [d1, d2, solo]) c.ws.close();
+    await sleep(800);
+  }
 
   console.log('\n=== private rooms ===');
   const host = await connect();

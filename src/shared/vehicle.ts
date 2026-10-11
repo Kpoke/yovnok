@@ -537,6 +537,7 @@ export function stepVehicle(s: VehicleState, input: VehicleInput, dt: number): v
         forward +=
           sign *
           VEHICLE.engineForce *
+          (s.spec.power ?? 1) *
           VEHICLE.handbrakeDriveFactor *
           engine *
           drive *
@@ -569,8 +570,8 @@ export function stepVehicle(s: VehicleState, input: VehicleInput, dt: number): v
         if (forward < topSpeed) {
           const force =
             (boosting
-              ? VEHICLE.engineForce * VEHICLE.boost.forceMultiplier
-              : VEHICLE.engineForce) *
+              ? VEHICLE.engineForce * (s.spec.power ?? 1) * VEHICLE.boost.forceMultiplier
+              : VEHICLE.engineForce * (s.spec.power ?? 1)) *
             engine *
             drive;
           forward = Math.min(topSpeed, forward + force * magnitude * dt);
@@ -611,7 +612,7 @@ export function stepVehicle(s: VehicleState, input: VehicleInput, dt: number): v
     // sharply enough to actually point it away from its direction of travel.
     const steerBonus = input.handbrake ? VEHICLE.handbrakeSteerBonus : 1;
     // Positive steer is right; increasing yaw turns left, hence the minus.
-    s.yaw -= input.steer * VEHICLE.steerRate * authority * engage * reversing * steerBonus * dt;
+    s.yaw -= input.steer * VEHICLE.steerRate * (s.spec.handling ?? 1) * authority * engage * reversing * steerBonus * dt;
     // Damaged tyres drag the car toward the side that is hurt.
     s.yaw += steerPull(s.components) * dt;
   } else {

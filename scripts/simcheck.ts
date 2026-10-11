@@ -19,6 +19,7 @@
 import {
   HAZARD,
   MATCH,
+  maxHullOf,
   PALETTE,
   REPAIR,
   TICK,
@@ -80,6 +81,14 @@ const DT = TICK.dt;
  * covered separately in test 19.
  */
 const TEST_SPEC = VEHICLE_CLASSES.suv;
+/**
+ * The handling checks below measure the BASE tuning. The squad truck is
+ * deliberately heavier (less power, slower steering), so it is neutralised for
+ * them and checked on its own at the end (test 28).
+ */
+const TRUCK_TUNING = { power: TEST_SPEC.power, handling: TEST_SPEC.handling };
+TEST_SPEC.power = 1;
+TEST_SPEC.handling = 1;
 
 let failures = 0;
 
@@ -610,12 +619,12 @@ console.log('\n=== 19. the two vehicle classes are genuinely different ===');
 
   check(
     'the classes differ in size',
-    coupe.halfLength !== suv.halfLength && coupe.boxHeight !== suv.boxHeight,
+    (coupe.halfLength !== suv.halfLength || coupe.halfWidth !== suv.halfWidth) && coupe.boxHeight !== suv.boxHeight,
     `coupe ${coupe.halfLength}×${coupe.boxHeight} · suv ${suv.halfLength}×${suv.boxHeight}`,
   );
   check(
     'the SUV is the larger vehicle',
-    suv.halfLength > coupe.halfLength &&
+    suv.halfLength >= coupe.halfLength &&
       suv.halfWidth >= coupe.halfWidth &&
       suv.boxHeight > coupe.boxHeight &&
       suv.rideHeight > coupe.rideHeight,
@@ -1133,6 +1142,20 @@ console.log('\n=== 26. authored map: verticality, landmarks, roads (M12) ===');
     'and a road is drivable, not a wall',
     road ? !isBlockingAt(road, 200, 0, TEST_SPEC.rideHeight, VEHICLE.stepUp) : false,
   );
+}
+
+console.log('\n=== 28. the squad truck is heavier than the duo car ===');
+{
+  Object.assign(TEST_SPEC, TRUCK_TUNING);
+  const reach = (spec: typeof TEST_SPEC): number => {
+    const s = createVehicle(0, 2, 0, 0, spec);
+    run(s, 180, { throttle: 1 });
+    return Math.abs(s.pos.z);
+  };
+  const car = reach(VEHICLE_CLASSES.coupe);
+  const truck = reach(VEHICLE_CLASSES.suv);
+  check('in 3 s from a standstill the truck covers less ground', truck < car * 0.95, `truck ${truck.toFixed(0)} m, car ${car.toFixed(0)} m`);
+  check('and carries more hull', maxHullOf(VEHICLE_CLASSES.suv) > maxHullOf(VEHICLE_CLASSES.coupe) * 1.5);
 }
 
 console.log('\n=== 27. every map is sound ===');

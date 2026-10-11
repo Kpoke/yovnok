@@ -104,7 +104,7 @@ class Observer {
           o.latest = msg as Snap;
         }
       });
-      socket.once('open', () => socket.send(JSON.stringify({ t: 'hello', cls: 'suv', crew: 0 })));
+      socket.once('open', () => socket.send(JSON.stringify({ t: 'hello', cls: 'suv', crew: 0, format: process.env.FORMAT })));
       socket.once('error', reject);
     });
   }

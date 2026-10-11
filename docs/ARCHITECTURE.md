@@ -33,6 +33,14 @@ held by the `RoomManager` until the player presses PLAY (`hello`), then placed:
 starts when its host says so (`roomStart`); the host also picks the map
 (`roomMap`). A car held for a player who dropped waits, parked.
 
+**Formats** (`src/shared/formats.ts`). Every room runs a battle royale in one
+format: solo (12 armed brawlers), duos (6 two-seat cars) or squads (3
+four-seat trucks). Public matchmaking keeps formats apart; bots fill every free
+seat, drivers first, and a joining person takes a bot's seat in the car with the
+most people. In the crewed formats the driver drives and window gunners fire
+personal weapons (`crews.ts` seats); gunners can be knocked out for
+`COMBAT.crewRespawnSeconds` and may change window (`seat`), never the wheel.
+
 **Limits.** At `MAX_PLAYERS` people online, or with every room slot taken by a
 live match, `hello` is answered `busy` and the page retries. Idle extra rooms
 close; there is always one.

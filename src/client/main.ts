@@ -13,9 +13,10 @@
 import { createGltfLoader } from './assetLoaders';
 import type { CreditsSection } from '../shared/credits';
 import * as THREE from 'three';
-import { CAMERA, COMBAT, LIGHTING_PRESETS, TICK, VEHICLE, ZONE } from '../shared/config';
+import { CAMERA, COMBAT, LIGHTING_PRESETS, maxHullOf, TICK, VEHICLE, ZONE } from '../shared/config';
 import { MAPS, SPAWNS, useMap } from '../shared/arena';
 import { DEFAULT_MAP, isMapId, type MapId } from '../shared/mapIds';
+import type { FormatId } from '../shared/formats';
 import { World } from './world';
 import { THEMES } from './maps/themes';
 import { localToWorld, NEUTRAL_INPUT, stepVehicle, type VehicleInput } from '../shared/vehicle';
@@ -295,7 +296,7 @@ window.addEventListener('gamepadconnected', () => {
 
 // Joining is explicit: the page opens a menu, and only PLAY places us (or
 // creating / joining a private room).
-function startJoin(room?: string): void {
+function startJoin(room?: string, format: FormatId | null = 'solo'): void {
   if (touchOnly) goFullscreen();
   // Anonymous statistics: how people play (input device and quality preset).
   net.clientInfo = {
@@ -307,16 +308,18 @@ function startJoin(room?: string): void {
   hud.setLoading(0, 'loading');
   void assetsReady.then(() => {
     hud.setLoading(1, room ? 'opening the room' : 'joining the broadcast');
-    net.join(room);
+    net.join(room, format);
   });
 }
-hud.onJoin(() => startJoin());
+hud.onJoin((format) => startJoin(undefined, format));
 
 // Private rooms: the drawer on the title and the room's own lobby.
 const roomUi = new RoomUi();
 roomUi.handlers({
   join: (room) => startJoin(room),
   pickMap: (map) => net.sendRoomMap(map),
+  pickFormat: (format) => net.sendRoomFormat(format),
+  sit: (crew, seat) => net.sendRoomSeat(crew, seat),
   start: () => net.sendRoomStart(),
   leave: () => net.leave(),
 });
@@ -775,6 +778,8 @@ function frame(now: number): void {
     }
   }
   if (inputs.consumeReload()) net.requestReload(net.slotFor('primary') ?? undefined);
+  // A gunner moves to the next free window (the driver's seat is fixed).
+  if (inputs.consumeSeat() && playing && !net.isDriver) net.requestSeat();
   const switchTo = inputs.consumeSwitch();
   if (switchTo !== null) net.switchWeapon(switchTo);
 
@@ -894,12 +899,15 @@ function frame(now: number): void {
     lastSkid.right = null;
   }
 
-  localCar.update(local, lastInput, realDt, { hull: net.self.hull, maxHull: COMBAT.maxHull });
+  localCar.update(local, lastInput, realDt, { hull: net.self.hull, maxHull: maxHullOf(local.spec) });
   // A destroyed car is off the field until the crew respawns: drawing it lying
   // there would suggest it is still shootable.
   localCar.root.visible = !net.localDead;
   if (!net.localDead && net.connected) damageFx.emit(net.crewId ?? -1, localCar.root, localCar.damageAnchors, local.vel, localCar.damage, realDt);
-  if (net.crewId !== null) localCar.setOccupants(net.occupantsOf(net.crewId));
+  if (net.crewId !== null) {
+    localCar.setOccupants(net.occupantsOf(net.crewId));
+    localCar.setGunnerAims(net.gunnerAimsOf(net.crewId));
+  }
   // Our guns follow the crosshair, each only as far as it physically turns.
   localCar.setWeaponAims(net.mountedAims());
 
@@ -921,13 +929,14 @@ function frame(now: number): void {
     }
     rig.update(state, NEUTRAL_INPUT, realDt, {
       hull: net.hullOf(id),
-      maxHull: COMBAT.maxHull,
+      maxHull: maxHullOf(state.spec),
     });
     rig.root.visible = !net.isDead(id);
     if (rig.root.visible) damageFx.emit(id, rig.root, rig.damageAnchors, state.vel, rig.damage, realDt);
     // A distant car's shadow is a few blurred texels: skip its shadow draws.
     rig.setShadowDetail(Math.hypot(state.pos.x - camera.position.x, state.pos.z - camera.position.z) < SHADOW_CAR_DISTANCE);
     rig.setOccupants(net.occupantsOf(id));
+    rig.setGunnerAims(net.gunnerAimsOf(id));
     // Their guns follow their driver's aim. The aim message carries the CAMERA
     // pitch (positive looks down), so it is negated into the gun's (positive up).
     const mounted = seatsForRig(state.spec.id);
@@ -1163,13 +1172,25 @@ function frame(now: number): void {
   // First-match onboarding: one tip at a time, once per tab.
   if (net.match.phase === 'live') {
     if (!tips.controls) {
+      const gunner = !net.isDriver;
+      const crewed = net.mounted === null;
       hud.showTip(
-        inputs.touch
-          ? 'Left thumb drives · right thumb aims · hold MG to fire'
-          : inputs.padActive
-            ? 'RT drive · right stick aim · RB fire'
-            : 'WASD drive · mouse aim · left-click fire',
-        6,
+        gunner
+          ? inputs.touch
+            ? 'Drag to aim · FIRE and LAUNCH · SEAT moves you to another window'
+            : inputs.padActive
+              ? 'Right stick aim · RB fire · LB launcher · D-pad changes window'
+              : 'Mouse aim · left-click fire · right-click launcher · F changes window'
+          : crewed
+            ? inputs.touch
+              ? 'You drive — your crew shoots. Left thumb steers and drives'
+              : 'You drive — your crew shoots. WASD drive · Space drift · Shift boost'
+            : inputs.touch
+              ? 'Left thumb drives · right thumb aims · hold MG to fire'
+              : inputs.padActive
+                ? 'RT drive · right stick aim · RB fire'
+                : 'WASD drive · mouse aim · left-click fire',
+        7,
       );
       rememberTip('controls');
     } else if (!tips.zone && zone?.shrinking) {
@@ -1184,7 +1205,7 @@ function frame(now: number): void {
   // Damage taken: a thud scaled by the size of the hit.
   const hull = net.self.hull;
   if (net.connected && hull < lastHull - 0.5) {
-    const fraction = (lastHull - hull) / COMBAT.maxHull;
+    const fraction = (lastHull - hull) / maxHullOf(net.local.spec);
     audio.impact(fraction);
     addShake(0.18 + fraction * 1.2);
     // Being hit must be unmistakable: a red flash from the screen edges, scaled
@@ -1196,9 +1217,11 @@ function frame(now: number): void {
   hud.update(local, realDt);
   hud.setCombat({
     ...net.self,
+    maxHull: maxHullOf(net.local.spec),
     armed: net.canFire,
     components: local.components,
-    showHealth: net.match.mode !== 'solo',
+    // A window gunner can be knocked back inside: they get a health bar too.
+    showHealth: net.match.mode !== 'solo' || !net.isDriver,
   });
   // Car-mounted weapons: one read-out per trigger, each on its own reload.
   hud.setMountedWeapons(
@@ -1215,7 +1238,7 @@ function frame(now: number): void {
         })
       : null,
   );
-  hud.setHurt(net.self.hull / COMBAT.maxHull);
+  hud.setHurt(net.self.hull / maxHullOf(net.local.spec));
   hud.setCrosshairVisible(net.connected && net.canFire && !net.localDead);
   // Interest management means the member list is a view, not a headcount — show
   // the match's roster for PLAYERS.
@@ -1279,6 +1302,8 @@ function frame(now: number): void {
   // No CLICK TO DRIVE for a pad player: they never need the mouse.
   hud.setPromptVisible(!inputs.locked && playing && !menuOpen && !inputs.padActive && !inputs.touch);
   inputs.touch?.setVisible(playing && !menuOpen);
+  document.body.classList.toggle('gunner', net.connected && !net.isDriver);
+  inputs.touch?.setRole(!net.isDriver ? 'gunner' : net.mounted === null ? 'driver' : 'solo');
   hud.setMatch(net.match, net.crewId, net.localRespawnIn, net.localPlacement, spectateCrew);
   hud.setBoard(net.match.phase === 'results' ? net.board : [], net.crewId);
 

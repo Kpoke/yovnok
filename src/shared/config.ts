@@ -32,7 +32,7 @@ export const COMBAT = {
    */
   headRadius: 0.22,
   /** How long a downed crew member waits before returning to their seat. */
-  crewRespawnSeconds: 6,
+  crewRespawnSeconds: 8,
   minFireInterval: 0.03,
   /**
    * Hard ceiling on the lag compensation rewind, in seconds.
@@ -450,7 +450,18 @@ export type VehicleSpec = {
   track: number;
   /** Front-rear wheel spacing. */
   wheelbase: number;
+  /** Hull relative to `COMBAT.maxHull` (a squad truck carries more armour). */
+  hullScale?: number;
+  /** Engine force, relative (a heavier vehicle pulls slower). */
+  power?: number;
+  /** Steering rate, relative. */
+  handling?: number;
 };
+
+/** A vehicle's full hull. */
+export function maxHullOf(spec: { hullScale?: number }): number {
+  return COMBAT.maxHull * (spec.hullScale ?? 1);
+}
 
 export const VEHICLE_CLASSES: Record<VehicleClassId, VehicleSpec> = {
   /**
@@ -458,21 +469,31 @@ export const VEHICLE_CLASSES: Record<VehicleClassId, VehicleSpec> = {
    * `boxHeight` deliberately wraps the greenhouse rather than just the hull, so
    * the roof cannot visually clip through geometry the collider ignores.
    */
+  /**
+   * The DUOS car: the brawler's body without its guns — a driver and one gunner
+   * leaning out of the passenger window. Same size and handling as the brawler.
+   */
   coupe: {
     id: 'coupe',
-    label: 'Coupe',
-    halfWidth: 0.93,
-    halfLength: 2.15,
-    boxHeight: 1.28,
-    wheelRadius: 0.35,
-    rideHeight: 0.72,
-    track: 1.62,
-    wheelbase: 2.62,
+    label: 'Duo car',
+    halfWidth: 0.97,
+    halfLength: 2.45,
+    boxHeight: 1.2,
+    wheelRadius: 0.351,
+    rideHeight: 0.78,
+    track: 1.51,
+    wheelbase: 2.74,
   },
-  /** Four-seat SUV: tall and boxy, two rows of windows and seats for the crew. */
+  /**
+   * The SQUADS truck: the armoured truck without its roof station — a driver
+   * and three window gunners. 1.6× the hull, and slower
+   * to pull and to turn, so four guns in one target stays fair.
+   */
   suv: {
     id: 'suv',
-    label: 'SUV',
+    label: 'Squad truck',
+    // The armoured model was prepared to this body (its mirrors and bumpers
+    // stand a little proud of it).
     halfWidth: 1.0,
     halfLength: 2.45,
     boxHeight: 1.85,
@@ -480,16 +501,10 @@ export const VEHICLE_CLASSES: Record<VehicleClassId, VehicleSpec> = {
     rideHeight: 1.05,
     track: 1.72,
     wheelbase: 2.95,
+    hullScale: 1.6,
+    power: 0.82,
+    handling: 0.85,
   },
-  /**
-   * One-man-team brawler: a 2-seat armoured muscle car (see DESIGN.md §2.3).
-   * There is nobody else in it, so there are no windows to shoot from — the guns
-   * are bolted to the car, and the driver works them. Team modes keep the bigger
-   * vehicles, which have seats for gunners.
-   *
-   * Real-world sized from its model (`scripts/prep/brawler.ts`): 4.9 m long,
-   * 1.51 m track, 2.74 m wheelbase — a little narrower and lower than the SUV.
-   */
   solo: {
     id: 'solo',
     label: 'Brawler',
@@ -685,6 +700,11 @@ export const CAMERA = {
   // line clears the station, so the crosshair is never on it. Close enough
   // that the car fills the lower third of the frame.
   soloDistance: 6.0,
+  /** Window gunner, over the shoulder: distance behind the head, height, and
+   * how far to the side of the line of sight. */
+  gunnerDistance: 3.2,
+  gunnerHeight: 1.1,
+  gunnerShoulder: 1.1,
   soloHeight: 2.5,
   /** How far ahead the camera looks. Larger flattens the aim feel. */
   soloLookAhead: 26,

@@ -7,6 +7,7 @@
  * an FPS read-out so we can see the cost of the simulation.
  */
 
+import type { FormatId } from '../shared/formats';
 import { COMBAT, NET, VEHICLE } from '../shared/config';
 import { integrity, wheelIntegrity, type Components } from '../shared/components';
 import type { VehicleState } from '../shared/vehicle';
@@ -143,7 +144,7 @@ export class Hud {
   private onRandomCallsignCallback: (() => void) | null = null;
   // The title starts hidden behind the stand-by card; the frame loop reveals it.
   private joinVisible = false;
-  private onJoinCallback: (() => void) | null = null;
+  private onJoinCallback: ((format: FormatId | null) => void) | null = null;
 
   // ---- loading (after PLAY, before the match) ----
   private loadingPanel = byId('loading');
@@ -162,14 +163,15 @@ export class Hud {
       this.bannerButton.disabled = true;
       this.onReadyCallback?.();
     });
-    // PLAY opens its two choices (vs bots, private room); while a car is held
-    // it is REJOIN and goes straight back in.
+    // PLAY opens its choices (solo, duos, squads, private room); while a car is
+    // held it is REJOIN and goes straight back in.
     const choices = byId('play-choices');
-    const bots = byId<HTMLButtonElement>('play-bots');
-    bots.addEventListener('click', () => {
-      bots.disabled = true;
-      this.onJoinCallback?.();
-    });
+    for (const button of choices.querySelectorAll<HTMLButtonElement>('.play-format')) {
+      button.addEventListener('click', () => {
+        for (const b of choices.querySelectorAll<HTMLButtonElement>('.play-format')) b.disabled = true;
+        this.onJoinCallback?.(button.dataset.format as FormatId);
+      });
+    }
     this.joinButton.addEventListener('click', () => {
       if (!this.joinButton.dataset.rejoin) {
         const open = choices.classList.toggle('hidden') === false;
@@ -177,7 +179,7 @@ export class Hud {
         return;
       }
       this.joinButton.disabled = true;
-      this.onJoinCallback?.();
+      this.onJoinCallback?.(null); // REJOIN: back to the held car, whatever its format
     });
     // Menus: each item with a `data-panel` opens that panel beside the menu,
     // one at a time. SETTINGS is ONE panel shared by the title and the in-game
@@ -332,7 +334,7 @@ export class Hud {
   }
 
   /** Register the join-lobby handler. */
-  onJoin(callback: () => void): void {
+  onJoin(callback: (format: FormatId | null) => void): void {
     this.onJoinCallback = callback;
   }
 
@@ -350,7 +352,7 @@ export class Hud {
     document.body.classList.toggle('menu', show);
     if (show) {
       this.joinButton.disabled = false;
-      byId<HTMLButtonElement>('play-bots').disabled = false;
+      for (const b of document.querySelectorAll<HTMLButtonElement>('.play-format')) b.disabled = false;
     }
   }
 
@@ -412,6 +414,8 @@ export class Hud {
     if (fraction === null) return;
     this.joinPanel.classList.add('hidden');
     this.joinVisible = false;
+    // The title is gone: its page state goes with it (it hides the crosshair).
+    document.body.classList.remove('menu');
     this.loadingFill.style.width = `${Math.round(clamp01(fraction) * 100)}%`;
     if (text) this.loadingText.textContent = text;
   }
@@ -822,6 +826,8 @@ export class Hud {
   setCombat(self: {
     hp: number;
     hull: number;
+    /** The vehicle's full hull (a squad truck has more). */
+    maxHull?: number;
     weapon: string;
     rounds: number;
     magazine: number;
@@ -852,7 +858,7 @@ export class Hud {
     this.cAmmoFill.style.width = `${showAmmo ? (reloading ? 100 : fraction * 100) : 0}%`;
     this.cHealth.textContent = String(Math.round(self.alive ? self.hp : 0));
     this.cHull.textContent = String(Math.round(self.hull));
-    this.cHullFill.style.width = `${Math.round(clamp01(self.hull / COMBAT.maxHull) * 100)}%`;
+    this.cHullFill.style.width = `${Math.round(clamp01(self.hull / (self.maxHull ?? COMBAT.maxHull)) * 100)}%`;
     this.cHealthRow.classList.toggle('hidden', !self.showHealth);
 
     setPip(this.cEngine, integrity(self.components.engine));

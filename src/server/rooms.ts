@@ -25,6 +25,7 @@
 
 import type { WebSocket } from 'ws';
 import { isMapId, MAP_IDS } from '../shared/mapIds';
+import { isFormatId, type FormatId } from '../shared/formats';
 import { Room } from './room';
 import { record } from './stats';
 
@@ -71,7 +72,13 @@ export class RoomManager {
     this.pending.add(entry);
 
     const onMessage = (data: unknown): void => {
-      let msg: { t?: unknown; token?: unknown; room?: unknown; client?: { input?: unknown; quality?: unknown } };
+      let msg: {
+        t?: unknown;
+        token?: unknown;
+        room?: unknown;
+        format?: unknown;
+        client?: { input?: unknown; quality?: unknown };
+      };
       try {
         msg = JSON.parse(String(data)) as typeof msg;
       } catch {
@@ -90,7 +97,11 @@ export class RoomManager {
       if (msg.t !== 'hello') return; // nothing else means anything before joining
 
       const token = typeof msg.token === 'string' ? msg.token : '';
-      const rejoining = token !== '' && this.rooms.some((r) => r.heldSecondsFor(token) > 0);
+      // A car held for this browser is taken back by REJOIN (no format named),
+      // or by asking for that car's format again — not by choosing another.
+      const asked = isFormatId(msg.format) ? msg.format : null;
+      const rejoining =
+        token !== '' && this.rooms.some((r) => r.heldSecondsFor(token) > 0 && (asked === null || r.format === asked));
       const busy = (reason: 'full' | 'rooms' | 'live'): void => {
         if (socket.readyState !== 1) return;
         socket.send(
@@ -106,8 +117,9 @@ export class RoomManager {
 
       let room: Room | null;
       const wanted = typeof msg.room === 'string' ? msg.room.trim().toUpperCase() : '';
+      const format: FormatId = asked ?? 'solo';
       if (rejoining) {
-        room = this.place(token);
+        room = this.place(token, format);
       } else if (wanted === 'NEW') {
         if (this.rooms.length >= MAX_ROOMS) return refuse('no rooms free');
         room = this.open(this.newCode());
@@ -118,7 +130,7 @@ export class RoomManager {
         if (state === 'full') return refuse('room full');
         if (state === 'live') return busy('live');
       } else {
-        room = this.place(token);
+        room = this.place(token, format);
       }
       if (!room) return busy('rooms');
       cleanup();
@@ -147,26 +159,27 @@ export class RoomManager {
   }
 
   /** Which room a player pressing PLAY goes to; null when full. */
-  private place(token: string): Room | null {
+  private place(token: string, format: FormatId): Room | null {
     if (token) {
       const holding = this.rooms.find((r) => r.heldSecondsFor(token) > 0);
       if (holding) return holding;
     }
-    const joinable = this.rooms.filter((r) => r.joinable && !r.isPrivate);
+    const joinable = this.rooms.filter((r) => r.joinable && !r.isPrivate && r.format === format);
     // Closest to starting first, then the fullest: players gather, not scatter.
     joinable.sort((a, b) => Number(b.startingSoon) - Number(a.startingSoon) || b.playerCount - a.playerCount);
     if (joinable[0]) return joinable[0];
     if (this.rooms.length >= MAX_ROOMS) return null;
-    return this.open();
+    return this.open(undefined, format);
   }
 
   /** A public room (on a random map), or a private one with its code. */
-  private open(code?: string): Room {
+  private open(code?: string, format: FormatId = 'solo'): Room {
     const map = code ? undefined : (DEV_MAP ?? MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)]);
     const room = new Room({
       code,
       map,
       rotate: !code && !DEV_MAP,
+      format,
       othersOnline: () => this.pending.size + this.online - room.playerCount,
     });
     room.start();

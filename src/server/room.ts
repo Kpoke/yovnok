@@ -20,7 +20,8 @@
  */
 
 import type { WebSocket } from 'ws';
-import { COMBAT, HAZARD, MATCH, NET, REPAIR, TICK, VEHICLE_CLASSES, type VehicleClassId } from '../shared/config';
+import { COMBAT, HAZARD, MATCH, maxHullOf, NET, REPAIR, TICK, VEHICLE_CLASSES, type VehicleClassId } from '../shared/config';
+import { FORMATS, isFormatId, type FormatId } from '../shared/formats';
 import {
   ARENA_HALF,
   DUEL_SPAWN_RADIUS,
@@ -106,7 +107,7 @@ import {
   type ZoneRules,
   type ZoneState,
 } from '../shared/zone';
-import { botLook, DEFAULT_LOOK, loadoutOf, packLook, unpackLook, type CosmeticLook } from '../shared/cosmetics';
+import { botLook, DEFAULT_LOOK, gunnerLoadoutOf, loadoutOf, packLook, unpackLook, type CosmeticLook } from '../shared/cosmetics';
 import { createBotMemory, decideBot, type BotEnemy, type BotMemory } from './bot';
 import { botCallsign, callsignAllowed, sanitiseCallsign } from '../shared/callsign';
 import { record } from './stats';
@@ -414,6 +415,8 @@ export type RoomOptions = {
   rotate?: boolean;
   /** People online outside this room (title pages and other matches). */
   othersOnline?: () => number;
+  /** Solo, duos or squads (process MODE=duel keeps the old crew duel). */
+  format?: FormatId;
 };
 
 export class Room {
@@ -430,6 +433,7 @@ export class Room {
 
   constructor(options: RoomOptions = {}) {
     this.code = options.code ?? null;
+    this.setFormat(options.format ?? 'solo');
     this.mapId = options.map ?? DEFAULT_MAP;
     this.rotate = options.rotate ?? !this.code;
     this.othersOnline = options.othersOnline ?? (() => 0);
@@ -483,9 +487,29 @@ export class Room {
   private timer: ReturnType<typeof setInterval> | null = null;
   /** Mode, team count and rules all follow from MODE; declared in that order. */
   private mode: MatchMode = MODE;
+  /** The format (solo, duos, squads): the vehicle and how many cars. */
+  format: FormatId = 'solo';
   private teamCount: number = MODE === 'solo' ? SOLO_CARS : TEAM_COUNT;
   private vehicleClass: VehicleClassId =
     MODE === 'solo' ? 'solo' : CREW_SIZE === 2 ? 'coupe' : 'suv';
+
+  /** Set the format (only between matches): cars, vehicle, field size. */
+  private setFormat(format: FormatId): void {
+    this.format = format;
+    if (MODE !== 'solo') return; // the legacy crew duel is configured by env
+    const f = FORMATS[format];
+    this.teamCount = format === 'solo' ? SOLO_CARS : f.cars;
+    this.vehicleClass = f.vehicle;
+    if (this.match) {
+      this.match = createMatchState(this.teamCount, this.mode);
+      this.seenPhase = 'lobby';
+    }
+  }
+
+  /** Seats per car in this format. */
+  private get seatsPerCar(): number {
+    return seatsFor(this.vehicleClass).length;
+  }
   private projectiles: Projectile[] = [];
   private nextProjectileId = 1;
   /**
@@ -604,7 +628,8 @@ export class Room {
   get joinable(): boolean {
     const phase = this.match.phase;
     if (this.isPrivate) return phase !== 'live' && this.humanCount() < PRIVATE_MAX_PLAYERS;
-    return (phase === 'lobby' || phase === 'countdown') && this.humanCount() < this.teamCount;
+    const seats = MODE === 'solo' ? this.teamCount * this.seatsPerCar : this.teamCount;
+    return (phase === 'lobby' || phase === 'countdown') && this.humanCount() < seats;
   }
 
   /** A private room that is full or mid-match (a code-holder must wait). */
@@ -651,8 +676,10 @@ export class Room {
   /** How many bots should exist right now (DESIGN.md §12.4: lobby fill). */
   private desiredBots(): number {
     if (BOT_TARGET === 'off' || this.isPrivate) return 0;
-    const field = BOT_TARGET === 'fill' ? this.teamCount : Math.min(BOT_TARGET, this.teamCount);
-    return Math.max(0, field - this.humanCount());
+    const cars = BOT_TARGET === 'fill' ? this.teamCount : Math.min(BOT_TARGET, this.teamCount);
+    // Every seat of every car: a squad truck with one person has three bots.
+    const seats = MODE === 'solo' ? cars * this.seatsPerCar : cars;
+    return Math.max(0, seats - this.humanCount());
   }
 
   /**
@@ -682,21 +709,26 @@ export class Room {
 
   /** Place one bot in the first team with no occupants. Returns false if full. */
   private addBot(): boolean {
+    // The emptiest car with a free seat (so every car gets a driver first).
+    const capacity = this.seatsPerCar;
     let team = -1;
+    let fewest = Infinity;
     for (let id = 0; id < this.teamCount; id++) {
-      const crew = this.crews.get(id);
-      if (!crew || crew.members.size === 0) {
+      const count = this.crews.get(id)?.members.size ?? 0;
+      if (count < capacity && count < fewest) {
+        fewest = count;
         team = id;
-        break;
       }
     }
     if (team < 0) return false;
 
     const crew = this.ensureCrew(team);
-    const seat = seatsFor(crew.cls)[0].id;
+    const taken = new Set(crew.members.values());
+    const seat = seatsFor(crew.cls).find((s) => !taken.has(s.id))?.id;
+    if (!seat) return false;
     const id = this.nextPlayerId++;
     const seatDef = seatById(crew.cls, seat);
-    const loadout = seatDef?.mounted ? armedLoadout(seatDef, botLook(id)) : [...DEFAULT_LOADOUT];
+    const loadout = this.loadoutFor(seatDef, botLook(id));
 
     const bot: Player = {
       id,
@@ -729,6 +761,84 @@ export class Room {
     crew.members.set(id, seat);
     if (seatDef?.drives) crew.driverId = id;
     this.broadcastRoster();
+    return true;
+  }
+
+  /** A seat's weapons for a look: the car's guns, or a gunner's own. */
+  private loadoutFor(seat: SeatDef | undefined, look: CosmeticLook): WeaponId[] {
+    if (seat?.mounted) return armedLoadout(seat, look);
+    if (seat && !seat.drives && MODE === 'solo') return gunnerLoadoutOf(look);
+    return [...DEFAULT_LOADOUT];
+  }
+
+  /**
+   * The bot a joining person replaces: in the car with the most people (so
+   * people end up together), the driver if no person drives that car yet.
+   */
+  private botToReplace(): Player | null {
+    let best: Player | null = null;
+    let bestScore = -Infinity;
+    for (const bot of this.players.values()) {
+      if (!bot.bot || !bot.joined || bot.awayUntil > 0) continue;
+      const crew = this.crews.get(bot.crew);
+      if (!crew) continue;
+      let people = 0;
+      let personDrives = false;
+      for (const id of crew.members.keys()) {
+        const p = this.players.get(id);
+        if (p && !p.bot) {
+          people++;
+          if (crew.driverId === id) personDrives = true;
+        }
+      }
+      const driving = seatById(crew.cls, bot.seat)?.drives ?? false;
+      const score = people * 10 + (driving && !personDrives ? 5 : 0) - crew.id * 0.01;
+      if (score > bestScore) {
+        bestScore = score;
+        best = bot;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Move an occupant to another seat of the same car (a gunner changing
+   * window). A bot in the way swaps; a person in the way, or the driver's seat
+   * in a match, refuses. Returns whether it moved.
+   */
+  private changeSeat(player: Player, seat: SeatId, allowDriver: boolean): boolean {
+    const crew = this.crews.get(player.crew);
+    if (!crew || player.seat === seat) return false;
+    const target = seatById(crew.cls, seat);
+    const current = seatById(crew.cls, player.seat);
+    if (!target || !current) return false;
+    if (!allowDriver && (target.drives || current.drives)) return false;
+    const occupantId = [...crew.members.entries()].find(([, s]) => s === seat)?.[0];
+    const occupant = occupantId !== undefined ? this.players.get(occupantId) : undefined;
+    if (occupant && !occupant.bot) return false;
+    const from = player.seat;
+    crew.members.set(player.id, seat);
+    player.seat = seat;
+    if (target.drives) crew.driverId = player.id;
+    else if (crew.driverId === player.id) crew.driverId = null;
+    player.loadout = this.loadoutFor(target, unpackLook(player.look));
+    player.ammo = createAmmoState(player.loadout);
+    if (occupant) {
+      crew.members.set(occupant.id, from);
+      occupant.seat = from;
+      if (current.drives) crew.driverId = occupant.id;
+      occupant.loadout = this.loadoutFor(current, unpackLook(occupant.look));
+      occupant.ammo = createAmmoState(occupant.loadout);
+    }
+    for (const p of this.players.values()) {
+      if (p.joined) {
+        this.send(p.socket, { t: 'seat', id: player.id, seat });
+        if (occupant) this.send(p.socket, { t: 'seat', id: occupant.id, seat: from });
+      }
+    }
+    this.refreshCrewLook(crew);
+    this.broadcastRoster();
+    this.broadcastRoomState();
     return true;
   }
 
@@ -786,7 +896,7 @@ export class Room {
         phase: bot.botPhase,
         memory: bot.botMemory,
         zone: this.zone,
-        hullFraction: crew.hull / COMBAT.maxHull,
+        hullFraction: crew.hull / maxHullOf(VEHICLE_CLASSES[crew.cls]),
         repairs,
         loadout: bot.loadout,
       });
@@ -801,6 +911,11 @@ export class Room {
       }
       if (seat.mounted && seat.mounted.length > 1 && intent.fireSecondary) {
         this.handleFire(bot, crew, bot.lastFireSeq + 1, intent.aimYaw, intent.aimPitch, 0, 1, intent.secondaryTarget);
+      }
+      // A window gunner bot lobs its launcher now and then while engaged.
+      if (!seat.mounted && seat.arc && intent.fire && bot.loadout.length > 1 && now >= (this.launchAt.get(bot.id) ?? 0)) {
+        this.handleFire(bot, crew, bot.lastFireSeq + 1, intent.aimYaw, intent.aimPitch, 0, 1, intent.target);
+        this.launchAt.set(bot.id, now + 4500 + Math.random() * 3000);
       }
     }
     return inputs;
@@ -817,7 +932,7 @@ export class Room {
         x: crew.state.pos.x,
         y: crew.state.pos.y,
         z: crew.state.pos.z,
-        hullFraction: crew.hull / COMBAT.maxHull,
+        hullFraction: crew.hull / maxHullOf(VEHICLE_CLASSES[crew.cls]),
         vx: crew.state.vel.x,
         vz: crew.state.vel.z,
       });
@@ -859,10 +974,19 @@ export class Room {
     const capacity = seatsFor(this.vehicleClass).length;
     let chosen = -1;
     let fewest = Infinity;
+    // Battle-royale team formats fill a car before starting the next, so people
+    // ride together; the crew duel spreads players across its two teams.
+    const together = MODE === 'solo' && capacity > 1;
+    let most = -1;
     for (let id = 0; id < this.teamCount; id++) {
       const count = this.crews.get(id)?.members.size ?? 0;
       if (count >= capacity) continue;
-      if (count < fewest) {
+      if (together) {
+        if (count > most) {
+          most = count;
+          chosen = id;
+        }
+      } else if (count < fewest) {
         fewest = count;
         chosen = id;
       }
@@ -910,7 +1034,7 @@ export class Room {
         ackSeq: 0,
         lastInputAt: performance.now(),
         appliedThrottle: 0,
-        hull: COMBAT.maxHull,
+        hull: maxHullOf(VEHICLE_CLASSES[this.vehicleClass]),
         dead: false,
         respawnIn: 0,
         placement: null,
@@ -930,6 +1054,7 @@ export class Room {
     crewReq?: number,
     seatReq?: SeatId,
     look?: number,
+    force?: { crew: number; seat: SeatId },
   ): void {
     if (player.joined) return;
 
@@ -947,14 +1072,18 @@ export class Room {
       this.rules = matchRules(crewSize(cls), RULE_OVERRIDES);
     }
 
-    let placement = this.assignSeats(crewReq, seatReq);
+    let placement = force ? { crew: this.ensureCrew(force.crew), seat: force.seat } : this.assignSeats(crewReq, seatReq);
     if (!placement && this.match.phase !== 'live') {
       // A human displaces a bot in the lobby: bots fill the seats humans left,
-      // not the other way round. Never done mid-match (§12.4).
-      const bot = [...this.players.values()].find((p) => p.bot && p.joined);
+      // not the other way round. Never done mid-match (§12.4). The bot chosen
+      // is in the car with the most people already (so people team up), and a
+      // bot DRIVER where no person drives yet.
+      const bot = this.botToReplace();
       if (bot) {
+        const seat = bot.seat;
+        const crewId = bot.crew;
         this.removeBot(bot.id);
-        placement = this.assignSeats(crewReq, seatReq);
+        placement = { crew: this.ensureCrew(crewId), seat };
       }
     }
     if (!placement) {
@@ -973,14 +1102,11 @@ export class Room {
     if (seatById(crew.cls, seat)?.drives) crew.driverId = player.id;
     this.refreshCrewLook(crew);
 
-    // The car may be the weapon: a seat with mounted guns defines the occupant's
-    // loadout, so client and server agree on what is held without sending it.
+    // What the occupant holds follows from the seat: the car's guns (solo), a
+    // window gunner's personal weapons, both chosen in the garage (the look).
     const seatDef = seatById(crew.cls, seat);
-    if (seatDef?.mounted) {
-      // The car's guns are the player's choice (carried in the look).
-      player.loadout = armedLoadout(seatDef, unpackLook(player.look));
-      player.ammo = createAmmoState(player.loadout);
-    }
+    player.loadout = this.loadoutFor(seatDef, unpackLook(player.look));
+    player.ammo = createAmmoState(player.loadout);
 
     const spawn = this.spawnOf(crew.id);
     this.send(player.socket, {
@@ -1034,6 +1160,42 @@ export class Room {
     for (const p of this.players.values()) this.send(p.socket, { t: 'map', id: this.mapId, next: this.nextMapId });
   }
 
+  /** Private room: sit in a chosen car and seat (between matches). */
+  private sitAt(player: Player, crewId: number, seat: SeatId): void {
+    if (crewId < 0 || crewId >= this.teamCount || !seatById(this.vehicleClass, seat)) return;
+    if (crewId === player.crew) {
+      this.changeSeat(player, seat, true);
+      return;
+    }
+    const target = this.crews.get(crewId);
+    if (target && [...target.members.values()].includes(seat)) return; // taken
+    this.unseat(player);
+    this.admit(player, this.vehicleClass, undefined, undefined, undefined, { crew: crewId, seat });
+  }
+
+  /** Take a player out of their car (they stay connected, unseated). */
+  private unseat(player: Player): void {
+    const crew = this.crews.get(player.crew);
+    if (crew) {
+      crew.members.delete(player.id);
+      if (crew.driverId === player.id) crew.driverId = null;
+      if (crew.members.size === 0) this.crews.delete(crew.id);
+      else this.refreshCrewLook(crew);
+    }
+    for (const other of this.players.values()) if (other.id !== player.id) this.send(other.socket, { t: 'leave', id: player.id });
+    player.joined = false;
+  }
+
+  /** Private room: a new format — new vehicles, everyone seated afresh. */
+  private reformat(format: FormatId): void {
+    const humans = [...this.players.values()].filter((p) => p.joined && !p.bot);
+    for (const p of humans) this.unseat(p);
+    this.crews.clear();
+    this.setFormat(format);
+    for (const p of humans) this.admit(p, this.vehicleClass);
+    console.log(`[room] format → ${format}`);
+  }
+
   /** The private lobby, to every member (each told whether they host). */
   private broadcastRoomState(): void {
     if (!this.code) return;
@@ -1041,6 +1203,18 @@ export class Room {
     if (this.hostId === null || !humans.some((p) => p.id === this.hostId)) this.hostId = humans[0]?.id ?? null;
     const host = this.hostId !== null ? this.players.get(this.hostId) : undefined;
     const players = humans.map((p) => p.name);
+    // Every car and its seats, for the seat picker (team formats only).
+    const cars = (me: number): Extract<ServerMessage, { t: 'room' }>['cars'] =>
+      this.format === 'solo'
+        ? []
+        : Array.from({ length: this.teamCount }, (_, crew) => ({
+            crew,
+            seats: seatsFor(this.vehicleClass).map((s) => {
+              const id = [...(this.crews.get(crew)?.members.entries() ?? [])].find(([, seat]) => seat === s.id)?.[0];
+              const who = id !== undefined ? this.players.get(id) : undefined;
+              return { seat: s.id, name: who?.name ?? null, me: id === me };
+            }),
+          }));
     for (const p of humans) {
       this.send(p.socket, {
         t: 'room',
@@ -1051,6 +1225,8 @@ export class Room {
         map: this.mapId,
         min: PRIVATE_MIN_PLAYERS,
         max: PRIVATE_MAX_PLAYERS,
+        format: this.format,
+        cars: cars(p.id),
       });
     }
   }
@@ -1299,15 +1475,45 @@ export class Room {
     }
 
     // Private room, host only: pick the map, start the match.
-    if (msg.t === 'roomMap' || msg.t === 'roomStart') {
-      if (!this.isPrivate || player.id !== this.hostId) return;
+    // A gunner moving to another window (never into or out of the driver's seat).
+    if (msg.t === 'seat') {
+      if (msg.seat === 'next') {
+        // The next window round the car that is empty or has a bot in it.
+        const crew = this.crews.get(player.crew);
+        if (!crew) return;
+        const seats = seatsFor(crew.cls).filter((s) => !s.drives);
+        const at = seats.findIndex((s) => s.id === player.seat);
+        for (let k = 1; k <= seats.length; k++) {
+          const next = seats[(at + k) % seats.length];
+          if (next.id !== player.seat && this.changeSeat(player, next.id, false)) break;
+        }
+        return;
+      }
+      if (typeof msg.seat === 'string') this.changeSeat(player, msg.seat, false);
+      return;
+    }
+
+    if (msg.t === 'roomMap' || msg.t === 'roomStart' || msg.t === 'roomFormat' || msg.t === 'roomSeat') {
+      if (!this.isPrivate) return;
       const phase = this.match.phase;
       if (phase !== 'lobby' && phase !== 'results') return;
+      // Anyone picks their own seat between matches; the rest is the host's.
+      if (msg.t === 'roomSeat') {
+        if (Number.isInteger(msg.crew) && typeof msg.seat === 'string') this.sitAt(player, msg.crew, msg.seat);
+        return;
+      }
+      if (player.id !== this.hostId) return;
+      if (msg.t === 'roomFormat') {
+        if (isFormatId(msg.format) && msg.format !== this.format) this.reformat(msg.format);
+        return;
+      }
       if (msg.t === 'roomMap') {
         if (isMapId(msg.map) && msg.map !== this.mapId) this.switchMap(msg.map);
         return;
       }
-      if (this.humanCount() >= PRIVATE_MIN_PLAYERS) this.startCountdown(performance.now());
+      // Two players, and in two different cars (one car alone has won already).
+      const occupied = [...this.crews.values()].filter((c) => c.members.size > 0).length;
+      if (this.humanCount() >= PRIVATE_MIN_PLAYERS && occupied >= 2) this.startCountdown(performance.now());
       return;
     }
 
@@ -1475,8 +1681,9 @@ export class Room {
     if (!seat || !seat.arc) return; // the driver is unarmed
     if (!Number.isFinite(seq) || seq <= player.lastFireSeq) return;
 
-    // A car-mounted weapon fires by trigger; a window gunner fires what they hold.
-    const slot = (seat.mounted ? validSlot(player, slotRequested) : undefined) ?? player.ammo.slot;
+    // Each trigger fires its own slot: the car's guns, or a window gunner's
+    // primary (left) and launcher (right).
+    const slot = validSlot(player, slotRequested) ?? player.ammo.slot;
     if ((player.ammo.reload[slot] ?? 0) > 0) return;
 
     const weapon = weaponInSlot(player.loadout, slot);
@@ -1594,16 +1801,11 @@ export class Room {
       // otherwise kill a driver inside an intact car and leave it parked,
       // driverless and counted alive, until the zone ground it down (measured:
       // half the "zone kills" in solobench were exactly this).
-      if (shot.memberHit !== null && this.mode !== 'solo') {
+      // Team formats: a gunner leaning out of a window can be shot — knocked
+      // back inside for a few seconds. The driver, inside the cabin, is not.
+      if (shot.memberHit !== null && (this.mode !== 'solo' || this.format !== 'solo')) {
         const victim = this.players.get(shot.memberHit);
-        if (victim) {
-          damageMember(victim, weapon.damage);
-          if (!victim.alive) {
-            victim.respawnIn = COMBAT.crewRespawnSeconds;
-            const victimCrew = this.crews.get(victim.crew);
-            if (victimCrew?.driverId === victim.id) victimCrew.driverId = null;
-          }
-        }
+        if (victim) this.hurtMember(victim, weapon.damage);
       }
 
       this.pendingShots.push({
@@ -1637,6 +1839,19 @@ export class Room {
         vz: dz * weapon.speed,
         life: 6,
       });
+    }
+  }
+
+  /** Damage an occupant: a gunner knocked out returns after a few seconds. */
+  private hurtMember(victim: Player, amount: number): void {
+    const crew = this.crews.get(victim.crew);
+    if (!victim.alive || !crew) return;
+    // In a battle royale the driver is safe inside: a stalled car is no fight.
+    if (this.mode === 'solo' && crew.driverId === victim.id) return;
+    damageMember(victim, amount);
+    if (!victim.alive) {
+      victim.respawnIn = COMBAT.crewRespawnSeconds;
+      if (crew.driverId === victim.id) crew.driverId = null;
     }
   }
 
@@ -1753,7 +1968,7 @@ export class Room {
     const spawn = this.spawnOf(crew.id);
     resetVehicle(crew.state, spawn.x, spawn.y, spawn.z, spawn.yaw);
     crew.history.length = 0;
-    crew.hull = COMBAT.maxHull;
+    crew.hull = maxHullOf(VEHICLE_CLASSES[crew.cls]);
     crew.queue.length = 0;
     crew.lastInput = { ...NEUTRAL_INPUT };
     crew.dead = false;
@@ -1856,7 +2071,7 @@ export class Room {
             this.hurt(crew, weapon.damage * 0.6 * falloff, `${weapon.id} splash`);
             if (crew.hull <= 0) this.destroyVehicle(crew, p.crew);
           }
-          for (const member of this.mode === 'solo' ? [] : members) {
+          for (const member of this.mode === 'solo' && this.format === 'solo' ? [] : members) {
             if (member.crew === p.crew || !member.alive) continue;
             const vehicle = this.crews.get(member.crew);
             if (!vehicle) continue;
@@ -1866,7 +2081,7 @@ export class Room {
             const distance = Math.hypot(head.x - hx, head.y - hy, head.z - hz);
             if (distance > weapon.splash) continue;
             const victim = this.players.get(member.id);
-            if (victim) damageMember(victim, weapon.damage * 0.5 * (1 - distance / weapon.splash));
+            if (victim) this.hurtMember(victim, weapon.damage * 0.5 * (1 - distance / weapon.splash));
           }
         }
 
@@ -2186,6 +2401,8 @@ export class Room {
   }
 
   private seenPhase: MatchState['phase'] = 'lobby';
+  /** When each window-gunner bot may next fire its launcher (ms). */
+  private launchAt = new Map<number, number>();
 
   /** Fresh field at the top of a match: crews home, healed, full crates. */
   private resetForMatch(): void {
@@ -2210,7 +2427,7 @@ export class Room {
    * driver's mistake must not wipe a four-person crew instantly.
    */
   private stepHazards(dt: number): void {
-    const floor = COMBAT.maxHull * HAZARD.hullFloor;
+    const floor = COMBAT.maxHull * HAZARD.hullFloor; // (a fixed floor, the same for every vehicle)
     for (const crew of this.crews.values()) {
       const rate = hazardAt(crew.state.pos.x, crew.state.pos.z);
       if (rate <= 0) continue;
@@ -2276,12 +2493,12 @@ export class Room {
         const distance = Math.hypot(state.pos.x - crate.x, state.pos.z - crate.z);
         if (!canRepair({ distance, speed: state.forwardSpeed })) continue;
 
-        const hullMissing = crew.hull < COMBAT.maxHull;
+        const hullMissing = crew.hull < maxHullOf(VEHICLE_CLASSES[crew.cls]);
         const partsDamaged = COMPONENT_IDS.some((id) => state.components[id] < COMPONENT_MAX);
         if (!hullMissing && !partsDamaged) continue;
 
         if (hullMissing) {
-          crew.hull = Math.min(COMBAT.maxHull, crew.hull + REPAIR.hullPerSecond * dt);
+          crew.hull = Math.min(maxHullOf(VEHICLE_CLASSES[crew.cls]), crew.hull + REPAIR.hullPerSecond * dt);
         }
         for (const id of COMPONENT_IDS) {
           repairComponent(state.components, id, REPAIR.componentPerSecond * dt);

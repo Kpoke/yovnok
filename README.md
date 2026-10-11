@@ -24,11 +24,24 @@ sideways; add it to the home screen for full screen).
 
 Press **PLAY**, then:
 
-- **VS BOTS** — a public match. Bots fill whatever seats players do not. Alone
-  on the server, it starts in seconds; when others are online, it waits up to
-  a minute so people pressing PLAY around the same time share the match.
+- **SOLO** — twelve armed cars, every car for itself.
+- **DUOS** — six cars, each a driver and a gunner leaning out of the window.
+- **SQUADS** — three armoured trucks, each a driver and three window gunners.
+  The truck carries 1.6× the armour but pulls and turns slower.
+
+Every mode is a battle royale: the ring closes, the last car standing wins.
+Bots fill whatever seats players do not (people are seated together). Alone on
+the server, a match starts in seconds; when others are online, it waits up to a
+minute so people pressing PLAY around the same time share it.
+
+In duos and squads the driver only drives and the gunners only shoot, from
+an over-the-shoulder view: the primary on the left trigger, a grenade launcher
+on the right. A gunner can move to another window (not the wheel); a gunner who
+is shot down is knocked back inside for 8 seconds. The car is out when its hull
+is.
 - **PRIVATE ROOM** — create a room and send friends its five-letter code or
-  invite link. 2–12 players, no bots; the host picks the map and starts.
+  invite link. 2–12 players, no bots; the host picks the mode and the map and
+  starts, and everyone picks their car and seat.
 
 When the server is at capacity, PLAY shows a waiting card and goes in as soon as
 a seat frees up.
@@ -43,6 +56,7 @@ a seat frees up.
 | Handbrake | `Space` | `X` | `DRIFT` |
 | Boost | `Shift` | `B` or `L3` | `BOOST` |
 | Reload | `R` | `Y` | `↻` |
+| Change window (gunner) | `F` | D-pad left/right | `SEAT` |
 | Menu | `Esc` | `Start` (D-pad + `A`/`B` to choose) | `☰` |
 | Performance overlay | `F3` or `` ` `` | — | — |
 

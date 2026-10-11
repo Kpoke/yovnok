@@ -77,6 +77,8 @@ export type VehicleRig = {
    * weapon turns together (twin guns converge by firing from their muzzles).
    */
   setWeaponAims: (aims: ReadonlyArray<{ yaw: number; pitch: number }>) => void;
+  /** Turn each window gunner's figure to their aim (car-relative yaw, by seat). */
+  setGunnerAims: (aims: ReadonlyMap<string, number>) => void;
   /** Where its headlights and tail lights are, car-local (left side; mirror x). */
   lightAnchors: LightAnchors;
   /** Cast shadows (the big meshes only) or none: off for distant cars. */
@@ -415,6 +417,14 @@ export function buildVehicle(
     }
   };
 
+  const setGunnerAims = (aims: ReadonlyMap<string, number>): void => {
+    for (const [seatId, meshes] of occupantMeshes) {
+      const yaw = aims.get(seatId);
+      if (yaw === undefined) continue;
+      for (const figure of meshes) figure.rotation.y = yaw;
+    }
+  };
+
   const dispose = (): void => {
     root.traverse((object) => {
       const mesh = object as THREE.Mesh;
@@ -434,6 +444,7 @@ export function buildVehicle(
     update,
     setOccupants,
     setWeaponAims,
+    setGunnerAims,
     setShadowDetail,
     damageAnchors,
     lightAnchors,
