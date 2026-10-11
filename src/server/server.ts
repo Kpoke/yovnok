@@ -329,8 +329,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   // 304 and a few bytes, and a CDN in front may keep serving them meanwhile.
   // index.html must always be checked, or a deploy would never be picked up.
   const fingerprinted = /-[A-Za-z0-9_-]{8,}\.(js|css|wasm)$/.test(target);
+  // Data files saying which models and textures exist (the vehicle manifest,
+  // credits) are checked on every load too: cached, a page kept an old manifest
+  // for an hour after a release and drew new vehicles as their placeholders.
   const cacheControl =
-    ext === '.html'
+    ext === '.html' || ext === '.json' || ext === '.webmanifest'
       ? 'no-cache'
       : fingerprinted
         ? 'public, max-age=31536000, immutable'
