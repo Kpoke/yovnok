@@ -190,6 +190,8 @@ for (const count of [2, 8, 30, 60]) {
         hp: 100,
         alive: true,
         out: s > 0,
+        aimYaw: 0,
+        aimPitch: 0,
       });
     }
   }

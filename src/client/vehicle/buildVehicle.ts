@@ -38,7 +38,7 @@ import {
 } from '../../shared/cosmetics';
 import { buildGun } from './guns';
 import { buildBodyKit, buildDecals } from './bodyKits';
-import { seatsFor } from '../../shared/crews';
+import { roofAmount, seatsFor } from '../../shared/crews';
 import { componentIntegrity, type ComponentId } from '../../shared/components';
 import type { VehicleInput, VehicleState } from '../../shared/vehicle';
 import { createMaterials, disposeMaterials, type SeatSide, type VehicleMaterials } from './parts';
@@ -442,6 +442,13 @@ export function buildVehicle(
           role: driver ? 'driver' : 'gunner',
           side: seat.side,
           hip: new THREE.Vector3(seat.mount[0], seat.mount[1] + 0.1, seat.mount[2] + 0.06),
+          // On the sill: just inside the body's side, a little under the roof.
+          sill: new THREE.Vector3(
+            (seat.side === 'right' ? 1 : -1) * spec.halfWidth * 0.74,
+            spec.boxHeight - spec.rideHeight - 0.12,
+            seat.mount[2] + 0.06,
+          ),
+          roof: driver ? 0 : roofAmount(seat, pose.yaw),
           yaw: pose.yaw,
           // The aim carries the CAMERA pitch (positive looks down).
           pitch: -pose.pitch,

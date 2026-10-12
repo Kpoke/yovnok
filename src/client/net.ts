@@ -897,7 +897,17 @@ export class NetClient {
   private combatMembers(): CombatMember[] {
     const members: CombatMember[] = [];
     for (const m of this.members.values()) {
-      members.push({ id: m.id, crew: m.crew, seat: m.seat, hp: m.hp, alive: m.alive, out: m.out });
+      members.push({
+        id: m.id,
+        crew: m.crew,
+        seat: m.seat,
+        hp: m.hp,
+        alive: m.alive,
+        out: m.out,
+        // The aim message carries the camera pitch (positive looks down).
+        aimYaw: m.aimYaw,
+        aimPitch: -m.aimPitch,
+      });
     }
     return members;
   }
@@ -982,7 +992,7 @@ export class NetClient {
     // Aim the same way the server will (see `Room.handleFire`): a mounted gun
     // turns about its pivot toward the crosshair point, then fires from its
     // muzzle toward it, clamped to how far it turns; twin guns alternate.
-    let muzzle = muzzleWorld(mine, seat);
+    let muzzle = muzzleWorld(mine, seat, this.aimYaw, -this.aimPitch);
     let shotYaw = this.shotYaw;
     let shotPitch = this.shotPitch;
     const mountedWeapon = seat.mounted?.[slot];

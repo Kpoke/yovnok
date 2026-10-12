@@ -28,7 +28,7 @@ for (const cls of ['coupe', 'suv'] as const) {
 
   for (const seat of seatsFor(cls)) {
     if (!seat.arc) continue;
-    const member = { id: 99, crew: 1, seat: seat.id, hp: 100, alive: true, out: true };
+    const member = { id: 99, crew: 1, seat: seat.id, hp: 100, alive: true, out: true, aimYaw: -Math.PI / 2, aimPitch: 0 };
 
     for (const [label, off] of [
       ['cabin ', EYE_OFFSET],

@@ -18,6 +18,7 @@ import {
   EYE_OFFSET,
   CHEST_OFFSET,
   FIRE_PORT_OFFSET,
+  gunnerPoint,
   HEAD_OFFSET,
   mountMuzzleLocal,
   seatById,
@@ -56,6 +57,9 @@ export type CombatMember = {
   alive: boolean;
   /** Leaning out of the window (aiming): exposed, and able to fire. */
   out: boolean;
+  /** Their aim (car-relative): out of the window, or up over the roof. */
+  aimYaw: number;
+  aimPitch: number;
 };
 
 const vec = (x: number, y: number, z: number) => ({ x, y, z });
@@ -153,10 +157,19 @@ export function aimMountedWeapon(
  * the car" and "out of a window" are different places and the tracer has to
  * start where the player believes the gun is.
  */
-export function muzzleWorld(vehicle: CombatVehicle, seat: SeatDef): { x: number; y: number; z: number } {
+export function muzzleWorld(
+  vehicle: CombatVehicle,
+  seat: SeatDef,
+  aimYaw = 0,
+  aimPitch = 0,
+): { x: number; y: number; z: number } {
+  if (isWindowGunner(seat)) return vehiclePointWorld(vehicle.state, gunnerPoint(vehicle.cls, seat, aimYaw, aimPitch, 'muzzle')!);
   const port = seat.firePort ?? FIRE_PORT_OFFSET[seat.side];
   return seatPointWorld(vehicle.state, seat, port);
 }
+
+/** A gunner at a window (not a driver, not a car-mounted weapon). */
+const isWindowGunner = (seat: SeatDef): boolean => seat.arc !== null && !seat.drives && !seat.mounted;
 
 /**
  * Where a crew member's head is, which is what a shot has to find.
@@ -171,14 +184,22 @@ export function muzzleWorld(vehicle: CombatVehicle, seat: SeatDef): { x: number;
  * The driver stays on the cabin offset and is skipped outright by role, so they
  * are doubly unreachable: armoured, and with no window to lean from.
  */
-export function headWorld(vehicle: CombatVehicle, seat: SeatDef): { x: number; y: number; z: number } {
+export function headWorld(vehicle: CombatVehicle, seat: SeatDef, aimYaw = 0, aimPitch = 0): { x: number; y: number; z: number } {
+  if (isWindowGunner(seat)) return vehiclePointWorld(vehicle.state, gunnerPoint(vehicle.cls, seat, aimYaw, aimPitch, 'head')!);
   const offset = seat.drives ? EYE_OFFSET : HEAD_OFFSET[seat.side];
   return seatPointWorld(vehicle.state, seat, offset);
 }
 
-/** A leaning gunner's chest, out of the window below their head. */
-export function chestWorld(vehicle: CombatVehicle, seat: SeatDef): { x: number; y: number; z: number } {
+/** A leaning gunner's chest, out of the window (or over the roof) below their head. */
+export function chestWorld(vehicle: CombatVehicle, seat: SeatDef, aimYaw = 0, aimPitch = 0): { x: number; y: number; z: number } {
+  if (isWindowGunner(seat)) return vehiclePointWorld(vehicle.state, gunnerPoint(vehicle.cls, seat, aimYaw, aimPitch, 'chest')!);
   return seatPointWorld(vehicle.state, seat, CHEST_OFFSET[seat.side]);
+}
+
+/** Up over the roof their waist shows too; null at the window, behind the door. */
+export function waistWorld(vehicle: CombatVehicle, seat: SeatDef, aimYaw = 0, aimPitch = 0): { x: number; y: number; z: number } | null {
+  const local = isWindowGunner(seat) ? gunnerPoint(vehicle.cls, seat, aimYaw, aimPitch, 'waist') : null;
+  return local ? vehiclePointWorld(vehicle.state, local) : null;
 }
 
 /**
@@ -468,9 +489,11 @@ export function resolveHitscan(
     const seat = seatsFor(original.cls).find((s) => s.id === member.seat);
     if (!seat || seat.drives) continue;
     const vehicle = rewindVehicle(original, rewindSeconds);
+    const waist = waistWorld(vehicle, seat, member.aimYaw, member.aimPitch);
     for (const [point, radius] of [
-      [headWorld(vehicle, seat), COMBAT.headRadius],
-      [chestWorld(vehicle, seat), COMBAT.chestRadius],
+      [headWorld(vehicle, seat, member.aimYaw, member.aimPitch), COMBAT.headRadius],
+      [chestWorld(vehicle, seat, member.aimYaw, member.aimPitch), COMBAT.chestRadius],
+      ...(waist ? ([[waist, COMBAT.chestRadius]] as const) : []),
     ] as const) {
       const t = raycastSphere(ox, oy, oz, dx, dy, dz, point.x, point.y, point.z, radius, best);
       if (t !== null && t < best) {

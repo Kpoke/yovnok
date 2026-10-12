@@ -19,6 +19,9 @@ import { COMBAT, VEHICLE_CLASSES } from '../src/shared/config';
 import { componentBoxes } from '../src/shared/components';
 import { combatTestPlacement } from './testPlacement';
 import {
+  clampToArc,
+  gunnerPoint,
+  roofAmount,
   seatById,
   seatsFor,
   withinArc,
@@ -488,8 +491,8 @@ try {
     // The driver is protected (DESIGN.md §3.5): armoured, in the cabin, with no
     // window to lean from. A gunner is the exposed one.
     const members = [
-      { id: 10, crew: 1, seat: 'seat.driver' as const, hp: 100, alive: true, out: false },
-      { id: 11, crew: 1, seat: 'seat.frontRight' as const, hp: 100, alive: true, out: true },
+      { id: 10, crew: 1, seat: 'seat.driver' as const, hp: 100, alive: true, out: false, aimYaw: 0, aimPitch: 0 },
+      { id: 11, crew: 1, seat: 'seat.frontRight' as const, hp: 100, alive: true, out: true, aimYaw: -Math.PI / 2, aimPitch: 0 },
     ];
     const gunnerHead = headWorld(target, seatById('suv', 'seat.frontRight')!);
     const atGunner = resolveHitscan(
@@ -510,6 +513,32 @@ try {
       atGunner.memberHit === 11 && atGunner.hullHit === null,
       `memberHit=${atGunner.memberHit} hull=${atGunner.hullHit}`,
     );
+    // All round: aiming across the car, a gunner is up on the sill over the
+    // roof — head and muzzle above it — and hittable there from either side.
+    const gunnerSeat = seatById('suv', 'seat.frontRight')!;
+    const roofTop = VEHICLE_CLASSES.suv.boxHeight - VEHICLE_CLASSES.suv.rideHeight;
+    check('a window gunner can aim all the way round', clampToArc(gunnerSeat.arc!, Math.PI * 0.9) === Math.PI * 0.9);
+    check('aiming out of their own side, they are at the window', roofAmount(gunnerSeat, -Math.PI / 2) === 0);
+    check('aiming across the car, they are up over the roof', roofAmount(gunnerSeat, Math.PI / 2) === 1);
+    const overHead = gunnerPoint('suv', gunnerSeat, Math.PI / 2, 0, 'head')!;
+    const overMuzzle = gunnerPoint('suv', gunnerSeat, Math.PI / 2, 0, 'muzzle')!;
+    check('up there, head and muzzle are above the roof', overHead[1] > roofTop + 0.3 && overMuzzle[1] > roofTop + 0.1, `head ${overHead[1].toFixed(2)}, muzzle ${overMuzzle[1].toFixed(2)}, roof ${roofTop.toFixed(2)}`);
+    const overHeadWorld = headWorld(target, gunnerSeat, Math.PI / 2, 0);
+    const fromFarSide = resolveHitscan(
+      [target],
+      members.map((m) => (m.id === 11 ? { ...m, aimYaw: Math.PI / 2 } : m)),
+      -1,
+      -12,
+      overHeadWorld.y,
+      overHeadWorld.z,
+      1,
+      0,
+      0,
+      220,
+      0,
+    );
+    check('and can be shot from the far side', fromFarSide.memberHit === 11, `memberHit=${fromFarSide.memberHit}`);
+
     const tucked = resolveHitscan(
       [target],
       members.map((m) => ({ ...m, out: false })),
@@ -683,14 +712,13 @@ try {
     }
   }
 
-  console.log('\n=== 5. hitting the hull from outside the arc does nothing ===');
+  console.log('\n=== 5. a shot aimed away misses ===');
   {
     const before = target.vehicle()?.hull ?? 0;
     const enemy = target.vehicle();
     const aim = enemy ? shooter.aimAt(enemy) : null;
     if (aim) {
-      // Aim hard the other way: the server clamps to the window, so the shot
-      // must leave the barrel pointing somewhere it cannot hit.
+      // Aim hard the other way: the shot leaves pointing away from the target.
       for (let i = 0; i < 4; i++) {
         shooter.fire(aim.yaw + Math.PI, aim.pitch);
         await sleep(140);
@@ -699,7 +727,7 @@ try {
     await sleep(400);
     const after = target.vehicle()?.hull ?? 0;
     check(
-      'a clamped shot cannot reach the target',
+      'a shot aimed away cannot reach the target',
       Math.abs(after - before) < 0.001,
       `hull ${before} → ${after}`,
     );

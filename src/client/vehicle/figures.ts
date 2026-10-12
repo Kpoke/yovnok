@@ -14,20 +14,27 @@
  * Car frame throughout: x right, y up, -z forward.
  */
 
-import * as THREE from "three";
-import type { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { COMBAT } from "../../shared/config";
-import { OUTFITS } from "../../shared/cosmetics";
-import type { WeaponId } from "../../shared/weapons";
+import * as THREE from 'three';
+import type { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { COMBAT } from '../../shared/config';
+import { OUTFITS } from '../../shared/cosmetics';
+import type { WeaponId } from '../../shared/weapons';
 
 /** What one seat's person is doing, for `Figure.pose`. */
 export type FigurePose = {
-  role: "driver" | "gunner";
+  role: 'driver' | 'gunner';
   /** Which window a gunner leans out of. */
-  side: "left" | "right";
+  side: 'left' | 'right';
   /** Where their hips sit (on the seat), car frame. */
   hip: THREE.Vector3;
+  /**
+   * Where the hips go up on the window sill to shoot over the roof, car frame,
+   * and how far up there they are for this aim (0 at the window … 1 over the
+   * roof; `roofAmount`).
+   */
+  sill: THREE.Vector3;
+  roof: number;
   /** Aim relative to the car's nose (+ = left) and pitch (+ = up), radians. */
   yaw: number;
   pitch: number;
@@ -55,9 +62,7 @@ export class FigureLibrary {
       this.pending = Promise.all(
         OUTFITS.map(async (outfit, index) => {
           try {
-            const gltf = await this.loader.loadAsync(
-              `/assets/characters/${outfit.id}/figure.glb`,
-            );
+            const gltf = await this.loader.loadAsync(`/assets/characters/${outfit.id}/figure.glb`);
             const tintable = new Set<string>();
             gltf.scene.traverse((o) => {
               const mesh = o as THREE.SkinnedMesh;
@@ -85,8 +90,7 @@ export class FigureLibrary {
 
   /** A new figure wearing `outfit`, its suit tinted toward `tint`; null until loaded. */
   create(outfit: number, tint: number): Figure | null {
-    const source =
-      this.outfits.get(outfit) ?? this.outfits.values().next().value;
+    const source = this.outfits.get(outfit) ?? this.outfits.values().next().value;
     if (!source) return null;
     return new Figure(cloneSkinned(source.scene), source.tintable, tint);
   }
@@ -113,54 +117,25 @@ const tubeGreen = new THREE.MeshStandardMaterial({
 /** A hand-held gun along -Z, its butt at the origin (the shoulder). */
 function handGun(weapon: WeaponId): THREE.Group {
   const g = new THREE.Group();
-  const add = (
-    geometry: THREE.BufferGeometry,
-    material: THREE.Material,
-  ): void => {
+  const add = (geometry: THREE.BufferGeometry, material: THREE.Material): void => {
     g.add(new THREE.Mesh(geometry, material));
   };
-  const tube = (
-    r: number,
-    z0: number,
-    z1: number,
-    y = 0,
-  ): THREE.BufferGeometry =>
-    new THREE.CylinderGeometry(r, r, z1 - z0, 10)
-      .rotateX(Math.PI / 2)
-      .translate(0, y, -(z0 + z1) / 2);
-  if (weapon === "launcher") {
+  const tube = (r: number, z0: number, z1: number, y = 0): THREE.BufferGeometry =>
+    new THREE.CylinderGeometry(r, r, z1 - z0, 10).rotateX(Math.PI / 2).translate(0, y, -(z0 + z1) / 2);
+  if (weapon === 'launcher') {
     add(tube(0.05, 0.0, 0.62), tubeGreen);
     add(tube(0.065, 0.48, 0.66), tubeGreen);
-    add(
-      new THREE.BoxGeometry(0.03, 0.1, 0.05).translate(0, -0.08, -0.22),
-      gunMetal,
-    );
+    add(new THREE.BoxGeometry(0.03, 0.1, 0.05).translate(0, -0.08, -0.22), gunMetal);
     return g;
   }
-  const length =
-    weapon === "marksman" ? 1.0 : weapon === "shotgun" ? 0.82 : 0.78;
-  add(
-    new THREE.BoxGeometry(0.045, 0.1, 0.2).translate(0, -0.02, -0.1),
-    furniture,
-  ); // stock
-  add(
-    new THREE.BoxGeometry(0.055, 0.09, 0.32).translate(0, 0, -0.36),
-    gunMetal,
-  ); // receiver
-  add(tube(weapon === "shotgun" ? 0.022 : 0.013, 0.52, length), gunMetal); // barrel
-  add(
-    new THREE.BoxGeometry(0.03, 0.09, 0.05).translate(0, -0.08, -0.3),
-    gunMetal,
-  ); // grip
-  if (weapon === "rifle")
-    add(
-      new THREE.BoxGeometry(0.035, 0.13, 0.06)
-        .rotateX(0.2)
-        .translate(0, -0.1, -0.42),
-      gunMetal,
-    );
-  if (weapon === "shotgun") add(tube(0.03, 0.5, 0.68, -0.045), furniture); // pump
-  if (weapon === "marksman") add(tube(0.022, 0.3, 0.52, 0.075), gunMetal); // scope
+  const length = weapon === 'marksman' ? 1.0 : weapon === 'shotgun' ? 0.82 : 0.78;
+  add(new THREE.BoxGeometry(0.045, 0.1, 0.2).translate(0, -0.02, -0.1), furniture); // stock
+  add(new THREE.BoxGeometry(0.055, 0.09, 0.32).translate(0, 0, -0.36), gunMetal); // receiver
+  add(tube(weapon === 'shotgun' ? 0.022 : 0.013, 0.52, length), gunMetal); // barrel
+  add(new THREE.BoxGeometry(0.03, 0.09, 0.05).translate(0, -0.08, -0.3), gunMetal); // grip
+  if (weapon === 'rifle') add(new THREE.BoxGeometry(0.035, 0.13, 0.06).rotateX(0.2).translate(0, -0.1, -0.42), gunMetal);
+  if (weapon === 'shotgun') add(tube(0.03, 0.5, 0.68, -0.045), furniture); // pump
+  if (weapon === 'marksman') add(tube(0.022, 0.3, 0.52, 0.075), gunMetal); // scope
   return g;
 }
 
@@ -174,20 +149,12 @@ const _w = new THREE.Quaternion();
 const _p = new THREE.Quaternion();
 
 /** Turn `bone` (in world space, shortest arc) so it points from itself toward `child` along `dir`. */
-function aimBone(
-  bone: THREE.Object3D,
-  child: THREE.Object3D,
-  dirWorld: THREE.Vector3,
-): void {
+function aimBone(bone: THREE.Object3D, child: THREE.Object3D, dirWorld: THREE.Vector3): void {
   aimBoneAt(bone, child.getWorldPosition(new THREE.Vector3()), dirWorld);
 }
 
 /** Turn `bone` so the world point `point` (which moves with it) lies along `dir` from it. */
-function aimBoneAt(
-  bone: THREE.Object3D,
-  point: THREE.Vector3,
-  dirWorld: THREE.Vector3,
-): void {
+function aimBoneAt(bone: THREE.Object3D, point: THREE.Vector3, dirWorld: THREE.Vector3): void {
   bone.getWorldPosition(_a);
   _b.copy(point);
   _d.subVectors(_b, _a);
@@ -201,11 +168,7 @@ function aimBoneAt(
 }
 
 /** Turn `bone` about the world axis by `angle`. */
-function twistBone(
-  bone: THREE.Object3D,
-  axisWorld: THREE.Vector3,
-  angle: number,
-): void {
+function twistBone(bone: THREE.Object3D, axisWorld: THREE.Vector3, angle: number): void {
   bone.getWorldQuaternion(_w);
   _w.premultiply(_q.setFromAxisAngle(axisWorld, angle));
   bone.parent!.getWorldQuaternion(_p);
@@ -227,7 +190,7 @@ type Limb = {
   endLocal: THREE.Vector3 | null;
 };
 
-const SPINE = ["Spine", "Spine1", "Spine2", "Neck"] as const;
+const SPINE = ['Spine', 'Spine1', 'Spine2', 'Neck'] as const;
 
 export class Figure {
   readonly root = new THREE.Group();
@@ -240,10 +203,12 @@ export class Figure {
   private gunId: WeaponId | null = null;
   /** 0 tucked in … 1 out of the window, eased toward the wanted state. */
   private lean = 0;
+  /** 0 at the window … 1 up on the sill over the roof, eased toward the aim's. */
+  private roof = 0;
   private readonly tinted: THREE.Material[] = [];
 
   constructor(model: THREE.Object3D, tintable: Set<string>, tint: number) {
-    this.root.name = "figure";
+    this.root.name = 'figure';
     this.root.add(model, this.gunHolder);
     const paint = new THREE.Color(0xffffff).lerp(new THREE.Color(tint), 0.6);
     const materials = new Map<THREE.Material, THREE.Material>();
@@ -267,7 +232,7 @@ export class Figure {
       }
     });
     this.root.updateMatrixWorld(true);
-    this.bone("Hips").getWorldPosition(this.hipsRest);
+    this.bone('Hips').getWorldPosition(this.hipsRest);
     this.root.worldToLocal(this.hipsRest);
     const limb = (root: string, mid: string, end: string): Limb => {
       const r = this.bone(root);
@@ -277,23 +242,19 @@ export class Figure {
         root: r,
         mid: m,
         end: e,
-        a: r
-          .getWorldPosition(new THREE.Vector3())
-          .distanceTo(m.getWorldPosition(new THREE.Vector3())),
-        b: m
-          .getWorldPosition(new THREE.Vector3())
-          .distanceTo(e.getWorldPosition(new THREE.Vector3())),
+        a: r.getWorldPosition(new THREE.Vector3()).distanceTo(m.getWorldPosition(new THREE.Vector3())),
+        b: m.getWorldPosition(new THREE.Vector3()).distanceTo(e.getWorldPosition(new THREE.Vector3())),
         endLocal: null,
       };
     };
     this.arms = {
-      left: limb("LeftArm", "LeftForeArm", "LeftHand"),
-      right: limb("RightArm", "RightForeArm", "RightHand"),
+      left: limb('LeftArm', 'LeftForeArm', 'LeftHand'),
+      right: limb('RightArm', 'RightForeArm', 'RightHand'),
     };
     // Where each palm is drawn: the skinned vertices the hand bone drives.
     for (const [arm, name] of [
-      [this.arms.left, "LeftHand"],
-      [this.arms.right, "RightHand"],
+      [this.arms.left, 'LeftHand'],
+      [this.arms.right, 'RightHand'],
     ] as const) {
       const sum = new THREE.Vector3();
       let n = 0;
@@ -308,8 +269,7 @@ export class Figure {
         const W = mesh.geometry.attributes.skinWeight;
         for (let i = 0; i < W.count; i++) {
           let best = 0;
-          for (let k = 1; k < 4; k++)
-            if (W.getComponent(i, k) > W.getComponent(i, best)) best = k;
+          for (let k = 1; k < 4; k++) if (W.getComponent(i, k) > W.getComponent(i, best)) best = k;
           if (J.getComponent(i, best) !== index) continue;
           mesh.getVertexPosition(i, v);
           sum.add(v.applyMatrix4(mesh.matrixWorld));
@@ -323,8 +283,8 @@ export class Figure {
       }
     }
     this.legs = {
-      left: limb("LeftUpLeg", "LeftLeg", "LeftFoot"),
-      right: limb("RightUpLeg", "RightLeg", "RightFoot"),
+      left: limb('LeftUpLeg', 'LeftLeg', 'LeftFoot'),
+      right: limb('RightUpLeg', 'RightLeg', 'RightFoot'),
     };
   }
 
@@ -350,12 +310,7 @@ export class Figure {
     const joint = s.clone().addScaledVector(axis, x).addScaledVector(bend, h);
     const end = s.clone().addScaledVector(axis, d);
     aimBone(limb.root, limb.mid, joint.clone().sub(s));
-    if (limb.endLocal)
-      aimBoneAt(
-        limb.mid,
-        limb.mid.localToWorld(limb.endLocal.clone()),
-        end.sub(joint),
-      );
+    if (limb.endLocal) aimBoneAt(limb.mid, limb.mid.localToWorld(limb.endLocal.clone()), end.sub(joint));
     else aimBone(limb.mid, limb.end, end.sub(joint));
   }
 
@@ -363,35 +318,29 @@ export class Figure {
   pose(p: FigurePose, dt: number): void {
     const car = this.root.parent;
     if (!car) return;
-    const want = p.role === "gunner" && p.alive && p.out ? 1 : 0;
+    const want = p.role === 'gunner' && p.alive && p.out ? 1 : 0;
     const step = dt / COMBAT.leanSeconds;
-    this.lean =
-      want > this.lean
-        ? Math.min(want, this.lean + step)
-        : Math.max(want, this.lean - step * 1.5);
+    this.lean = want > this.lean ? Math.min(want, this.lean + step) : Math.max(want, this.lean - step * 1.5);
     const lean = this.lean * this.lean * (3 - 2 * this.lean); // eased
-    const side = p.side === "right" ? 1 : -1;
+    const side = p.side === 'right' ? 1 : -1;
 
     for (const [bone, q] of this.rest) bone.quaternion.copy(q);
     // Hips on the seat; leaning out shifts them a little up and toward the
     // window — the person stays seated and leans out from the waist.
-    const hip = p.hip
-      .clone()
-      .add(new THREE.Vector3(side * 0.25 * lean, 0.5 * lean, 0));
+    // Aiming across the car they climb onto the sill instead and shoot over
+    // the roof (eased in with the lean, and as the aim swings across).
+    this.roof += (p.roof - this.roof) * Math.min(1, dt * 8);
+    const roof = this.roof * lean;
+    const window = p.hip.clone().add(new THREE.Vector3(side * 0.25 * lean, 0.5 * lean, 0));
+    const hip = window.lerp(p.sill, roof);
     this.root.position.copy(hip).sub(this.hipsRest);
     this.root.updateMatrixWorld(true);
 
     // Development: `window.__figureRest = true` shows the model unposed.
-    if (
-      import.meta.env.DEV &&
-      (window as unknown as { __figureRest?: boolean }).__figureRest
-    )
-      return;
+    if (import.meta.env.DEV && (window as unknown as { __figureRest?: boolean }).__figureRest) return;
     car.updateMatrixWorld();
-    const toWorldDir = (x: number, y: number, z: number): THREE.Vector3 =>
-      new THREE.Vector3(x, y, z).transformDirection(car.matrixWorld);
-    const toWorld = (v: THREE.Vector3): THREE.Vector3 =>
-      v.clone().applyMatrix4(car.matrixWorld);
+    const toWorldDir = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, y, z).transformDirection(car.matrixWorld);
+    const toWorld = (v: THREE.Vector3): THREE.Vector3 => v.clone().applyMatrix4(car.matrixWorld);
     const carUp = toWorldDir(0, 1, 0);
 
     // Legs: seated, knees forward, feet on the floor ahead of the seat.
@@ -399,84 +348,59 @@ export class Figure {
       [this.legs.left, -1],
       [this.legs.right, 1],
     ] as const) {
-      const foot = toWorld(
-        p.hip.clone().add(new THREE.Vector3(sx * 0.16, -0.3, -0.62)),
-      );
-      this.reach(limb, foot, toWorldDir(0, 0.4, -1));
+      // Up on the sill the feet stay inside, on the seat, knees bent inward.
+      const seated = p.hip.clone().add(new THREE.Vector3(sx * 0.16, -0.3, -0.62));
+      const onSeat = p.hip.clone().add(new THREE.Vector3(sx * 0.14 - side * 0.05, 0.02, -0.28));
+      const foot = toWorld(seated.lerp(onSeat, roof));
+      this.reach(limb, foot, toWorldDir(-side * 0.8 * roof, 0.4 - 0.2 * roof, -1 + 0.4 * roof));
     }
 
     // Spine: upright (a little reclined); out of the window it bends outward;
     // knocked down it slumps forward.
+    // Over the roof the body is upright, leaning in over it.
     const spineDir = !p.alive
       ? toWorldDir(0.1 * side, 0.55, -0.8)
-      : toWorldDir(side * 1.0 * lean, 1, 0.3 * (1 - lean));
-    for (let i = 0; i < SPINE.length - 1; i++)
-      aimBone(this.bone(SPINE[i]), this.bone(SPINE[i + 1]), spineDir);
+      : toWorldDir(side * (1.0 * lean * (1 - roof) - 0.35 * roof), 1, 0.3 * (1 - lean));
+    for (let i = 0; i < SPINE.length - 1; i++) aimBone(this.bone(SPINE[i]), this.bone(SPINE[i + 1]), spineDir);
 
     // Aim, car frame (+yaw = left).
     const cosP = Math.cos(p.pitch);
-    const aim = new THREE.Vector3(
-      -Math.sin(p.yaw) * cosP,
-      Math.sin(p.pitch),
-      -Math.cos(p.yaw) * cosP,
-    );
+    const aim = new THREE.Vector3(-Math.sin(p.yaw) * cosP, Math.sin(p.pitch), -Math.cos(p.yaw) * cosP);
     const aimWorld = aim.clone().transformDirection(car.matrixWorld);
     if (lean > 0) {
       // Turn the chest toward the aim (about the car's up), the head the rest.
       const flat = Math.atan2(-aim.x, -aim.z); // yaw from forward, + = left
-      twistBone(this.bone("Spine2"), carUp, flat * 0.75 * lean);
+      twistBone(this.bone('Spine2'), carUp, flat * 0.75 * lean);
     }
     const headDir = !p.alive
       ? toWorldDir(0, -0.4, -1)
-      : p.role === "driver" || lean === 0
+      : p.role === 'driver' || lean === 0
         ? toWorldDir(0, 1, -0.05)
-        : new THREE.Vector3().lerpVectors(
-            toWorldDir(0, 1, 0),
-            aimWorld.clone().add(carUp.clone().multiplyScalar(1.4)),
-            lean,
-          );
-    aimBone(this.bone("Neck"), this.bone("Head"), headDir);
+        : new THREE.Vector3().lerpVectors(toWorldDir(0, 1, 0), aimWorld.clone().add(carUp.clone().multiplyScalar(1.4)), lean);
+    aimBone(this.bone('Neck'), this.bone('Head'), headDir);
 
     // Arms and the gun.
     const shoulder = this.arms.right.root.getWorldPosition(new THREE.Vector3());
     const hipWorld = toWorld(p.hip);
     this.setGun(p.gun);
     if (!p.alive) {
-      this.reach(
-        this.arms.left,
-        toWorld(p.hip.clone().add(new THREE.Vector3(-0.22, 0.05, -0.28))),
-        toWorldDir(-1, 0, 0.3),
-      );
-      this.reach(
-        this.arms.right,
-        toWorld(p.hip.clone().add(new THREE.Vector3(0.22, 0.05, -0.28))),
-        toWorldDir(1, 0, 0.3),
-      );
+      this.reach(this.arms.left, toWorld(p.hip.clone().add(new THREE.Vector3(-0.22, 0.05, -0.28))), toWorldDir(-1, 0, 0.3));
+      this.reach(this.arms.right, toWorld(p.hip.clone().add(new THREE.Vector3(0.22, 0.05, -0.28))), toWorldDir(1, 0, 0.3));
       this.gunHolder.visible = false;
       return;
     }
-    if (p.role === "driver") {
+    if (p.role === 'driver') {
       // Hands at ten to two on a wheel ahead of the chest.
       const wheel = p.hip.clone().add(new THREE.Vector3(0, 0.38, -0.5));
-      this.reach(
-        this.arms.left,
-        toWorld(wheel.clone().add(new THREE.Vector3(-0.17, 0.05, 0))),
-        toWorldDir(-1, -1, 0.2),
-      );
-      this.reach(
-        this.arms.right,
-        toWorld(wheel.clone().add(new THREE.Vector3(0.17, 0.05, 0))),
-        toWorldDir(1, -1, 0.2),
-      );
+      this.reach(this.arms.left, toWorld(wheel.clone().add(new THREE.Vector3(-0.17, 0.05, 0))), toWorldDir(-1, -1, 0.2));
+      this.reach(this.arms.right, toWorld(wheel.clone().add(new THREE.Vector3(0.17, 0.05, 0))), toWorldDir(1, -1, 0.2));
       this.gunHolder.visible = false;
       return;
     }
     // A gunner: the gun points along the aim when out; across the lap, muzzle
     // up and forward, when tucked in.
     const lapDir = toWorldDir(0.15 * side, 0.55, -0.85).normalize();
-    const gunDir = new THREE.Vector3()
-      .lerpVectors(lapDir, aimWorld, lean)
-      .normalize();
+    const gunDir = new THREE.Vector3().lerpVectors(lapDir, aimWorld, lean).normalize();
     const butt = new THREE.Vector3().lerpVectors(
       toWorld(p.hip.clone().add(new THREE.Vector3(0.12, 0.12, -0.18))),
       shoulder.clone().addScaledVector(carUp, -0.04),
@@ -496,11 +420,7 @@ export class Figure {
     );
     // Place the gun: its butt at `butt`, along `gunDir`, upright.
     this.gunHolder.visible = this.gunId !== null;
-    const basis = new THREE.Matrix4().makeBasis(
-      right,
-      gunUp,
-      gunDir.clone().negate(),
-    );
+    const basis = new THREE.Matrix4().makeBasis(right, gunUp, gunDir.clone().negate());
     const world = new THREE.Quaternion().setFromRotationMatrix(basis);
     this.root.getWorldQuaternion(_p);
     this.gunHolder.quaternion.copy(_p.invert().multiply(world));
@@ -510,8 +430,7 @@ export class Figure {
   private setGun(id: WeaponId | null): void {
     if (id === this.gunId) return;
     this.gunId = id;
-    for (const child of [...this.gunHolder.children])
-      this.gunHolder.remove(child);
+    for (const child of [...this.gunHolder.children]) this.gunHolder.remove(child);
     if (id) this.gunHolder.add(handGun(id));
   }
 

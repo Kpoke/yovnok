@@ -1742,7 +1742,9 @@ export class Room {
     } else {
       // Aim is clamped to the window the gunner is leaning out of. The client
       // clamps too, for feel; this is the authority.
-      muzzle = muzzleWorld(crew, seat);
+      // Where the gun is depends on the posture (window, or over the roof),
+      // which follows the aim.
+      muzzle = muzzleWorld(crew, seat, player.aimYaw, -player.aimPitch);
       const aim = target ? relativeAim(crew.state.yaw, muzzle, target) : { yaw: aimYawRequested, pitch: pitchRequested };
       aimYaw = clampToArc(seat.arc, aim.yaw);
       pitch = clamp(aim.pitch, -1.2, 1.2);
@@ -2093,7 +2095,7 @@ export class Room {
             const seat = seatById(vehicle.cls, member.seat);
             // Only a gunner leaning out is in the open; inside, the car takes it.
             if (!seat || !member.out) continue;
-            const head = headWorld(vehicle, seat);
+            const head = headWorld(vehicle, seat, member.aimYaw, member.aimPitch);
             const distance = Math.hypot(head.x - hx, head.y - hy, head.z - hz);
             if (distance > weapon.splash) continue;
             const victim = this.players.get(member.id);
@@ -2154,6 +2156,9 @@ export class Room {
         hp: player.hp,
         alive: player.alive,
         out: player.out,
+        // The aim message carries the camera pitch (positive looks down).
+        aimYaw: player.aimYaw,
+        aimPitch: -player.aimPitch,
       });
     }
     return out;

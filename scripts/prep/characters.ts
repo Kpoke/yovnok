@@ -20,28 +20,26 @@
  * turn and scale go on one node above everything.
  */
 
-import { join } from "node:path";
-import type { Document } from "@gltf-transform/core";
-import { prune, simplify, weld } from "@gltf-transform/functions";
-import { MeshoptSimplifier } from "meshoptimizer";
-import * as THREE from "three";
-import { io, ROOT } from "./lib";
+import { join } from 'node:path';
+import type { Document } from '@gltf-transform/core';
+import { prune, simplify, weld } from '@gltf-transform/functions';
+import { MeshoptSimplifier } from 'meshoptimizer';
+import * as THREE from 'three';
+import { io, ROOT } from './lib';
 
-const OUTFITS = ["tactical", "striker", "soldier"] as const;
+const OUTFITS = ['tactical', 'striker', 'soldier'] as const;
 /** Toe to crown, metres (the toe joint sits at the ball of the foot). */
 const HEIGHT = 1.72;
 /** Triangles kept per figure. */
 const TRIANGLES = Number(process.env.FIGURE_TRIS ?? 7000);
 
 /** "mixamorig:LeftForeArm_022" → "LeftForeArm". */
-const tidy = (name: string): string =>
-  name.replace(/^mixamorig:/, "").replace(/_\d+$/, "");
+const tidy = (name: string): string => name.replace(/^mixamorig:/, '').replace(/_\d+$/, '');
 
 function triangles(doc: Document): number {
   let n = 0;
   for (const mesh of doc.getRoot().listMeshes()) {
-    for (const prim of mesh.listPrimitives())
-      n += (prim.getIndices()?.getCount() ?? 0) / 3;
+    for (const prim of mesh.listPrimitives()) n += (prim.getIndices()?.getCount() ?? 0) / 3;
   }
   return n;
 }
@@ -57,32 +55,23 @@ function triangles(doc: Document): number {
  * exact for a rigid hand whatever else differs between the two bodies.
  */
 async function replaceTacticalParts(doc: Document): Promise<void> {
-  const donor = await io.read(
-    join(
-      ROOT,
-      "assets-src",
-      "characters",
-      "striker",
-      "original",
-      "striker.glb",
-    ),
-  );
+  const donor = await io.read(join(ROOT, 'assets-src', 'characters', 'striker', 'original', 'striker.glb'));
   // Tactical part ← the same mesh in the Striker (its visor glass is "Material.001").
   // Old and new positions of every base-body vertex, with its main joint.
   const pairs: Array<{ joint: number; from: number[]; to: number[] }> = [];
   for (const [here, there] of [
-    ["gloves", "gloves"],
-    ["Head", "Head"],
-    ["material", "material"],
-    ["Material.001", "Glass"],
-    ["jumpsuit", "Jumpsuit"],
-    ["boots", "Boots"],
+    ['gloves', 'gloves'],
+    ['Head', 'Head'],
+    ['material', 'material'],
+    ['Material.001', 'Glass'],
+    ['jumpsuit', 'Jumpsuit'],
+    ['boots', 'Boots'],
   ] as const) {
     const before = carryMesh(doc, donor, here, there);
     const prim = nodeByMaterial(doc, here).getMesh()!.listPrimitives()[0];
-    const after = prim.getAttribute("POSITION")!.getArray()!;
-    const W = prim.getAttribute("WEIGHTS_0")!;
-    const J = prim.getAttribute("JOINTS_0")!;
+    const after = prim.getAttribute('POSITION')!.getArray()!;
+    const W = prim.getAttribute('WEIGHTS_0')!;
+    const J = prim.getAttribute('JOINTS_0')!;
     const w = [0, 0, 0, 0];
     const j = [0, 0, 0, 0];
     for (let i = 0; i < W.getCount(); i++) {
@@ -98,7 +87,7 @@ async function replaceTacticalParts(doc: Document): Promise<void> {
   }
   // The Tactical's own kit sat on the OLD body: move it as the body moved,
   // by a least-squares affine fit per joint (its parent's when too few points).
-  const skinJoints = nodeByMaterial(doc, "gloves").getSkin()!.listJoints();
+  const skinJoints = nodeByMaterial(doc, 'gloves').getSkin()!.listJoints();
   const fits = new Map<number, THREE.Matrix4 | null>();
   const fitFor = (joint: number): THREE.Matrix4 | null => {
     if (fits.has(joint)) return fits.get(joint)!;
@@ -106,24 +95,7 @@ async function replaceTacticalParts(doc: Document): Promise<void> {
     let fit: THREE.Matrix4 | null = null;
     if (pts.length >= 12) {
       // Solve [x y z 1]·A = [x' y' z'] (normal equations, 4×4).
-      const ata = new THREE.Matrix4().set(
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-      );
+      const ata = new THREE.Matrix4().set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
       const e = ata.elements;
       const atb = [0, 1, 2].map(() => [0, 0, 0, 0]);
       for (const p of pts) {
@@ -134,27 +106,9 @@ async function replaceTacticalParts(doc: Document): Promise<void> {
         }
       }
       const inv = ata.clone().invert();
-      const col = (c: number) =>
-        new THREE.Vector4().fromArray(atb[c]).applyMatrix4(inv);
+      const col = (c: number) => new THREE.Vector4().fromArray(atb[c]).applyMatrix4(inv);
       const [cx, cy, cz] = [col(0), col(1), col(2)];
-      fit = new THREE.Matrix4().set(
-        cx.x,
-        cx.y,
-        cx.z,
-        cx.w,
-        cy.x,
-        cy.y,
-        cy.z,
-        cy.w,
-        cz.x,
-        cz.y,
-        cz.z,
-        cz.w,
-        0,
-        0,
-        0,
-        1,
-      );
+      fit = new THREE.Matrix4().set(cx.x, cx.y, cx.z, cx.w, cy.x, cy.y, cy.z, cy.w, cz.x, cz.y, cz.z, cz.w, 0, 0, 0, 1);
     } else {
       const parent = skinJoints[joint].getParentNode();
       const index = parent ? skinJoints.indexOf(parent) : -1;
@@ -163,13 +117,13 @@ async function replaceTacticalParts(doc: Document): Promise<void> {
     fits.set(joint, fit);
     return fit;
   };
-  for (const material of ["ShoulderPads", "Headphones", "plate"]) {
+  for (const material of ['ShoulderPads', 'Headphones', 'plate']) {
     for (const node of doc.getRoot().listNodes()) {
       const prim = node.getMesh()?.listPrimitives()[0];
       if (!prim || prim.getMaterial()?.getName() !== material) continue;
-      const P = prim.getAttribute("POSITION")!;
-      const W = prim.getAttribute("WEIGHTS_0")!;
-      const J = prim.getAttribute("JOINTS_0")!;
+      const P = prim.getAttribute('POSITION')!;
+      const W = prim.getAttribute('WEIGHTS_0')!;
+      const J = prim.getAttribute('JOINTS_0')!;
       const out = new Float32Array(P.getCount() * 3);
       const v = new THREE.Vector3();
       const w = [0, 0, 0, 0];
@@ -180,47 +134,32 @@ async function replaceTacticalParts(doc: Document): Promise<void> {
         J.getElement(i, j);
         P.getElement(i, e);
         const fit = fitFor(j[w.indexOf(Math.max(...w))]);
-        (fit ? v.fromArray(e).applyMatrix4(fit) : v.fromArray(e)).toArray(
-          out,
-          i * 3,
-        );
+        (fit ? v.fromArray(e).applyMatrix4(fit) : v.fromArray(e)).toArray(out, i * 3);
       }
       P.setArray(out);
     }
   }
-  console.log(
-    "tactical: base body carried over from the striker, its kit refitted",
-  );
+  console.log('tactical: base body carried over from the striker, its kit refitted');
 }
 
 const nodeByMaterial = (d: Document, material: string) =>
   d
     .getRoot()
     .listNodes()
-    .find(
-      (x) =>
-        x.getMesh()?.listPrimitives()[0]?.getMaterial()?.getName() === material,
-    )!;
+    .find((x) => x.getMesh()?.listPrimitives()[0]?.getMaterial()?.getName() === material)!;
 
 /** Replace one mesh's geometry with the donor's same mesh; returns the old positions. */
-function carryMesh(
-  doc: Document,
-  donor: Document,
-  hereMaterial: string,
-  thereMaterial: string,
-): ArrayLike<number> {
+function carryMesh(doc: Document, donor: Document, hereMaterial: string, thereMaterial: string): ArrayLike<number> {
   const hereNode = nodeByMaterial(doc, hereMaterial);
   const thereNode = nodeByMaterial(donor, thereMaterial);
   const gloves = hereNode.getMesh()!.listPrimitives()[0];
   const source = thereNode.getMesh()!.listPrimitives()[0];
-  const old = Float32Array.from(
-    gloves.getAttribute("POSITION")!.getArray()! as ArrayLike<number>,
-  );
+  const old = Float32Array.from(gloves.getAttribute('POSITION')!.getArray()! as ArrayLike<number>);
   const name = (j: { getName(): string }): string =>
     j
       .getName()
-      .replace(/^mixamorig:/, "")
-      .replace(/_\d+$/, "");
+      .replace(/^mixamorig:/, '')
+      .replace(/_\d+$/, '');
   const hereJoints = hereNode.getSkin()!.listJoints().map(name);
   const thereJoints = thereNode.getSkin()!.listJoints().map(name);
   const ibm = (node: typeof hereNode, i: number): THREE.Matrix4 => {
@@ -233,23 +172,16 @@ function carryMesh(
   const carry = new Map<number, THREE.Matrix4>();
   /** Donor bind space → its bone j → the same bone here → this bind space. */
   const carryOf = (j: number): THREE.Matrix4 => {
-    if (map[j] < 0)
-      throw new Error(
-        `tactical: no ${thereJoints[j]} joint for the ${hereMaterial}`,
-      );
+    if (map[j] < 0) throw new Error(`tactical: no ${thereJoints[j]} joint for the ${hereMaterial}`);
     let m = carry.get(j);
-    if (!m)
-      carry.set(
-        j,
-        (m = ibm(hereNode, map[j]).invert().multiply(ibm(thereNode, j))),
-      );
+    if (!m) carry.set(j, (m = ibm(hereNode, map[j]).invert().multiply(ibm(thereNode, j))));
     return m;
   };
 
-  const P = source.getAttribute("POSITION")!;
-  const N = source.getAttribute("NORMAL");
-  const W = source.getAttribute("WEIGHTS_0")!;
-  const J = source.getAttribute("JOINTS_0")!;
+  const P = source.getAttribute('POSITION')!;
+  const N = source.getAttribute('NORMAL');
+  const W = source.getAttribute('WEIGHTS_0')!;
+  const J = source.getAttribute('JOINTS_0')!;
   const positions = new Float32Array(P.getCount() * 3);
   const normals = N ? new Float32Array(P.getCount() * 3) : null;
   const joints = new Uint16Array(P.getCount() * 4);
@@ -273,37 +205,19 @@ function carryMesh(
         .transformDirection(m)
         .toArray(normals, i * 3);
     }
-    for (let c = 0; c < 4; c++)
-      joints[i * 4 + c] = w[c] > 0 ? (carryOf(jj[c]), map[jj[c]]) : 0;
+    for (let c = 0; c < 4; c++) joints[i * 4 + c] = w[c] > 0 ? (carryOf(jj[c]), map[jj[c]]) : 0;
   }
-  const set = (
-    attr: string,
-    array: Float32Array<ArrayBuffer> | Uint16Array<ArrayBuffer>,
-    type: "VEC3" | "VEC4",
-  ) => {
+  const set = (attr: string, array: Float32Array<ArrayBuffer> | Uint16Array<ArrayBuffer>, type: 'VEC3' | 'VEC4') => {
     const existing = gloves.getAttribute(attr);
     if (existing) existing.setArray(array).setType(type);
-    else
-      gloves.setAttribute(
-        attr,
-        doc
-          .createAccessor()
-          .setArray(array)
-          .setType(type)
-          .setBuffer(doc.getRoot().listBuffers()[0]),
-      );
+    else gloves.setAttribute(attr, doc.createAccessor().setArray(array).setType(type).setBuffer(doc.getRoot().listBuffers()[0]));
   };
-  set("POSITION", positions, "VEC3");
-  if (normals) set("NORMAL", normals, "VEC3");
-  set("JOINTS_0", joints, "VEC4");
-  gloves
-    .getAttribute("WEIGHTS_0")!
-    .setArray(Float32Array.from(W.getArray()! as ArrayLike<number>));
-  const uv = source.getAttribute("TEXCOORD_0");
-  if (uv)
-    gloves
-      .getAttribute("TEXCOORD_0")
-      ?.setArray(Float32Array.from(uv.getArray()!));
+  set('POSITION', positions, 'VEC3');
+  if (normals) set('NORMAL', normals, 'VEC3');
+  set('JOINTS_0', joints, 'VEC4');
+  gloves.getAttribute('WEIGHTS_0')!.setArray(Float32Array.from(W.getArray()! as ArrayLike<number>));
+  const uv = source.getAttribute('TEXCOORD_0');
+  if (uv) gloves.getAttribute('TEXCOORD_0')?.setArray(Float32Array.from(uv.getArray()!));
   gloves.getIndices()!.setArray(source.getIndices()!.getArray()!.slice());
   return old;
 }
@@ -317,8 +231,7 @@ function carryMesh(
  * bones as they stand makes the figure look the same and deform correctly.
  */
 function rebindToPose(doc: Document): void {
-  const world = (node: { getWorldMatrix(): number[] | Float32Array }) =>
-    new THREE.Matrix4().fromArray(node.getWorldMatrix() as number[]);
+  const world = (node: { getWorldMatrix(): number[] | Float32Array }) => new THREE.Matrix4().fromArray(node.getWorldMatrix() as number[]);
   const buffer = doc.getRoot().listBuffers()[0];
   // Every mesh first (they share skins: the old binding must stay until all
   // are baked), then each skin rebound once.
@@ -345,10 +258,10 @@ function rebindToPose(doc: Document): void {
   for (const node of nodes) {
     const matrices = skinning.get(node.getSkin()!)!;
     for (const prim of node.getMesh()!.listPrimitives()) {
-      const P = prim.getAttribute("POSITION")!;
-      const N = prim.getAttribute("NORMAL");
-      const W = prim.getAttribute("WEIGHTS_0")!;
-      const J = prim.getAttribute("JOINTS_0")!;
+      const P = prim.getAttribute('POSITION')!;
+      const N = prim.getAttribute('NORMAL');
+      const W = prim.getAttribute('WEIGHTS_0')!;
+      const J = prim.getAttribute('JOINTS_0')!;
       const positions = new Float32Array(P.getCount() * 3);
       const normals = N ? new Float32Array(P.getCount() * 3) : null;
       const blend = new THREE.Matrix4();
@@ -364,8 +277,7 @@ function rebindToPose(doc: Document): void {
         for (let k = 0; k < 4; k++) {
           if (!w[k]) continue;
           const src = matrices[j[k]].elements;
-          for (let x = 0; x < 16; x++)
-            blend.elements[x] += (src[x] * w[k]) / total;
+          for (let x = 0; x < 16; x++) blend.elements[x] += (src[x] * w[k]) / total;
         }
         P.getElement(i, e);
         v.fromArray(e)
@@ -378,55 +290,31 @@ function rebindToPose(doc: Document): void {
             .toArray(normals, i * 3);
         }
       }
-      prim.setAttribute(
-        "POSITION",
-        doc
-          .createAccessor()
-          .setType("VEC3")
-          .setArray(positions)
-          .setBuffer(buffer),
-      );
-      if (normals)
-        prim.setAttribute(
-          "NORMAL",
-          doc
-            .createAccessor()
-            .setType("VEC3")
-            .setArray(normals)
-            .setBuffer(buffer),
-        );
+      prim.setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(positions).setBuffer(buffer));
+      if (normals) prim.setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(normals).setBuffer(buffer));
     }
     // The mesh node at the scene root, untransformed: the joints alone place it.
     node.getParentNode()?.removeChild(node);
-    node
-      .setTranslation([0, 0, 0])
-      .setRotation([0, 0, 0, 1])
-      .setScale([1, 1, 1]);
+    node.setTranslation([0, 0, 0]).setRotation([0, 0, 0, 1]).setScale([1, 1, 1]);
     for (const sc of doc.getRoot().listScenes()) sc.removeChild(node);
-    (doc.getRoot().getDefaultScene() ?? doc.getRoot().listScenes()[0]).addChild(
-      node,
-    );
+    (doc.getRoot().getDefaultScene() ?? doc.getRoot().listScenes()[0]).addChild(node);
   }
   // The downloads' skeletons do not fit their meshes (the Striker's arms are
   // far shorter than its sleeves). Fit each joint to its skin: vertices
   // shared between a joint and its parent (weights split) ring that joint, so
   // their centre is where it belongs. A joint with no such ring keeps its
   // offset from its parent, grown as the whole figure is. Orientations stay.
-  const allJoints = [
-    ...new Set([...skins].flatMap((skin) => skin.listJoints())),
-  ];
+  const allJoints = [...new Set([...skins].flatMap((skin) => skin.listJoints()))];
   const before = new Map(allJoints.map((j) => [j, world(j)]));
-  const rings = new Map(
-    allJoints.map((j) => [j, { sum: new THREE.Vector3(), n: 0 }]),
-  );
+  const rings = new Map(allJoints.map((j) => [j, { sum: new THREE.Vector3(), n: 0 }]));
   let top = -Infinity;
   let floor = Infinity;
   for (const node of nodes) {
     const joints = node.getSkin()!.listJoints();
     for (const prim of node.getMesh()!.listPrimitives()) {
-      const P = prim.getAttribute("POSITION")!;
-      const W = prim.getAttribute("WEIGHTS_0")!;
-      const J = prim.getAttribute("JOINTS_0")!;
+      const P = prim.getAttribute('POSITION')!;
+      const W = prim.getAttribute('WEIGHTS_0')!;
+      const J = prim.getAttribute('JOINTS_0')!;
       const e = [0, 0, 0];
       const w = [0, 0, 0, 0];
       const j = [0, 0, 0, 0];
@@ -450,12 +338,9 @@ function rebindToPose(doc: Document): void {
       }
     }
   }
-  const find = (name: string) =>
-    allJoints.find((j) => tidy(j.getName()) === name)!;
-  const k =
-    (top - floor) / (before.get(find("HeadTop_End"))!.elements[13] - floor);
-  const depth = (n: (typeof allJoints)[number]): number =>
-    n.getParentNode() ? depth(n.getParentNode()!) + 1 : 0;
+  const find = (name: string) => allJoints.find((j) => tidy(j.getName()) === name)!;
+  const k = (top - floor) / (before.get(find('HeadTop_End'))!.elements[13] - floor);
+  const depth = (n: (typeof allJoints)[number]): number => (n.getParentNode() ? depth(n.getParentNode()!) + 1 : 0);
   const moved = new Map<(typeof allJoints)[number], THREE.Matrix4>();
   let fitted = 0;
   for (const joint of [...allJoints].sort((a, b) => depth(a) - depth(b))) {
@@ -469,17 +354,13 @@ function rebindToPose(doc: Document): void {
       position.copy(ring.sum).divideScalar(ring.n);
       fitted++;
     } else if (parent && moved.has(parent)) {
-      const was = new THREE.Vector3().setFromMatrixPosition(
-        before.get(parent)!,
-      );
+      const was = new THREE.Vector3().setFromMatrixPosition(before.get(parent)!);
       const now = new THREE.Vector3().setFromMatrixPosition(moved.get(parent)!);
       position.sub(was).multiplyScalar(k).add(now);
     }
     const newWorld = new THREE.Matrix4().compose(position, rotation, scale);
     moved.set(joint, newWorld);
-    const parentWorld = parent
-      ? (moved.get(parent) ?? world(parent))
-      : new THREE.Matrix4();
+    const parentWorld = parent ? (moved.get(parent) ?? world(parent)) : new THREE.Matrix4();
     const local = parentWorld.clone().invert().multiply(newWorld);
     const t = new THREE.Vector3();
     const r = new THREE.Quaternion();
@@ -489,9 +370,7 @@ function rebindToPose(doc: Document): void {
     joint.setRotation(r.toArray() as [number, number, number, number]);
     joint.setScale(sc.toArray() as [number, number, number]);
   }
-  console.log(
-    `  skeleton fitted to its mesh: ${fitted}/${allJoints.length} joints from their skin`,
-  );
+  console.log(`  skeleton fitted to its mesh: ${fitted}/${allJoints.length} joints from their skin`);
   for (const skin of skins) {
     const joints = skin.listJoints();
     const fresh = new Float32Array(joints.length * 16);
@@ -500,9 +379,7 @@ function rebindToPose(doc: Document): void {
         .invert()
         .toArray(fresh, i * 16),
     );
-    skin.setInverseBindMatrices(
-      doc.createAccessor().setType("MAT4").setArray(fresh).setBuffer(buffer),
-    );
+    skin.setInverseBindMatrices(doc.createAccessor().setType('MAT4').setArray(fresh).setBuffer(buffer));
   }
 }
 
@@ -517,14 +394,12 @@ function rigidHands(doc: Document): void {
     if (!skin || !node.getMesh()) continue;
     const names = skin.listJoints().map((j) => j.getName());
     const target = names.map((name, i) => {
-      const finger = /^(Left|Right)Hand(Thumb|Index|Middle|Ring|Pinky)/.exec(
-        name,
-      );
+      const finger = /^(Left|Right)Hand(Thumb|Index|Middle|Ring|Pinky)/.exec(name);
       return finger ? names.indexOf(`${finger[1]}Hand`) : i;
     });
     for (const prim of node.getMesh()!.listPrimitives()) {
-      const J = prim.getAttribute("JOINTS_0")!;
-      const W = prim.getAttribute("WEIGHTS_0")!;
+      const J = prim.getAttribute('JOINTS_0')!;
+      const W = prim.getAttribute('WEIGHTS_0')!;
       const j = [0, 0, 0, 0];
       const w = [0, 0, 0, 0];
       for (let i = 0; i < J.getCount(); i++) {
@@ -532,9 +407,7 @@ function rigidHands(doc: Document): void {
         W.getElement(i, w);
         // Fold duplicates together (a finger and its hand, now the same joint).
         const merged = new Map<number, number>();
-        for (let k = 0; k < 4; k++)
-          if (w[k] > 0)
-            merged.set(target[j[k]], (merged.get(target[j[k]]) ?? 0) + w[k]);
+        for (let k = 0; k < 4; k++) if (w[k] > 0) merged.set(target[j[k]], (merged.get(target[j[k]]) ?? 0) + w[k]);
         const entries = [...merged].sort((a, b) => b[1] - a[1]);
         for (let k = 0; k < 4; k++) {
           j[k] = entries[k]?.[0] ?? 0;
@@ -548,26 +421,20 @@ function rigidHands(doc: Document): void {
 }
 
 async function prepare(id: string): Promise<void> {
-  const dir = join(ROOT, "assets-src", "characters", id);
-  const doc = await io.read(join(dir, "original", `${id}.glb`));
+  const dir = join(ROOT, 'assets-src', 'characters', id);
+  const doc = await io.read(join(dir, 'original', `${id}.glb`));
   const root = doc.getRoot();
 
   for (const animation of root.listAnimations()) animation.dispose();
-  for (const joint of root.listSkins()[0].listJoints())
-    joint.setName(tidy(joint.getName()));
-  if (id === "tactical") await replaceTacticalParts(doc);
+  for (const joint of root.listSkins()[0].listJoints()) joint.setName(tidy(joint.getName()));
+  if (id === 'tactical') await replaceTacticalParts(doc);
   rebindToPose(doc);
   rigidHands(doc);
   // Stray unskinned meshes (the soldier carries an empty placeholder), and the
   // soldier's headset, which floats above its cap in the download itself.
   for (const node of root.listNodes()) {
-    const material = node
-      .getMesh()
-      ?.listPrimitives()[0]
-      ?.getMaterial()
-      ?.getName();
-    if ((node.getMesh() && !node.getSkin()) || material === "HeadphonesT")
-      node.dispose();
+    const material = node.getMesh()?.listPrimitives()[0]?.getMaterial()?.getName();
+    if ((node.getMesh() && !node.getSkin()) || material === 'HeadphonesT') node.dispose();
   }
 
   const skin = root.listSkins()[0];
@@ -582,14 +449,13 @@ async function prepare(id: string): Promise<void> {
   // Measured in the bind pose (a T-pose): standing.
   // Measured in the download's own pose (a frame of its idle), axes and units:
   // up runs from the toes to the crown, and the hands lie right → left.
-  const v = (name: string): THREE.Vector3 =>
-    new THREE.Vector3().fromArray(at(name));
-  const toe = v("LeftToeBase").add(v("RightToeBase")).multiplyScalar(0.5);
-  const crown = v("HeadTop_End");
+  const v = (name: string): THREE.Vector3 => new THREE.Vector3().fromArray(at(name));
+  const toe = v('LeftToeBase').add(v('RightToeBase')).multiplyScalar(0.5);
+  const crown = v('HeadTop_End');
   const up = crown.clone().sub(toe);
   const scale = HEIGHT / up.length();
   up.normalize();
-  const left = v("LeftHand").sub(v("RightHand"));
+  const left = v('LeftHand').sub(v('RightHand'));
   left.addScaledVector(up, -left.dot(up)).normalize();
   // The game's figure: up +Y, its right +X (so it faces -Z). R maps the
   // download's (right, up, back) onto (X, Y, Z).
@@ -598,13 +464,13 @@ async function prepare(id: string): Promise<void> {
   const R = new THREE.Matrix4().makeBasis(right, up, back).transpose();
   const turn = new THREE.Quaternion().setFromRotationMatrix(R);
   // p' = R·(s·p) + t, with the hips over the origin and the toes at y = 0.
-  const hips = v("Hips").applyMatrix4(R).multiplyScalar(scale);
+  const hips = v('Hips').applyMatrix4(R).multiplyScalar(scale);
   const toeY = toe.clone().applyMatrix4(R).multiplyScalar(scale).y;
   const t: [number, number, number] = [-hips.x, -toeY + 0.03, -hips.z];
 
   const scene = root.getDefaultScene() ?? root.listScenes()[0];
   const wrap = doc
-    .createNode("figure")
+    .createNode('figure')
     .setTranslation(t)
     .setRotation(turn.toArray() as [number, number, number, number])
     .setScale([scale, scale, scale]);
@@ -618,18 +484,11 @@ async function prepare(id: string): Promise<void> {
 
   const before = triangles(doc);
   const ratio = Math.min(1, TRIANGLES / before);
-  await doc.transform(
-    prune({ keepLeaves: true }),
-    weld(),
-    simplify({ simplifier: MeshoptSimplifier, ratio, error: 0.02 }),
-  );
+  await doc.transform(prune({ keepLeaves: true }), weld(), simplify({ simplifier: MeshoptSimplifier, ratio, error: 0.02 }));
   await doc.transform(prune({ keepLeaves: true }));
-  await io.write(join(dir, "figure.glb"), doc);
-  console.log(
-    `${id}: ${before} → ${triangles(doc)} tris, scale ${scale.toFixed(4)}`,
-  );
+  await io.write(join(dir, 'figure.glb'), doc);
+  console.log(`${id}: ${before} → ${triangles(doc)} tris, scale ${scale.toFixed(4)}`);
 }
 
 await MeshoptSimplifier.ready;
-for (const id of OUTFITS)
-  if (!process.env.ONLY || process.env.ONLY === id) await prepare(id);
+for (const id of OUTFITS) if (!process.env.ONLY || process.env.ONLY === id) await prepare(id);

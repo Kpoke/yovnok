@@ -27,7 +27,7 @@
  * car, which is exactly the kind of bug that looks like "the gun doesn't work".
  */
 
-import type { VehicleClassId } from './config';
+import { VEHICLE_CLASSES, type VehicleClassId } from './config';
 import type { WeaponId } from './weapons';
 
 /**
@@ -177,6 +177,13 @@ export function seatCapability(seat: SeatDef): SeatCapability {
 const deg = (d: number): number => (d * Math.PI) / 180;
 
 /** One gunner per class in the coupe; three in the SUV. */
+/**
+ * A window gunner's field of fire: all the way round. Out of their own side
+ * they lean out of the window; across the car they climb onto the sill and
+ * shoot over the roof (`roofAmount`).
+ */
+const ALL_ROUND: readonly [number, number] = [-Math.PI, Math.PI];
+
 const COUPE_SEATS: SeatDef[] = [
   // The duo car is the brawler's body, without its guns: seats where its own are.
   { id: 'seat.driver', drives: true, side: 'left', mount: [-0.38, -0.3, 0.2], arc: null },
@@ -185,9 +192,7 @@ const COUPE_SEATS: SeatDef[] = [
     drives: false,
     side: 'right',
     mount: [0.38, -0.3, 0.2],
-    // Front passenger (right side): forward, round the right flank, to the
-    // right-rear quarter. Right is negative here — see the convention above.
-    arc: [deg(-155), deg(5)],
+    arc: ALL_ROUND,
   },
 ];
 
@@ -200,22 +205,21 @@ const SUV_SEATS: SeatDef[] = [
     drives: false,
     side: 'right',
     mount: [0.45, -0.52, -0.25],
-    arc: [deg(-155), deg(5)],
+    arc: ALL_ROUND,
   },
   {
     id: 'seat.rearLeft',
     drives: false,
     side: 'left',
     mount: [-0.45, -0.52, 0.85],
-    // Rear left window: left flank round to behind. Left is positive.
-    arc: [deg(25), deg(185)],
+    arc: ALL_ROUND,
   },
   {
     id: 'seat.rearRight',
     drives: false,
     side: 'right',
     mount: [0.45, -0.52, 0.85],
-    arc: [deg(-185), deg(-25)],
+    arc: ALL_ROUND,
   },
 ];
 
@@ -326,4 +330,70 @@ export function clampToArc(arc: readonly [number, number], yaw: number): number 
   const pastEnd = offset - span;
   const beforeStart = Math.PI * 2 - offset;
   return pastEnd < beforeStart ? arc[1] : arc[0];
+}
+
+// ------------------------------------------------------------- gunner posture
+
+/** Aim yaw (car-relative, + = left) a gunner's window faces: their side. */
+const outward = (seat: SeatDef): number => (seat.side === 'right' ? -Math.PI / 2 : Math.PI / 2);
+
+/**
+ * How far a window gunner is up on the sill shooting over the roof: 0 leaning
+ * out of the window (aiming out of their own side, within ~100° of it), 1 up
+ * over the roof (aiming across the car), blended between 100° and 125°.
+ */
+export function roofAmount(seat: SeatDef, aimYaw: number): number {
+  let d = Math.abs(aimYaw - outward(seat)) % (Math.PI * 2);
+  if (d > Math.PI) d = Math.PI * 2 - d;
+  const t = (d - (100 * Math.PI) / 180) / ((25 * Math.PI) / 180);
+  const x = t < 0 ? 0 : t > 1 ? 1 : t;
+  return x * x * (3 - 2 * x);
+}
+
+export type GunnerPart = 'head' | 'chest' | 'waist' | 'muzzle';
+
+/**
+ * A window gunner's body (what a shot has to find) and muzzle, car-local, for
+ * their aim: out of the window, or up on the sill over the roof, blended. Up
+ * there more of them shows — the waist counts as well (and is null at the
+ * window, where the door covers it).
+ */
+export function gunnerPoint(
+  cls: VehicleClassId,
+  seat: SeatDef,
+  aimYaw: number,
+  aimPitch: number,
+  part: GunnerPart,
+): [number, number, number] | null {
+  const spec = VEHICLE_CLASSES[cls];
+  const s = seat.side === 'right' ? 1 : -1;
+  const roof = roofAmount(seat, aimYaw);
+  const top = spec.boxHeight - spec.rideHeight;
+  const [mx, my, mz] = seat.mount;
+  const at = (o: readonly number[]): [number, number, number] => [mx + o[0], my + o[1], mz + o[2]];
+  const head: [number, number, number][] = [at(HEAD_OFFSET[seat.side]), [s * spec.halfWidth * 0.5, top + 0.48, mz]];
+  const chest: [number, number, number][] = [at(CHEST_OFFSET[seat.side]), [s * spec.halfWidth * 0.58, top + 0.15, mz]];
+  const mix = (pair: [number, number, number][]): [number, number, number] => [
+    pair[0][0] + (pair[1][0] - pair[0][0]) * roof,
+    pair[0][1] + (pair[1][1] - pair[0][1]) * roof,
+    pair[0][2] + (pair[1][2] - pair[0][2]) * roof,
+  ];
+  if (part === 'head') return mix(head);
+  if (part === 'chest') return mix(chest);
+  if (part === 'waist') return roof > 0.5 ? [s * spec.halfWidth * 0.72, top - 0.12, mz] : null;
+  // The muzzle: at the window, the fixed port; over the roof, out along the
+  // aim from the shoulder (well above the roof, so the car never blocks it).
+  const window = at(FIRE_PORT_OFFSET[seat.side]);
+  const h = mix(head);
+  const c = Math.cos(aimPitch);
+  const over: [number, number, number] = [
+    h[0] - Math.sin(aimYaw) * c * 0.7,
+    h[1] - 0.18 + Math.sin(aimPitch) * 0.7,
+    h[2] - Math.cos(aimYaw) * c * 0.7,
+  ];
+  return [
+    window[0] + (over[0] - window[0]) * roof,
+    window[1] + (over[1] - window[1]) * roof,
+    window[2] + (over[2] - window[2]) * roof,
+  ];
 }

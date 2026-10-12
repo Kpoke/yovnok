@@ -21,8 +21,8 @@
 import * as THREE from 'three';
 import { CAMERA, FEEL, VEHICLE } from '../shared/config';
 import { clamp, damp, wrapAngle } from '../shared/math';
-import { seatPointWorld } from '../shared/combat';
-import { WINDOW_EYE_OFFSET, type SeatDef } from '../shared/crews';
+import { seatPointWorld, vehiclePointWorld } from '../shared/combat';
+import { gunnerPoint, roofAmount, WINDOW_EYE_OFFSET, type SeatDef } from '../shared/crews';
 import type { VehicleState } from '../shared/vehicle';
 
 export class CameraRig {
@@ -121,7 +121,16 @@ export class CameraRig {
     // third-person shooter): behind and above the head along the aim, a little
     // to the outside, so you see yourself, your side of the car and the target.
     // Rigid, not damped: a lagging camera is a crosshair that lies.
-    const head = seatPointWorld(state, seat, WINDOW_EYE_OFFSET[seat.side]);
+    // From the window, or — aiming across the car — from up on the sill, over
+    // the roof (the gunner's own head, shared with the hit test).
+    const window = seatPointWorld(state, seat, WINDOW_EYE_OFFSET[seat.side]);
+    const roof = roofAmount(seat, aimYaw);
+    const up = vehiclePointWorld(state, gunnerPoint(state.spec.id, seat, aimYaw, 0, 'head')!);
+    const head = {
+      x: window.x + (up.x - window.x) * roof,
+      y: window.y + (up.y + 0.15 - window.y) * roof,
+      z: window.z + (up.z - window.z) * roof,
+    };
     const yaw = state.yaw + aimYaw;
     const cosPitch = Math.cos(aimPitch);
     const fx = -Math.sin(yaw) * cosPitch;
