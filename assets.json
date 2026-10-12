@@ -866,6 +866,62 @@
       "source": "https://sketchfab.com/3d-models/military-tactical-suit-lowpolygameready-ef698ce36b1545a78ce592dd3db4c7ed",
       "license": "CC-BY-4.0",
       "changes": "Its headset (floating above the cap in the download) and an empty placeholder mesh removed. Rebound to its saved pose with its skeleton fitted to its mesh (the download's bones did not match it), finger weights moved onto the hands, turned to face -Z and scaled to 1.72 m, simplified to about 7,000 triangles; textures resized to 512 px; recompressed (KTX2, meshopt). Its suit is tinted with the player's paint colour in game; the game poses the skeleton (no animation is used). Built by scripts/prep/characters.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/weapons/hand-rifle/original/rifle.glb",
+        "assets-src/weapons/hand-rifle/gun.glb",
+        "public/assets/weapons/hand-rifle/gun.glb"
+      ],
+      "kind": "model",
+      "title": "Low-Poly M4a1",
+      "author": "TastyTony",
+      "authorUrl": "https://sketchfab.com/TastyTony",
+      "source": "https://sketchfab.com/3d-models/low-poly-m4a1-8cab1cbeb82c4396a154f9fc8771417b",
+      "license": "CC-BY-4.0",
+      "changes": "Its animation rig baked into plain meshes. Turned to point -Z with its top up, the origin at the butt, scaled to its real length; textures resized to 512 px; recompressed (KTX2, meshopt). Held by the window gunners in duos and squads. Built by scripts/prep/hand-guns.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/weapons/hand-marksman/original/marksman.glb",
+        "assets-src/weapons/hand-marksman/gun.glb",
+        "public/assets/weapons/hand-marksman/gun.glb"
+      ],
+      "kind": "model",
+      "title": "Low-Poly SR-25",
+      "author": "TastyTony",
+      "authorUrl": "https://sketchfab.com/TastyTony",
+      "source": "https://sketchfab.com/3d-models/low-poly-sr-25-81976c51d61543a288cf135fd7485951",
+      "license": "CC-BY-4.0",
+      "changes": "Its animation rig baked into plain meshes. Turned to point -Z with its top up, the origin at the butt, scaled to its real length; textures resized to 512 px; recompressed (KTX2, meshopt). Held by the window gunners in duos and squads. Built by scripts/prep/hand-guns.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/weapons/hand-shotgun/original/shotgun.glb",
+        "assets-src/weapons/hand-shotgun/gun.glb",
+        "public/assets/weapons/hand-shotgun/gun.glb"
+      ],
+      "kind": "model",
+      "title": "Remington 870 Shotgun",
+      "author": "milinam2002",
+      "authorUrl": "https://sketchfab.com/milinam2002",
+      "source": "https://sketchfab.com/3d-models/remington-870-shotgun-6db0ad4764d14eee8f063eea3600071b",
+      "license": "CC-BY-4.0",
+      "changes": "Turned to point -Z with its top up, the origin at the butt, scaled to its real length; textures resized to 512 px; recompressed (KTX2, meshopt). Held by the window gunners in duos and squads. Built by scripts/prep/hand-guns.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/weapons/hand-launcher/original/launcher.glb",
+        "assets-src/weapons/hand-launcher/gun.glb",
+        "public/assets/weapons/hand-launcher/gun.glb"
+      ],
+      "kind": "model",
+      "title": "low-poly Milkor MGL",
+      "author": "DU1701",
+      "authorUrl": "https://sketchfab.com/DU1701",
+      "source": "https://sketchfab.com/3d-models/low-poly-milkor-mgl-0e35ba04be5443eea3386e10b643ec77",
+      "license": "CC-BY-4.0",
+      "changes": "Its four loose grenades removed. Turned to point -Z with its top up, the origin at the butt, scaled to its real length; textures resized to 512 px; recompressed (KTX2, meshopt). Held by the window gunners in duos and squads. Built by scripts/prep/hand-guns.ts and scripts/assetbuild.ts."
     }
   ]
 }

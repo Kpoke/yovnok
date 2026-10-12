@@ -553,6 +553,10 @@ try {
       0,
     );
     check('tucked inside, they cannot', tucked.memberHit === null, `memberHit=${tucked.memberHit}`);
+    // Leaning out of the RIGHT window, a shot from the LEFT has to go through
+    // the car to reach them: it does not.
+    const throughCar = resolveHitscan([target], members, -1, -12, gunnerHead.y, gunnerHead.z, 1, 0, 0, 220, 0);
+    check('a shot through the car does not reach them', throughCar.memberHit === null, `memberHit=${throughCar.memberHit}`);
 
     const driverHead = headWorld(target, seatById('suv', 'seat.driver')!);
     const atDriver = resolveHitscan(

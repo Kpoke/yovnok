@@ -59,14 +59,24 @@ export const FIRE_PORT_OFFSET = {
  * inside the cabin can never be hit from any angle (see `headWorld`).
  */
 export const HEAD_OFFSET = {
-  right: [0.78, 0.66, 0.05],
-  left: [-0.78, 0.66, 0.05],
+  right: [0.47, 1.05, 0.14],
+  left: [-0.47, 1.05, 0.14],
 } as const;
 
-/** A leaning gunner's chest, under the head, half out of the window. */
+/** A leaning gunner's chest, under the head, in the window opening. */
 export const CHEST_OFFSET = {
-  right: [0.68, 0.32, 0.05],
-  left: [-0.68, 0.32, 0.05],
+  right: [0.39, 0.86, 0.04],
+  left: [-0.39, 0.86, 0.04],
+} as const;
+
+/**
+ * A leaning gunner's shooting shoulder, where the butt sits: the muzzle is a
+ * gun's length from here along the aim. (These three are measured from the
+ * posed figure — vehicle/figures.ts — so a shot finds the body that is drawn.)
+ */
+export const SHOULDER_OFFSET = {
+  right: [0.5, 0.92, 0.24],
+  left: [-0.5, 0.92, 0.24],
 } as const;
 
 /**
@@ -381,16 +391,17 @@ export function gunnerPoint(
   if (part === 'head') return mix(head);
   if (part === 'chest') return mix(chest);
   if (part === 'waist') return roof > 0.5 ? [s * spec.halfWidth * 0.72, top - 0.12, mz] : null;
-  // The muzzle: at the window, the fixed port; over the roof, out along the
-  // aim from the shoulder (well above the roof, so the car never blocks it).
-  const window = at(FIRE_PORT_OFFSET[seat.side]);
-  const h = mix(head);
+  // The muzzle: a gun's length along the aim from the shooting shoulder — at
+  // the window, or over the roof (well above it, so the car never blocks it).
   const c = Math.cos(aimPitch);
-  const over: [number, number, number] = [
-    h[0] - Math.sin(aimYaw) * c * 0.7,
-    h[1] - 0.18 + Math.sin(aimPitch) * 0.7,
-    h[2] - Math.cos(aimYaw) * c * 0.7,
+  const along = (from: readonly number[], length: number): [number, number, number] => [
+    from[0] - Math.sin(aimYaw) * c * length,
+    from[1] + Math.sin(aimPitch) * length,
+    from[2] - Math.cos(aimYaw) * c * length,
   ];
+  const window = along(at(SHOULDER_OFFSET[seat.side]), 0.85);
+  const h = mix(head);
+  const over = along([h[0], h[1] - 0.18, h[2]], 0.7);
   return [
     window[0] + (over[0] - window[0]) * roof,
     window[1] + (over[1] - window[1]) * roof,

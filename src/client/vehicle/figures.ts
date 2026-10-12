@@ -43,7 +43,28 @@ export type FigurePose = {
   alive: boolean;
   /** What a gunner holds (null: empty hands, e.g. the driver). */
   gun: WeaponId | null;
+  /** Reloading the gun in hand. */
+  reload: boolean;
 };
+
+/**
+ * Where the hands go on each gun, in metres from the butt: across, up, and
+ * along the barrel. The rear hand on the grip, the front hand on the handguard
+ * (or pump, or foregrip), and the magazine for a reload.
+ */
+const GRIPS: Record<WeaponId, { grip: [number, number, number]; fore: [number, number, number]; mag: [number, number, number] }> = {
+  rifle: { grip: [0, -0.08, 0.27], fore: [0, -0.02, 0.52], mag: [0, -0.1, 0.38] },
+  marksman: { grip: [0, -0.08, 0.3], fore: [0, -0.02, 0.62], mag: [0, -0.1, 0.42] },
+  shotgun: { grip: [0, -0.06, 0.3], fore: [0, -0.04, 0.6], mag: [0, -0.03, 0.42] },
+  launcher: { grip: [0, -0.1, 0.27], fore: [0, -0.12, 0.5], mag: [0, -0.03, 0.4] },
+  mg: { grip: [0, -0.08, 0.27], fore: [0, -0.02, 0.52], mag: [0, -0.1, 0.38] },
+  rocket: { grip: [0, -0.08, 0.27], fore: [0, -0.02, 0.52], mag: [0, -0.1, 0.38] },
+  scatter: { grip: [0, -0.08, 0.27], fore: [0, -0.02, 0.52], mag: [0, -0.1, 0.38] },
+  lancer: { grip: [0, -0.08, 0.27], fore: [0, -0.02, 0.52], mag: [0, -0.1, 0.38] },
+  swarm: { grip: [0, -0.08, 0.27], fore: [0, -0.02, 0.52], mag: [0, -0.1, 0.38] },
+};
+/** Seconds to put one gun away and bring the other up. */
+const SWAP_SECONDS = 0.45;
 
 // ------------------------------------------------------------------ library
 
@@ -52,6 +73,8 @@ type Outfit = { scene: THREE.Object3D; tintable: Set<string> };
 /** Loads the outfits (once) and makes figures from them. */
 export class FigureLibrary {
   private readonly outfits = new Map<number, Outfit>();
+  /** The hand-held guns (scripts/prep/hand-guns.ts): butt at the origin, barrel -Z. */
+  private readonly guns = new Map<WeaponId, THREE.Object3D>();
   private pending: Promise<void> | null = null;
 
   constructor(private readonly loader: GLTFLoader) {}
@@ -79,7 +102,24 @@ export class FigureLibrary {
             console.warn(`[figures] ${outfit.id} failed to load`, error);
           }
         }),
-      ).then(() => undefined);
+      )
+        .then(() =>
+          Promise.all(
+            (['rifle', 'shotgun', 'marksman', 'launcher'] as const).map(async (id) => {
+              try {
+                const gltf = await this.loader.loadAsync(`/assets/weapons/hand-${id}/gun.glb`);
+                gltf.scene.traverse((o) => {
+                  const mesh = o as THREE.Mesh;
+                  if (mesh.isMesh) mesh.castShadow = false;
+                });
+                this.guns.set(id, gltf.scene);
+              } catch (error) {
+                console.warn(`[figures] the ${id} failed to load; drawing a plain one`, error);
+              }
+            }),
+          ),
+        )
+        .then(() => undefined);
     }
     return this.pending;
   }
@@ -92,7 +132,7 @@ export class FigureLibrary {
   create(outfit: number, tint: number): Figure | null {
     const source = this.outfits.get(outfit) ?? this.outfits.values().next().value;
     if (!source) return null;
-    return new Figure(cloneSkinned(source.scene), source.tintable, tint);
+    return new Figure(cloneSkinned(source.scene), source.tintable, tint, (id) => this.guns.get(id)?.clone() ?? handGun(id));
   }
 }
 
@@ -201,13 +241,28 @@ export class Figure {
   private readonly legs: { left: Limb; right: Limb };
   private readonly gunHolder = new THREE.Group();
   private gunId: WeaponId | null = null;
+  /** The gun being swapped in (undefined: no swap under way). */
+  private pendingGun: WeaponId | null | undefined = undefined;
+  /** 1 → 0 through a swap. */
+  private swap = 0;
+  /** The kick of recent shots, decaying. */
+  private recoil = 0;
+  private reloadPhase = 0;
+  private time = 0;
+  /** Each person sways out of step with the others. */
+  private readonly phase = Math.random() * Math.PI * 2;
   /** 0 tucked in … 1 out of the window, eased toward the wanted state. */
   private lean = 0;
   /** 0 at the window … 1 up on the sill over the roof, eased toward the aim's. */
   private roof = 0;
   private readonly tinted: THREE.Material[] = [];
 
-  constructor(model: THREE.Object3D, tintable: Set<string>, tint: number) {
+  constructor(
+    model: THREE.Object3D,
+    tintable: Set<string>,
+    tint: number,
+    private readonly makeGun: (id: WeaponId) => THREE.Object3D = handGun,
+  ) {
     this.root.name = 'figure';
     this.root.add(model, this.gunHolder);
     const paint = new THREE.Color(0xffffff).lerp(new THREE.Color(tint), 0.6);
@@ -360,7 +415,7 @@ export class Figure {
     // Over the roof the body is upright, leaning in over it.
     const spineDir = !p.alive
       ? toWorldDir(0.1 * side, 0.55, -0.8)
-      : toWorldDir(side * (1.0 * lean * (1 - roof) - 0.35 * roof), 1, 0.3 * (1 - lean));
+      : toWorldDir(side * (0.6 * lean * (1 - roof) - 0.35 * roof), 1, 0.3 * (1 - lean));
     for (let i = 0; i < SPINE.length - 1; i++) aimBone(this.bone(SPINE[i]), this.bone(SPINE[i + 1]), spineDir);
 
     // Aim, car frame (+yaw = left).
@@ -397,41 +452,94 @@ export class Figure {
       this.gunHolder.visible = false;
       return;
     }
-    // A gunner: the gun points along the aim when out; across the lap, muzzle
-    // up and forward, when tucked in.
-    const lapDir = toWorldDir(0.15 * side, 0.55, -0.85).normalize();
-    const gunDir = new THREE.Vector3().lerpVectors(lapDir, aimWorld, lean).normalize();
-    const butt = new THREE.Vector3().lerpVectors(
-      toWorld(p.hip.clone().add(new THREE.Vector3(0.12, 0.12, -0.18))),
-      shoulder.clone().addScaledVector(carUp, -0.04),
-      lean,
-    );
+    // A gunner. Out of the window (or over the roof) the gun is shouldered
+    // along the aim: butt in the shoulder pocket, rear hand on the grip, front
+    // hand on the handguard, head down behind the sights. Tucked in, it is held
+    // at low ready across the body, muzzle up. On top: idle sway and breathing,
+    // the kick of each shot, a reload (gun canted, hand to the magazine) and a
+    // swap (gun lowered out of view, the other raised).
+    this.time += dt;
+    this.recoil = Math.max(0, this.recoil - dt * 9);
+    const grips = GRIPS[this.gunId ?? 'rifle'];
+    // Swap: the gun goes down and the new one comes up (`setGun` starts it).
+    this.swap = Math.max(0, this.swap - dt / SWAP_SECONDS);
+    const swapDip = Math.sin(this.swap * Math.PI) * 1.1;
+    this.reloadPhase = p.reload ? this.reloadPhase + dt : 0;
+    const reloadAmount = p.reload ? Math.min(1, this.reloadPhase * 4) : 0;
+    const sway = (1 - 0.6 * lean) * 0.03 + 0.008;
+    const breathe = Math.sin(this.time * 1.6 + this.phase) * sway;
+    const drift = Math.sin(this.time * 0.9 + this.phase * 2.3) * sway;
+
+    const right0 = new THREE.Vector3().crossVectors(aimWorld, carUp).normalize();
+    const low = toWorldDir(0.25 * side, 0.75, -0.6).normalize();
+    const gunDir = new THREE.Vector3()
+      .lerpVectors(low, aimWorld, lean)
+      .addScaledVector(carUp, breathe + this.recoil * 0.12 - swapDip * 0.8 - reloadAmount * 0.35)
+      .addScaledVector(right0, drift)
+      .normalize();
     const right = new THREE.Vector3().crossVectors(gunDir, carUp).normalize();
-    const gunUp = new THREE.Vector3().crossVectors(right, gunDir).normalize();
-    this.reach(
-      this.arms.right,
-      butt.clone().addScaledVector(gunDir, 0.24).addScaledVector(gunUp, -0.07),
-      right.clone().addScaledVector(carUp, -1),
-    );
-    this.reach(
-      this.arms.left,
-      butt.clone().addScaledVector(gunDir, 0.5).addScaledVector(gunUp, -0.05),
-      right.clone().negate().addScaledVector(carUp, -1),
-    );
-    // Place the gun: its butt at `butt`, along `gunDir`, upright.
+    let gunUp = new THREE.Vector3().crossVectors(right, gunDir).normalize();
+    // A reload cants the gun over onto its side.
+    if (reloadAmount > 0) gunUp = gunUp.applyAxisAngle(gunDir, -0.5 * reloadAmount * side).normalize();
+    const gunRight = new THREE.Vector3().crossVectors(gunDir, gunUp).normalize();
+
+    // The shoulder pocket: just inside the right shoulder joint, a little low;
+    // the gun slides back into it with each shot.
+    const pocket = shoulder
+      .clone()
+      .addScaledVector(gunRight, -0.06)
+      .addScaledVector(gunUp, -0.04)
+      .addScaledVector(gunDir, -0.02 - this.recoil * 0.05);
+    const lowReady = toWorld(p.hip.clone().add(new THREE.Vector3(0.18, 0.18, -0.2)));
+    const butt = new THREE.Vector3().lerpVectors(lowReady, pocket, lean);
+    const onGun = (local: readonly [number, number, number]): THREE.Vector3 =>
+      butt.clone().addScaledVector(gunRight, local[0]).addScaledVector(gunUp, local[1]).addScaledVector(gunDir, local[2]);
+    const grip = onGun(grips.grip);
+    // Reloading, the front hand goes down to the magazine and back.
+    const reach = reloadAmount * (0.5 - 0.5 * Math.cos(this.reloadPhase * 5));
+    const fore = onGun(grips.fore).lerp(onGun(grips.mag).addScaledVector(gunUp, -0.12), reach);
+    // Elbows: the trigger arm out to the side and a little down; the support
+    // arm tucked under the gun.
+    this.reach(this.arms.right, grip, gunRight.clone().multiplyScalar(0.8).addScaledVector(carUp, -0.6));
+    this.reach(this.arms.left, fore, gunRight.clone().multiplyScalar(-0.3).addScaledVector(carUp, -1));
+    // The head: down to the sights when out, looking over the gun.
+    if (p.alive && lean > 0.2) {
+      const sight = gunDir.clone().addScaledVector(carUp, 0.35).normalize();
+      aimBone(this.bone('Neck'), this.bone('Head'), new THREE.Vector3().lerpVectors(headDir, sight, lean));
+    }
+
+    // Place the gun: butt at `butt`, barrel along `gunDir`.
     this.gunHolder.visible = this.gunId !== null;
-    const basis = new THREE.Matrix4().makeBasis(right, gunUp, gunDir.clone().negate());
+    const basis = new THREE.Matrix4().makeBasis(gunRight, gunUp, gunDir.clone().negate());
     const world = new THREE.Quaternion().setFromRotationMatrix(basis);
     this.root.getWorldQuaternion(_p);
     this.gunHolder.quaternion.copy(_p.invert().multiply(world));
     this.gunHolder.position.copy(this.root.worldToLocal(butt.clone()));
+    // Halfway through a swap, out of sight: the new gun goes in.
+    if (this.pendingGun !== undefined && this.swap <= 0.5) this.putGun(this.pendingGun);
   }
 
+  /** A shot was fired from this seat: the gun kicks back into the shoulder. */
+  kick(): void {
+    this.recoil = Math.min(1.4, this.recoil + 1);
+  }
+
+  /** Change gun: the first one goes straight in; later ones swap (down, then up). */
   private setGun(id: WeaponId | null): void {
-    if (id === this.gunId) return;
+    if (id === (this.pendingGun ?? this.gunId)) return;
+    if (this.gunId === null || id === null) {
+      this.putGun(id);
+      return;
+    }
+    this.pendingGun = id;
+    this.swap = 1;
+  }
+
+  private putGun(id: WeaponId | null): void {
+    this.pendingGun = undefined;
     this.gunId = id;
     for (const child of [...this.gunHolder.children]) this.gunHolder.remove(child);
-    if (id) this.gunHolder.add(handGun(id));
+    if (id) this.gunHolder.add(this.makeGun(id));
   }
 
   dispose(): void {

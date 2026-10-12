@@ -133,6 +133,8 @@ export type CrewPose = {
   /** The weapon in their hands: 0 their window gun (`gun`), 1 the launcher. */
   slot: number;
   gun: number;
+  /** Reloading the weapon in hand. */
+  reload: boolean;
   alive: boolean;
 };
 
@@ -1071,6 +1073,7 @@ export class NetClient {
         outfit: m.outfit,
         slot: mine ? this.self.slot : m.slot,
         gun: m.gun,
+        reload: (mine ? this.self.reload : m.reload) > 0,
         alive: m.alive,
       });
     }

@@ -786,6 +786,7 @@ function frame(now: number): void {
       // Draw our own shot NOW, from a local prediction, so the gun feels
       // attached to the trigger rather than to the network.
       const predicted = net.predictShot(slot);
+      if (predicted && net.seat) localCar.kick(net.seat);
       if (predicted) {
         const o = predicted.origin;
         const e = predicted.end;
@@ -834,6 +835,9 @@ function frame(now: number): void {
       // the positional mix. Ours already sounded at the trigger. (One bang per
       // scattergun shot, not one per pellet.)
       if (Math.random() < 1 / (shotWeapon.pellets ?? 1)) audio.shot(shot.ox, shot.oy, shot.oz, false, shot.weapon);
+      // And the shooter's gun kicks.
+      const shooter = net.members.get(shot.by);
+      if (shooter) remoteCars.get(shooter.crew)?.kick(shooter.seat);
     }
     if (mine) {
       // Ours: already drawn from prediction. The server's event is used only as
@@ -947,7 +951,7 @@ function frame(now: number): void {
       ? new Map(Object.entries(devCrew))
       : net.crewId !== null
       ? net.crewOf(net.crewId)
-      : new Map([['seat.driver', { yaw: 0, pitch: 0, out: false, outfit: profile.look.outfit, slot: 0, gun: profile.look.gunner, alive: true }]]),
+      : new Map<string, CrewPose>([['seat.driver', { yaw: 0, pitch: 0, out: false, outfit: profile.look.outfit, slot: 0, gun: profile.look.gunner, reload: false, alive: true }]]),
     realDt,
   );
   // Our guns follow the crosshair, each only as far as it physically turns.

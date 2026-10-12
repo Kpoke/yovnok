@@ -460,6 +460,9 @@ export function resolveHitscan(
   const arena = raycastSolids(ox, oy, oz, dx, dy, dz, maxDistance);
   if (arena !== null) best = arena;
 
+  // Every hull the ray meets before the arena stops it; the nearest is hit.
+  const limit = best;
+  const hulls = new Map<number, number>();
   for (const original of vehicles) {
     // Skip our own car ENTIRELY, not just at the damage step. The muzzle sits
     // inside it — a gunner fires from a window aperture — so a box test finds a
@@ -468,8 +471,10 @@ export function resolveHitscan(
     if (original.id === shooterCrew) continue;
 
     const vehicle = rewindVehicle(original, rewindSeconds);
-    const hit = raycastVehicle(vehicle, ox, oy, oz, dx, dy, dz, best);
+    const hit = raycastVehicle(vehicle, ox, oy, oz, dx, dy, dz, limit);
     if (!hit) continue;
+    hulls.set(vehicle.id, hit.distance);
+    if (hit.distance >= best) continue;
 
     // A nearer hull than anything so far: whoever is in it takes the hit.
     best = hit.distance;
@@ -489,14 +494,21 @@ export function resolveHitscan(
     const seat = seatsFor(original.cls).find((s) => s.id === member.seat);
     if (!seat || seat.drives) continue;
     const vehicle = rewindVehicle(original, rewindSeconds);
+    // Their own car's box does not shield them where they lean out of its
+    // window (the box is the whole body, the window is open) — but a ray that
+    // goes in through the far side of the car does not reach them.
+    let cover = limit;
+    for (const [id, distance] of hulls) if (id !== member.crew) cover = Math.min(cover, distance);
+    const own = hulls.get(member.crew);
     const waist = waistWorld(vehicle, seat, member.aimYaw, member.aimPitch);
     for (const [point, radius] of [
       [headWorld(vehicle, seat, member.aimYaw, member.aimPitch), COMBAT.headRadius],
       [chestWorld(vehicle, seat, member.aimYaw, member.aimPitch), COMBAT.chestRadius],
       ...(waist ? ([[waist, COMBAT.chestRadius]] as const) : []),
     ] as const) {
-      const t = raycastSphere(ox, oy, oz, dx, dy, dz, point.x, point.y, point.z, radius, best);
-      if (t !== null && t < best) {
+      const t = raycastSphere(ox, oy, oz, dx, dy, dz, point.x, point.y, point.z, radius, cover);
+      if (t === null || (own !== undefined && own < t - 0.8)) continue;
+      if (t < cover && (memberHit === null || t < best) && (hullHit === member.crew || t < best)) {
         best = t;
         memberHit = member.id;
         hullHit = null;

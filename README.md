@@ -37,8 +37,9 @@ minute so people pressing PLAY around the same time share it.
 In duos and squads the driver only drives and the gunners only shoot. Every
 car carries its people — a driver at the wheel and, in team modes, gunners who
 sit tucked inside and **lean out of their window to aim**, gun at the shoulder,
-with an over-the-shoulder view. Tucked in they cannot shoot or be shot; leaning
-out they can do both. A gunner holds a gun and a grenade launcher and swaps
+with an over-the-shoulder view — all the way round: aiming across the car they
+climb onto the sill and shoot over the roof, where more of them shows. Tucked
+in they cannot shoot or be shot; leaning out they can do both. A gunner holds a gun and a grenade launcher and swaps
 between them, can move to another window (not the wheel), and when shot down is
 knocked back inside for 8 seconds. The car is out when its hull is.
 - **PRIVATE ROOM** — create a room and send friends its five-letter code or

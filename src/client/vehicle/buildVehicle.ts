@@ -77,6 +77,8 @@ export type VehicleRig = {
    * seat, posed for what they are doing. Seats not listed are empty.
    */
   setCrew: (crew: ReadonlyMap<string, CrewPose>, dt: number) => void;
+  /** A shot left this seat: its person's gun kicks. */
+  kick: (seatId: string) => void;
   /**
    * Turn the car-mounted guns: one aim per mounted weapon (slot order), relative
    * to the car's nose, already clamped to that weapon's limits. Every gun of a
@@ -455,6 +457,7 @@ export function buildVehicle(
           out: pose.out,
           alive: pose.alive,
           gun: driver ? null : pose.slot === 1 ? GUNNER_SECONDARY : GUNNER_PRIMARIES[pose.gun] ?? GUNNER_PRIMARIES[0],
+          reload: pose.reload,
         },
         dt,
       );
@@ -480,6 +483,7 @@ export function buildVehicle(
     seats,
     update,
     setCrew,
+    kick: (seatId) => seated.get(seatId)?.figure.kick(),
     setWeaponAims,
     setShadowDetail,
     damageAnchors,
