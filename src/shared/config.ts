@@ -656,9 +656,9 @@ export const VEHICLE = {
 
 export const CAMERA = {
   /** Distance from the car at the default orbit angle. */
-  distance: 6.9,
+  distance: 4.6,
   /** Extra height added on top of the orbit maths. */
-  height: 2.1,
+  height: 1.6,
   /** Default downward pitch. */
   pitch: 0.17,
   minPitch: -0.35,
@@ -691,7 +691,7 @@ export const CAMERA = {
   soloDistance: 5.4,
   /** Window gunner, over the shoulder: distance behind the head, height, and
    * how far to the side of the line of sight. */
-  gunnerDistance: 2.7,
+  gunnerDistance: 2.2,
   gunnerHeight: 1.1,
   gunnerShoulder: 1.1,
   soloHeight: 1.75,
