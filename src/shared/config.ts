@@ -656,9 +656,9 @@ export const VEHICLE = {
 
 export const CAMERA = {
   /** Distance from the car at the default orbit angle. */
-  distance: 8.2,
+  distance: 6.9,
   /** Extra height added on top of the orbit maths. */
-  height: 2.4,
+  height: 2.1,
   /** Default downward pitch. */
   pitch: 0.17,
   minPitch: -0.35,
@@ -688,13 +688,13 @@ export const CAMERA = {
   // Sized for the brawler (1.4 m tall plus a 0.5 m roof station): the sight
   // line clears the station, so the crosshair is never on it. Close enough
   // that the car fills the lower third of the frame.
-  soloDistance: 6.0,
+  soloDistance: 5.4,
   /** Window gunner, over the shoulder: distance behind the head, height, and
    * how far to the side of the line of sight. */
-  gunnerDistance: 3.2,
+  gunnerDistance: 2.7,
   gunnerHeight: 1.1,
   gunnerShoulder: 1.1,
-  soloHeight: 2.5,
+  soloHeight: 1.75,
   /** How far ahead the camera looks. Larger flattens the aim feel. */
   soloLookAhead: 26,
   /**
