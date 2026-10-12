@@ -89,7 +89,7 @@ a seat frees up.
 **The garage.** Paint, a pattern (stripes, hazard, camo, tiger, checker) in a
 colour of your choice, rim colour, a body kit (bull bar, light bar, rear wing,
 side armour, side exhausts), a door decal with your race number, underglow,
-and your outfit (Striker, Tactical or Soldier, in your paint colour) — some
+and your outfit (SWAT, Mechanic or Soldier, in your paint colour) — some
 unlocked by playing (matches, kills, wins). And your guns, all open from the
 start:
 

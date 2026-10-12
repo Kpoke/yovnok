@@ -4,14 +4,17 @@
  *   npx tsx scripts/prep/characters.ts     # then: npm run assetbuild
  *
  * Inputs (unmodified downloads, kept as the preferred form for modification),
- * all by 1799danly, CC BY 4.0, all on the same Mixamo skeleton:
- *   assets-src/characters/tactical/original/tactical.glb   masked, plate carrier
- *   assets-src/characters/striker/original/striker.glb     racing jumpsuit, helmet
- *   assets-src/characters/soldier/original/soldier.glb     military kit, cap
+ * CC BY 4.0, all on Mixamo skeletons:
+ *   assets-src/characters/swat/original/swat.glb           "Swat", doctortex
+ *   assets-src/characters/mechanic/original/mechanic.glb   "US Navy Mechanic", doctortex
+ *   assets-src/characters/soldier/original/soldier.glb     "Army soldier Character", joneborden123
+ *
+ * Chosen for their rigs: every joint sits where its skin bends (within ~1% of
+ * height; `rebindToPose` measures it), so they bend cleanly when posed.
  *
  * Outputs: assets-src/characters/<id>/figure.glb — one skinned figure, in game
  * convention (metres, +Y up, facing -Z), feet on y = 0 and centred under the
- * hips; 1.72 m from toe to crown. No animation: the game poses the skeleton
+ * hips; 1.80 m from toe to crown. No animation: the game poses the skeleton
  * itself (sitting, at the wheel, leaning out of a window to aim). The joints are
  * renamed to plain Mixamo names ("Hips", "LeftForeArm"…) so one posing routine
  * drives every outfit. Simplified for a dozen figures on screen at once.
@@ -22,19 +25,19 @@
 
 import { join } from 'node:path';
 import type { Document } from '@gltf-transform/core';
-import { prune, simplify, weld } from '@gltf-transform/functions';
+import { metalRough, prune, simplify, weld } from '@gltf-transform/functions';
 import { MeshoptSimplifier } from 'meshoptimizer';
 import * as THREE from 'three';
 import { io, ROOT } from './lib';
 
-const OUTFITS = ['tactical', 'striker', 'soldier'] as const;
+const OUTFITS = ['swat', 'mechanic', 'soldier'] as const;
 /** Toe to crown, metres (the toe joint sits at the ball of the foot). */
-const HEIGHT = 1.72;
+const HEIGHT = 1.8;
 /** Triangles kept per figure. */
 const TRIANGLES = Number(process.env.FIGURE_TRIS ?? 7000);
 
-/** "mixamorig:LeftForeArm_022" → "LeftForeArm". */
-const tidy = (name: string): string => name.replace(/^mixamorig:/, '').replace(/_\d+$/, '');
+/** "mixamorig:LeftForeArm_022" (or any "namespace:") → "LeftForeArm". */
+const tidy = (name: string): string => name.replace(/^.*:/, '').replace(/_\d+$/, '');
 
 function triangles(doc: Document): number {
   let n = 0;
@@ -42,184 +45,6 @@ function triangles(doc: Document): number {
     for (const prim of mesh.listPrimitives()) n += (prim.getIndices()?.getCount() ?? 0) / 3;
   }
   return n;
-}
-
-/**
- * The Tactical download's gloves and head are broken: their vertices sit in
- * another space from the rest of the body (the gloves stretch into long
- * sheets, the head floats). Its base body is the Striker's — the same meshes,
- * textured differently — whose geometry is carried over (keeping the
- * Tactical's own materials).
- * Each vertex moves with the bone that mainly drives it — into that bone's
- * frame in the Striker, out of the same-named bone in the Tactical — which is
- * exact for a rigid hand whatever else differs between the two bodies.
- */
-async function replaceTacticalParts(doc: Document): Promise<void> {
-  const donor = await io.read(join(ROOT, 'assets-src', 'characters', 'striker', 'original', 'striker.glb'));
-  // Tactical part ← the same mesh in the Striker (its visor glass is "Material.001").
-  // Old and new positions of every base-body vertex, with its main joint.
-  const pairs: Array<{ joint: number; from: number[]; to: number[] }> = [];
-  for (const [here, there] of [
-    ['gloves', 'gloves'],
-    ['Head', 'Head'],
-    ['material', 'material'],
-    ['Material.001', 'Glass'],
-    ['jumpsuit', 'Jumpsuit'],
-    ['boots', 'Boots'],
-  ] as const) {
-    const before = carryMesh(doc, donor, here, there);
-    const prim = nodeByMaterial(doc, here).getMesh()!.listPrimitives()[0];
-    const after = prim.getAttribute('POSITION')!.getArray()!;
-    const W = prim.getAttribute('WEIGHTS_0')!;
-    const J = prim.getAttribute('JOINTS_0')!;
-    const w = [0, 0, 0, 0];
-    const j = [0, 0, 0, 0];
-    for (let i = 0; i < W.getCount(); i++) {
-      W.getElement(i, w);
-      J.getElement(i, j);
-      const k = w.indexOf(Math.max(...w));
-      pairs.push({
-        joint: j[k],
-        from: [before[i * 3], before[i * 3 + 1], before[i * 3 + 2]],
-        to: [after[i * 3], after[i * 3 + 1], after[i * 3 + 2]],
-      });
-    }
-  }
-  // The Tactical's own kit sat on the OLD body: move it as the body moved,
-  // by a least-squares affine fit per joint (its parent's when too few points).
-  const skinJoints = nodeByMaterial(doc, 'gloves').getSkin()!.listJoints();
-  const fits = new Map<number, THREE.Matrix4 | null>();
-  const fitFor = (joint: number): THREE.Matrix4 | null => {
-    if (fits.has(joint)) return fits.get(joint)!;
-    const pts = pairs.filter((p) => p.joint === joint);
-    let fit: THREE.Matrix4 | null = null;
-    if (pts.length >= 12) {
-      // Solve [x y z 1]·A = [x' y' z'] (normal equations, 4×4).
-      const ata = new THREE.Matrix4().set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-      const e = ata.elements;
-      const atb = [0, 1, 2].map(() => [0, 0, 0, 0]);
-      for (const p of pts) {
-        const r = [...p.from, 1];
-        for (let x = 0; x < 4; x++) {
-          for (let y = 0; y < 4; y++) e[y * 4 + x] += r[x] * r[y];
-          for (let c = 0; c < 3; c++) atb[c][x] += r[x] * p.to[c];
-        }
-      }
-      const inv = ata.clone().invert();
-      const col = (c: number) => new THREE.Vector4().fromArray(atb[c]).applyMatrix4(inv);
-      const [cx, cy, cz] = [col(0), col(1), col(2)];
-      fit = new THREE.Matrix4().set(cx.x, cx.y, cx.z, cx.w, cy.x, cy.y, cy.z, cy.w, cz.x, cz.y, cz.z, cz.w, 0, 0, 0, 1);
-    } else {
-      const parent = skinJoints[joint].getParentNode();
-      const index = parent ? skinJoints.indexOf(parent) : -1;
-      fit = index >= 0 ? fitFor(index) : null;
-    }
-    fits.set(joint, fit);
-    return fit;
-  };
-  for (const material of ['ShoulderPads', 'Headphones', 'plate']) {
-    for (const node of doc.getRoot().listNodes()) {
-      const prim = node.getMesh()?.listPrimitives()[0];
-      if (!prim || prim.getMaterial()?.getName() !== material) continue;
-      const P = prim.getAttribute('POSITION')!;
-      const W = prim.getAttribute('WEIGHTS_0')!;
-      const J = prim.getAttribute('JOINTS_0')!;
-      const out = new Float32Array(P.getCount() * 3);
-      const v = new THREE.Vector3();
-      const w = [0, 0, 0, 0];
-      const j = [0, 0, 0, 0];
-      const e = [0, 0, 0];
-      for (let i = 0; i < P.getCount(); i++) {
-        W.getElement(i, w);
-        J.getElement(i, j);
-        P.getElement(i, e);
-        const fit = fitFor(j[w.indexOf(Math.max(...w))]);
-        (fit ? v.fromArray(e).applyMatrix4(fit) : v.fromArray(e)).toArray(out, i * 3);
-      }
-      P.setArray(out);
-    }
-  }
-  console.log('tactical: base body carried over from the striker, its kit refitted');
-}
-
-const nodeByMaterial = (d: Document, material: string) =>
-  d
-    .getRoot()
-    .listNodes()
-    .find((x) => x.getMesh()?.listPrimitives()[0]?.getMaterial()?.getName() === material)!;
-
-/** Replace one mesh's geometry with the donor's same mesh; returns the old positions. */
-function carryMesh(doc: Document, donor: Document, hereMaterial: string, thereMaterial: string): ArrayLike<number> {
-  const hereNode = nodeByMaterial(doc, hereMaterial);
-  const thereNode = nodeByMaterial(donor, thereMaterial);
-  const gloves = hereNode.getMesh()!.listPrimitives()[0];
-  const source = thereNode.getMesh()!.listPrimitives()[0];
-  const old = Float32Array.from(gloves.getAttribute('POSITION')!.getArray()! as ArrayLike<number>);
-  const name = (j: { getName(): string }): string =>
-    j
-      .getName()
-      .replace(/^mixamorig:/, '')
-      .replace(/_\d+$/, '');
-  const hereJoints = hereNode.getSkin()!.listJoints().map(name);
-  const thereJoints = thereNode.getSkin()!.listJoints().map(name);
-  const ibm = (node: typeof hereNode, i: number): THREE.Matrix4 => {
-    const m = new Array<number>(16).fill(0);
-    node.getSkin()!.getInverseBindMatrices()!.getElement(i, m);
-    return new THREE.Matrix4().fromArray(m);
-  };
-  // (Only the hand and finger joints are used; tips differ between the two.)
-  const map = thereJoints.map((j) => hereJoints.indexOf(j));
-  const carry = new Map<number, THREE.Matrix4>();
-  /** Donor bind space → its bone j → the same bone here → this bind space. */
-  const carryOf = (j: number): THREE.Matrix4 => {
-    if (map[j] < 0) throw new Error(`tactical: no ${thereJoints[j]} joint for the ${hereMaterial}`);
-    let m = carry.get(j);
-    if (!m) carry.set(j, (m = ibm(hereNode, map[j]).invert().multiply(ibm(thereNode, j))));
-    return m;
-  };
-
-  const P = source.getAttribute('POSITION')!;
-  const N = source.getAttribute('NORMAL');
-  const W = source.getAttribute('WEIGHTS_0')!;
-  const J = source.getAttribute('JOINTS_0')!;
-  const positions = new Float32Array(P.getCount() * 3);
-  const normals = N ? new Float32Array(P.getCount() * 3) : null;
-  const joints = new Uint16Array(P.getCount() * 4);
-  const v = new THREE.Vector3();
-  const w = [0, 0, 0, 0];
-  const jj = [0, 0, 0, 0];
-  const e = [0, 0, 0];
-  for (let i = 0; i < P.getCount(); i++) {
-    W.getElement(i, w);
-    J.getElement(i, jj);
-    let k = 0;
-    for (let c = 1; c < 4; c++) if (w[c] > w[k]) k = c;
-    const m = carryOf(jj[k]);
-    P.getElement(i, e);
-    v.fromArray(e)
-      .applyMatrix4(m)
-      .toArray(positions, i * 3);
-    if (N && normals) {
-      N.getElement(i, e);
-      v.fromArray(e)
-        .transformDirection(m)
-        .toArray(normals, i * 3);
-    }
-    for (let c = 0; c < 4; c++) joints[i * 4 + c] = w[c] > 0 ? (carryOf(jj[c]), map[jj[c]]) : 0;
-  }
-  const set = (attr: string, array: Float32Array<ArrayBuffer> | Uint16Array<ArrayBuffer>, type: 'VEC3' | 'VEC4') => {
-    const existing = gloves.getAttribute(attr);
-    if (existing) existing.setArray(array).setType(type);
-    else gloves.setAttribute(attr, doc.createAccessor().setArray(array).setType(type).setBuffer(doc.getRoot().listBuffers()[0]));
-  };
-  set('POSITION', positions, 'VEC3');
-  if (normals) set('NORMAL', normals, 'VEC3');
-  set('JOINTS_0', joints, 'VEC4');
-  gloves.getAttribute('WEIGHTS_0')!.setArray(Float32Array.from(W.getArray()! as ArrayLike<number>));
-  const uv = source.getAttribute('TEXCOORD_0');
-  if (uv) gloves.getAttribute('TEXCOORD_0')?.setArray(Float32Array.from(uv.getArray()!));
-  gloves.getIndices()!.setArray(source.getIndices()!.getArray()!.slice());
-  return old;
 }
 
 /**
@@ -340,10 +165,26 @@ function rebindToPose(doc: Document): void {
   }
   const find = (name: string) => allJoints.find((j) => tidy(j.getName()) === name)!;
   const k = (top - floor) / (before.get(find('HeadTop_End'))!.elements[13] - floor);
+  // How far the joints sit from their skin, as a share of height. A sound rig
+  // (well under 3%) is left exactly as it is.
+  const misses = [...rings]
+    .filter(([, ring]) => ring.n >= 6)
+    .map(
+      ([joint, ring]) =>
+        ring.sum
+          .clone()
+          .divideScalar(ring.n)
+          .distanceTo(new THREE.Vector3().setFromMatrixPosition(before.get(joint)!)) /
+        (top - floor),
+    )
+    .sort((a, b) => a - b);
+  const median = misses[misses.length >> 1] ?? 0;
+  const fit = median > 0.03;
+  console.log(`  rig: joints sit ${(median * 100).toFixed(1)}% of height from their skin (median)${fit ? ' — fitting the skeleton' : ''}`);
   const depth = (n: (typeof allJoints)[number]): number => (n.getParentNode() ? depth(n.getParentNode()!) + 1 : 0);
   const moved = new Map<(typeof allJoints)[number], THREE.Matrix4>();
   let fitted = 0;
-  for (const joint of [...allJoints].sort((a, b) => depth(a) - depth(b))) {
+  for (const joint of fit ? [...allJoints].sort((a, b) => depth(a) - depth(b)) : []) {
     const position = new THREE.Vector3();
     const rotation = new THREE.Quaternion();
     const scale = new THREE.Vector3();
@@ -370,7 +211,7 @@ function rebindToPose(doc: Document): void {
     joint.setRotation(r.toArray() as [number, number, number, number]);
     joint.setScale(sc.toArray() as [number, number, number]);
   }
-  console.log(`  skeleton fitted to its mesh: ${fitted}/${allJoints.length} joints from their skin`);
+  if (fit) console.log(`  skeleton fitted to its mesh: ${fitted}/${allJoints.length} joints from their skin`);
   for (const skin of skins) {
     const joints = skin.listJoints();
     const fresh = new Float32Array(joints.length * 16);
@@ -427,14 +268,16 @@ async function prepare(id: string): Promise<void> {
 
   for (const animation of root.listAnimations()) animation.dispose();
   for (const joint of root.listSkins()[0].listJoints()) joint.setName(tidy(joint.getName()));
-  if (id === 'tactical') await replaceTacticalParts(doc);
   rebindToPose(doc);
   rigidHands(doc);
-  // Stray unskinned meshes (the soldier carries an empty placeholder), and the
-  // soldier's headset, which floats above its cap in the download itself.
-  for (const node of root.listNodes()) {
-    const material = node.getMesh()?.listPrimitives()[0]?.getMaterial()?.getName();
-    if ((node.getMesh() && !node.getSkin()) || material === 'HeadphonesT') node.dispose();
+  // Stray unskinned meshes (placeholders).
+  for (const node of root.listNodes()) if (node.getMesh() && !node.getSkin()) node.dispose();
+  // Materials: the standard metal/rough model (one download uses the retired
+  // specular-glossiness one), and opaque — the downloads mark whole bodies as
+  // blended, which sorts badly; only glass and eyes keep their transparency.
+  await doc.transform(metalRough());
+  for (const material of root.listMaterials()) {
+    if (!/glass|eye|lens|visor/i.test(material.getName())) material.setAlphaMode('OPAQUE').setDoubleSided(false);
   }
 
   const skin = root.listSkins()[0];
@@ -446,9 +289,8 @@ async function prepare(id: string): Promise<void> {
     return joint.getWorldTranslation();
   };
 
-  // Measured in the bind pose (a T-pose): standing.
-  // Measured in the download's own pose (a frame of its idle), axes and units:
-  // up runs from the toes to the crown, and the hands lie right → left.
+  // Measured in the download's own pose (a T-pose), axes and units: up runs
+  // from the toes to the crown, and the hands lie right → left.
   const v = (name: string): THREE.Vector3 => new THREE.Vector3().fromArray(at(name));
   const toe = v('LeftToeBase').add(v('RightToeBase')).multiplyScalar(0.5);
   const crown = v('HeadTop_End');

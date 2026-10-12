@@ -827,48 +827,6 @@
     },
     {
       "files": [
-        "assets-src/characters/tactical/original/tactical.glb",
-        "assets-src/characters/tactical/figure.glb",
-        "public/assets/characters/tactical/figure.glb"
-      ],
-      "kind": "model",
-      "title": "Game Ready low poly character tactical",
-      "author": "1799danly",
-      "authorUrl": "https://sketchfab.com/1799danly",
-      "source": "https://sketchfab.com/3d-models/game-ready-low-poly-character-tactical-342501b0c84843a3a418319c31ea26fa",
-      "license": "CC-BY-4.0",
-      "changes": "Its broken gloves, head and base suit were replaced with the same meshes from the author's Striker model (below), and its own kit refitted to them. Rebound to its saved pose with its skeleton fitted to its mesh (the download's bones did not match it), finger weights moved onto the hands, turned to face -Z and scaled to 1.72 m, simplified to about 7,000 triangles; textures resized to 512 px; recompressed (KTX2, meshopt). Its suit is tinted with the player's paint colour in game; the game poses the skeleton (no animation is used). Built by scripts/prep/characters.ts and scripts/assetbuild.ts."
-    },
-    {
-      "files": [
-        "assets-src/characters/striker/original/striker.glb",
-        "assets-src/characters/striker/figure.glb",
-        "public/assets/characters/striker/figure.glb"
-      ],
-      "kind": "model",
-      "title": "Jumpsuit Low Poly Game Ready (Striker14)",
-      "author": "1799danly",
-      "authorUrl": "https://sketchfab.com/1799danly",
-      "source": "https://sketchfab.com/3d-models/jumpsuit-low-poly-game-ready-striker14-da288adbddf949aa85962968732f0999",
-      "license": "CC-BY-4.0",
-      "changes": "Rebound to its saved pose with its skeleton fitted to its mesh (the download's bones did not match it), finger weights moved onto the hands, turned to face -Z and scaled to 1.72 m, simplified to about 7,000 triangles; textures resized to 512 px; recompressed (KTX2, meshopt). Its suit is tinted with the player's paint colour in game; the game poses the skeleton (no animation is used). Built by scripts/prep/characters.ts and scripts/assetbuild.ts."
-    },
-    {
-      "files": [
-        "assets-src/characters/soldier/original/soldier.glb",
-        "assets-src/characters/soldier/figure.glb",
-        "public/assets/characters/soldier/figure.glb"
-      ],
-      "kind": "model",
-      "title": "Military tactical suit (LowPolyGameReady)",
-      "author": "1799danly",
-      "authorUrl": "https://sketchfab.com/1799danly",
-      "source": "https://sketchfab.com/3d-models/military-tactical-suit-lowpolygameready-ef698ce36b1545a78ce592dd3db4c7ed",
-      "license": "CC-BY-4.0",
-      "changes": "Its headset (floating above the cap in the download) and an empty placeholder mesh removed. Rebound to its saved pose with its skeleton fitted to its mesh (the download's bones did not match it), finger weights moved onto the hands, turned to face -Z and scaled to 1.72 m, simplified to about 7,000 triangles; textures resized to 512 px; recompressed (KTX2, meshopt). Its suit is tinted with the player's paint colour in game; the game poses the skeleton (no animation is used). Built by scripts/prep/characters.ts and scripts/assetbuild.ts."
-    },
-    {
-      "files": [
         "assets-src/weapons/hand-rifle/original/rifle.glb",
         "assets-src/weapons/hand-rifle/gun.glb",
         "public/assets/weapons/hand-rifle/gun.glb"
@@ -922,6 +880,48 @@
       "source": "https://sketchfab.com/3d-models/low-poly-milkor-mgl-0e35ba04be5443eea3386e10b643ec77",
       "license": "CC-BY-4.0",
       "changes": "Its four loose grenades removed. Turned to point -Z with its top up, the origin at the butt, scaled to its real length; textures resized to 512 px; recompressed (KTX2, meshopt). Held by the window gunners in duos and squads. Built by scripts/prep/hand-guns.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/characters/swat/original/swat.glb",
+        "assets-src/characters/swat/figure.glb",
+        "public/assets/characters/swat/figure.glb"
+      ],
+      "kind": "model",
+      "title": "Swat",
+      "author": "doctortex",
+      "authorUrl": "https://sketchfab.com/doctortex",
+      "source": "https://sketchfab.com/3d-models/swat-d821ff6ab1e4455c8313db4658a56097",
+      "license": "CC-BY-4.0",
+      "changes": "Rebound to its saved pose, finger weights moved onto the hands, materials converted to metal/rough and made opaque, turned to face -Z and scaled to 1.8 m, simplified to about 7,000 triangles; textures resized to 512 px; recompressed (KTX2, meshopt). Its jacket is tinted with the player's paint colour in game; the game poses the skeleton (no animation is used). Built by scripts/prep/characters.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/characters/mechanic/original/mechanic.glb",
+        "assets-src/characters/mechanic/figure.glb",
+        "public/assets/characters/mechanic/figure.glb"
+      ],
+      "kind": "model",
+      "title": "US Navy Mechanic",
+      "author": "doctortex",
+      "authorUrl": "https://sketchfab.com/doctortex",
+      "source": "https://sketchfab.com/3d-models/us-navy-mechanic-e937e93ff2b643f799b67270ed3dbd9d",
+      "license": "CC-BY-4.0",
+      "changes": "Rebound to its saved pose, finger weights moved onto the hands, materials converted to metal/rough and made opaque, turned to face -Z and scaled to 1.8 m, simplified to about 7,000 triangles; textures resized to 512 px; recompressed (KTX2, meshopt). Its jacket is tinted with the player's paint colour in game; the game poses the skeleton (no animation is used). Built by scripts/prep/characters.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/characters/soldier/original/soldier.glb",
+        "assets-src/characters/soldier/figure.glb",
+        "public/assets/characters/soldier/figure.glb"
+      ],
+      "kind": "model",
+      "title": "Army soldier Character",
+      "author": "joneborden123",
+      "authorUrl": "https://sketchfab.com/joneborden123",
+      "source": "https://sketchfab.com/3d-models/army-soldier-character-cc995450452744ec8f852d8bf5f335d6",
+      "license": "CC-BY-4.0",
+      "changes": "Rebound to its saved pose, finger weights moved onto the hands, materials converted to metal/rough and made opaque, turned to face -Z and scaled to 1.8 m, simplified to about 7,000 triangles; textures resized to 512 px; recompressed (KTX2, meshopt). Its jacket is tinted with the player's paint colour in game; the game poses the skeleton (no animation is used). Built by scripts/prep/characters.ts and scripts/assetbuild.ts."
     }
   ]
 }

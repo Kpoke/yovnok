@@ -59,14 +59,14 @@ export const FIRE_PORT_OFFSET = {
  * inside the cabin can never be hit from any angle (see `headWorld`).
  */
 export const HEAD_OFFSET = {
-  right: [0.47, 1.05, 0.14],
-  left: [-0.47, 1.05, 0.14],
+  right: [0.5, 1.07, 0.15],
+  left: [-0.5, 1.07, 0.15],
 } as const;
 
 /** A leaning gunner's chest, under the head, in the window opening. */
 export const CHEST_OFFSET = {
-  right: [0.39, 0.86, 0.04],
-  left: [-0.39, 0.86, 0.04],
+  right: [0.38, 0.92, 0.07],
+  left: [-0.38, 0.92, 0.07],
 } as const;
 
 /**
@@ -75,8 +75,8 @@ export const CHEST_OFFSET = {
  * posed figure — vehicle/figures.ts — so a shot finds the body that is drawn.)
  */
 export const SHOULDER_OFFSET = {
-  right: [0.5, 0.92, 0.24],
-  left: [-0.5, 0.92, 0.24],
+  right: [0.44, 0.88, 0.25],
+  left: [-0.44, 0.88, 0.25],
 } as const;
 
 /**
@@ -381,8 +381,9 @@ export function gunnerPoint(
   const top = spec.boxHeight - spec.rideHeight;
   const [mx, my, mz] = seat.mount;
   const at = (o: readonly number[]): [number, number, number] => [mx + o[0], my + o[1], mz + o[2]];
-  const head: [number, number, number][] = [at(HEAD_OFFSET[seat.side]), [s * spec.halfWidth * 0.5, top + 0.48, mz]];
-  const chest: [number, number, number][] = [at(CHEST_OFFSET[seat.side]), [s * spec.halfWidth * 0.58, top + 0.15, mz]];
+  // Up on the sill (measured from the posed figure, like the offsets above).
+  const head: [number, number, number][] = [at(HEAD_OFFSET[seat.side]), [s * spec.halfWidth * 0.44, top + 0.39, mz + 0.12]];
+  const chest: [number, number, number][] = [at(CHEST_OFFSET[seat.side]), [s * spec.halfWidth * 0.56, top + 0.22, mz + 0.07]];
   const mix = (pair: [number, number, number][]): [number, number, number] => [
     pair[0][0] + (pair[1][0] - pair[0][0]) * roof,
     pair[0][1] + (pair[1][1] - pair[0][1]) * roof,
@@ -390,7 +391,7 @@ export function gunnerPoint(
   ];
   if (part === 'head') return mix(head);
   if (part === 'chest') return mix(chest);
-  if (part === 'waist') return roof > 0.5 ? [s * spec.halfWidth * 0.72, top - 0.12, mz] : null;
+  if (part === 'waist') return roof > 0.5 ? [s * spec.halfWidth * 0.62, top - 0.02, mz] : null;
   // The muzzle: a gun's length along the aim from the shooting shoulder — at
   // the window, or over the roof (well above it, so the car never blocks it).
   const c = Math.cos(aimPitch);
@@ -399,9 +400,8 @@ export function gunnerPoint(
     from[1] + Math.sin(aimPitch) * length,
     from[2] - Math.cos(aimYaw) * c * length,
   ];
-  const window = along(at(SHOULDER_OFFSET[seat.side]), 0.85);
-  const h = mix(head);
-  const over = along([h[0], h[1] - 0.18, h[2]], 0.7);
+  const window = along(at(SHOULDER_OFFSET[seat.side]), 0.82);
+  const over = along([s * spec.halfWidth * 0.64, top + 0.35, mz - 0.06], 0.82);
   return [
     window[0] + (over[0] - window[0]) * roof,
     window[1] + (over[1] - window[1]) * roof,

@@ -147,9 +147,9 @@ export const GLOWS: readonly { name: string; colour: number; unlock: UnlockRule 
  * Each is a model (`public/assets/characters/<id>/figure.glb`); the livery
  * colour tints its kit.
  */
-export const OUTFITS: readonly { id: 'striker' | 'tactical' | 'soldier'; name: string; unlock: UnlockRule }[] = [
-  { id: 'striker', name: 'Striker', unlock: { type: 'default' } },
-  { id: 'tactical', name: 'Tactical', unlock: { type: 'default' } },
+export const OUTFITS: readonly { id: 'swat' | 'mechanic' | 'soldier'; name: string; unlock: UnlockRule }[] = [
+  { id: 'swat', name: 'SWAT', unlock: { type: 'default' } },
+  { id: 'mechanic', name: 'Mechanic', unlock: { type: 'default' } },
   { id: 'soldier', name: 'Soldier', unlock: { type: 'matches', n: 3 } },
 ];
 export type OutfitId = (typeof OUTFITS)[number]['id'];

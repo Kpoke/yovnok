@@ -446,7 +446,7 @@ export function buildVehicle(
           hip: new THREE.Vector3(seat.mount[0], seat.mount[1] + 0.1, seat.mount[2] + 0.06),
           // On the sill: just inside the body's side, a little under the roof.
           sill: new THREE.Vector3(
-            (seat.side === 'right' ? 1 : -1) * spec.halfWidth * 0.74,
+            (seat.side === 'right' ? 1 : -1) * spec.halfWidth * 0.64,
             spec.boxHeight - spec.rideHeight - 0.12,
             seat.mount[2] + 0.06,
           ),

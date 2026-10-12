@@ -94,8 +94,10 @@ export class FigureLibrary {
               mesh.receiveShadow = true;
               mesh.frustumCulled = false; // a posed skin's bounds are stale
               const material = mesh.material as THREE.MeshStandardMaterial;
-              // The suit (not skin, gloves, glass or kit) takes the paint colour.
-              if (/suit/i.test(material.name)) tintable.add(material.name);
+              // The jacket takes the paint colour, so a crew reads as one team
+              // (not skin, gloves, trousers or kit): "Topmat" on the SWAT and
+              // Mechanic, "lambert1" on the Soldier.
+              if (/^(Topmat|lambert1)$/.test(material.name)) tintable.add(material.name);
             });
             this.outfits.set(index, { scene: gltf.scene, tintable });
           } catch (error) {
