@@ -124,7 +124,7 @@ export class TouchControls {
     const fire = this.root.querySelector('.touch-btn.fire');
     const fire2 = this.root.querySelector('.touch-btn.fire2');
     if (fire) fire.textContent = role === 'gunner' ? 'FIRE' : 'MG';
-    if (fire2) fire2.textContent = role === 'gunner' ? 'LAUNCH' : 'RPG';
+    if (fire2) fire2.textContent = role === 'gunner' ? 'SWAP' : 'RPG';
     this.releaseAll();
   }
   private role: 'solo' | 'driver' | 'gunner' = 'solo';
@@ -222,6 +222,12 @@ export class TouchControls {
         this.root.querySelector('.touch-btn.fire2')?.classList.remove('held');
       }
     }
+  }
+
+  /** A thumb on the aim side (dragging, or on FIRE): a window gunner leans out. */
+  get aiming(): boolean {
+    for (const f of this.fingers.values()) if (f.role === 'aim' || f.role === 'fire') return true;
+    return false;
   }
 
   /** True once after ☰. */

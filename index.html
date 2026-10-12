@@ -1014,6 +1014,8 @@
       body.menu #speed, body.menu #combat, body.menu #controls,
       body.menu #prompt, body.menu #crosshair { display: none; }
       /* A window gunner neither drives nor sees the driver's gauges. */
+      /* A gunner tucked inside: the crosshair is a faint dot until they lean out. */
+      body.tucked #crosshair { opacity: 0.3; transform: translate(-50%, -50%) scale(0.5); }
       .gunner-only { display: none; }
       body.gunner .gunner-only { display: inline; }
       body.gunner .drive-only, body.gunner #speed, body.gunner #controls { display: none; }
@@ -1129,7 +1131,7 @@
             <div id="play-choices" class="play-choices hidden">
               <button class="menu-item choice play-format" data-format="solo">SOLO<small>every car for itself · bots fill the field</small></button>
               <button class="menu-item choice play-format" data-format="duos">DUOS<small>a driver and a gunner per car</small></button>
-              <button class="menu-item choice play-format" data-format="squads">SQUADS<small>a driver and three gunners per truck</small></button>
+              <button class="menu-item choice play-format" data-format="squads">SQUADS<small>a driver and three gunners per SUV</small></button>
               <button id="join-private" class="menu-item choice" data-panel="private">PRIVATE ROOM<small>friends only · no bots</small></button>
             </div>
             <button id="join-garage" class="menu-item" data-panel="cosmetics">GARAGE</button>
@@ -1152,6 +1154,8 @@
               <div class="set-line"><input id="cos-number" inputmode="numeric" maxlength="2" placeholder="—" autocomplete="off" /><span class="cos-about">0–99, painted in the door roundel (blank for none)</span></div>
             </div>
             <div class="cos-row"><span class="cos-label">UNDERGLOW</span><div class="cos-options" id="cos-glow"></div></div>
+            <div class="cos-head cos-sub"><span>CREW</span><span>you, at the wheel or the window</span></div>
+            <div class="cos-row"><span class="cos-label">OUTFIT · TINTED WITH YOUR PAINT</span><div class="cos-options" id="cos-outfit"></div></div>
             <div class="cos-head cos-sub"><span>GUNS</span><span>every gun is open</span></div>
             <div class="drawer-note">Solo: your car's guns. Duos and squads: what you fire from the window.</div>
             <div class="cos-row"><span class="cos-label">BUMPER GUNS</span><div class="cos-options" id="cos-primary"></div></div>

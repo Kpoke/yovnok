@@ -169,11 +169,13 @@ const isSocket = (node: Node): boolean =>
  * stable, since removing a leaf can leave its parent empty.
  */
 function pruneEmptyNodes(doc: Document): void {
+  // A skeleton's tips (fingertips, the crown) are empty leaves too, and joints.
+  const joints = new Set(doc.getRoot().listSkins().flatMap((skin) => skin.listJoints()));
   let removed = true;
   while (removed) {
     removed = false;
     for (const node of doc.getRoot().listNodes()) {
-      if (node.getMesh() || node.listChildren().length > 0 || isSocket(node)) continue;
+      if (node.getMesh() || node.listChildren().length > 0 || isSocket(node) || joints.has(node)) continue;
       if (/^lod\d+$/.test(node.getName())) continue;
       node.dispose();
       removed = true;
@@ -269,7 +271,8 @@ export async function buildDocument(doc: Document, options: BuildOptions): Promi
   // arrives as dozens of meshes, and twelve such cars would cost ~1000 calls.
   // Socket nodes carry no mesh, so they survive untouched.
   // `cleanup: false`: join's own clean-up would prune the socket nodes.
-  await doc.transform(joinMeshes({ cleanup: false }), prune({ keepLeaves: true }));
+  // (Not a skinned figure: each of its meshes is bound to the skeleton.)
+  if (doc.getRoot().listSkins().length === 0) await doc.transform(joinMeshes({ cleanup: false }), prune({ keepLeaves: true }));
   pruneEmptyNodes(doc);
 
   const textures = doc.getRoot().listTextures().length;

@@ -113,6 +113,12 @@ export type MemberSnapshot = {
   allReloads: number[];
   /** False once downed, until they respawn. */
   alive: boolean;
+  /** Leaning out of the window to aim (a window gunner holding aim). */
+  out: boolean;
+  /** Index into `OUTFITS`: what the figure in this seat wears. */
+  outfit: number;
+  /** Index into `GUNNER_PRIMARIES`: the window gun in their hands. */
+  gun: number;
 };
 
 /**
@@ -358,8 +364,11 @@ export type ClientMessage =
   | { t: 'held?'; token: string }
   /** Driver only: batched inputs, oldest first. */
   | { t: 'input'; cmds: InputCmd[] }
-  /** Gunner only: where they are looking, relative to vehicle forward. */
-  | { t: 'aim'; yaw: number; pitch: number }
+  /**
+   * Gunner only: where they are looking, relative to vehicle forward, and
+   * whether they are leaning out of the window to aim (`out`, held aim).
+   */
+  | { t: 'aim'; yaw: number; pitch: number; out?: boolean }
   /**
    * Pull the trigger. `seq` orders shots so the server can rate-limit and reject
    * replayed ones, exactly as it does input. The aim is included because a shot

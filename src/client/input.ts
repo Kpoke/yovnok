@@ -70,6 +70,9 @@ export class Input {
   private firing2 = false;
   private fire2Pressed = false;
   private reloadRequested = false;
+  /** A window gunner swapping between their gun and the launcher (Q, wheel, LB). */
+  private swapRequested = false;
+  private wheelAt = 0;
   /** A gunner asked to move to the next window (F, D-pad, the SEAT button). */
   private seatRequested = false;
   private switchRequested: number | null = null;
@@ -83,6 +86,9 @@ export class Input {
     boost: false,
     fire: false,
     fire2: false,
+    /** Analogue triggers, for a window gunner (who never drives): aim and fire. */
+    lt: 0,
+    rt: 0,
     lastUsed: 0,
     previous: [] as boolean[],
   };
@@ -108,6 +114,7 @@ export class Input {
       this.keys.add(e.code);
       if (e.code === 'KeyR') this.reloadRequested = true;
       if (e.code === 'KeyF') this.seatRequested = true;
+      if (e.code === 'KeyQ') this.swapRequested = true;
       if (e.code === 'Digit1') this.switchRequested = 0;
       if (e.code === 'Digit2') this.switchRequested = 1;
       if (e.code === 'Digit3') this.switchRequested = 2;
@@ -145,6 +152,14 @@ export class Input {
       if (e.button === 0) this.firing = false;
       if (e.button === 2) this.firing2 = false;
     });
+    canvas.addEventListener(
+      'wheel',
+      () => {
+        if (performance.now() - this.wheelAt > 250) this.swapRequested = true;
+        this.wheelAt = performance.now();
+      },
+      { passive: true },
+    );
     // Right-click is a trigger, not a menu.
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('blur', () => {
@@ -192,6 +207,9 @@ export class Input {
     pad.boost = held(PAD.B) || held(PAD.L3);
     pad.fire = held(PAD.RB);
     pad.fire2 = held(PAD.LB);
+    pad.lt = lt;
+    pad.rt = rt;
+    if (pressed(PAD.LB)) this.swapRequested = true;
     if (pressed(PAD.RB)) this.firePressed = true;
     if (pressed(PAD.LB)) this.fire2Pressed = true;
     if (pressed(PAD.Y)) this.reloadRequested = true;
@@ -313,6 +331,27 @@ export class Input {
   consumeFire2Press(): boolean {
     const value = this.fire2Pressed || (this.touch?.fire2Pressed ?? false);
     this.fire2Pressed = false;
+    if (this.touch) this.touch.fire2Pressed = false;
+    return value;
+  }
+
+  /**
+   * A window gunner leaning out to aim: right mouse, the left trigger, or a
+   * thumb on the aim side of the screen (touch).
+   */
+  get wantsAim(): boolean {
+    return this.firing2 || this.pad.lt > 0.3 || (this.touch?.aiming ?? false);
+  }
+
+  /** A window gunner's trigger: left mouse, RT or RB, or FIRE. */
+  get wantsGunnerFire(): boolean {
+    return this.wantsFire || this.pad.rt > 0.3;
+  }
+
+  /** True once after a swap (Q, the wheel, LB, or SWAP on touch). */
+  consumeSwap(): boolean {
+    const value = this.swapRequested || (this.touch?.fire2Pressed ?? false);
+    this.swapRequested = false;
     if (this.touch) this.touch.fire2Pressed = false;
     return value;
   }

@@ -124,6 +124,18 @@ export function readCrewRequest(search: string): { crew?: number; seat?: SeatId 
   };
 }
 
+/** One crew member's figure state (see `Net.crewOf`). */
+export type CrewPose = {
+  yaw: number;
+  pitch: number;
+  out: boolean;
+  outfit: number;
+  /** The weapon in their hands: 0 their window gun (`gun`), 1 the launcher. */
+  slot: number;
+  gun: number;
+  alive: boolean;
+};
+
 export class NetClient {
   /** The authoritative class of the crew we ended up in. */
   vehicleClass: VehicleClassId;
@@ -324,6 +336,30 @@ export class NetClient {
    */
   get canFire(): boolean {
     return this.seat !== null && seatById(this.vehicleClass, this.seat)?.arc != null;
+  }
+
+  /** A window gunner (team formats): must lean out of the window to fire. */
+  get windowGunner(): boolean {
+    return this.canFire && !this.isDriver;
+  }
+
+  /** Leaning out of the window (held aim), and since when. */
+  leaning = false;
+  private leanedAt = 0;
+
+  /** Lean out (aim held) or back in; tells the server at once on a change. */
+  setLean(out: boolean): void {
+    const want = out && this.windowGunner && !this.localDead && this.self.alive;
+    if (want === this.leaning) return;
+    this.leaning = want;
+    if (want) this.leanedAt = performance.now();
+    this.aimTimer = 1; // send now
+  }
+
+  /** 0 tucked in … 1 fully out: how far out of the window we are (for drawing). */
+  get leanAmount(): number {
+    if (!this.leaning) return 0;
+    return Math.min(1, (performance.now() - this.leanedAt) / (COMBAT.leanSeconds * 1000));
   }
 
   get conditioned(): boolean {
@@ -624,6 +660,9 @@ export class NetClient {
             allReloads: [],
             reload: 0,
             alive: true,
+            out: false,
+            outfit: 0,
+            gun: 0,
           });
         }
         break;
@@ -756,6 +795,8 @@ export class NetClient {
    */
   canShoot(slot: number, now = performance.now()): boolean {
     if (!this.canFire || this.localDead || !this.self.alive) return false;
+    // A window gunner fires once fully out (a little margin over the server's).
+    if (this.windowGunner && (!this.leaning || now - this.leanedAt < COMBAT.leanSeconds * 1000 + 60)) return false;
     const socket = this.socket;
     if (!socket || socket.readyState !== 1) return false;
     if ((this.self.allReloads[slot] ?? this.self.reload) > 0) return false;
@@ -856,7 +897,7 @@ export class NetClient {
   private combatMembers(): CombatMember[] {
     const members: CombatMember[] = [];
     for (const m of this.members.values()) {
-      members.push({ id: m.id, crew: m.crew, seat: m.seat, hp: m.hp, alive: m.alive });
+      members.push({ id: m.id, crew: m.crew, seat: m.seat, hp: m.hp, alive: m.alive, out: m.out });
     }
     return members;
   }
@@ -1003,6 +1044,29 @@ export class NetClient {
     return aims;
   }
 
+  /**
+   * Everyone in a vehicle, by seat, as the figures need them: aim, whether
+   * they are leaning out, what they wear, and whether they are up (a downed
+   * gunner slumps inside until they are back).
+   */
+  crewOf(crew: number): Map<string, CrewPose> {
+    const out = new Map<string, CrewPose>();
+    for (const m of this.members.values()) {
+      if (m.crew !== crew) continue;
+      const mine = m.id === this.playerId;
+      out.set(m.seat, {
+        yaw: mine ? this.aimYaw : m.aimYaw,
+        pitch: mine ? this.aimPitch : m.aimPitch,
+        out: mine ? this.leaning : m.out,
+        outfit: m.outfit,
+        slot: mine ? this.self.slot : m.slot,
+        gun: m.gun,
+        alive: m.alive,
+      });
+    }
+    return out;
+  }
+
   occupantsOf(crew: number): Set<string> {
     const occupied = new Set<string>();
     for (const m of this.members.values()) {
@@ -1103,7 +1167,7 @@ export class NetClient {
 
     const socket = this.socket;
     if (!socket || socket.readyState !== 1) return;
-    const msg: ClientMessage = { t: 'aim', yaw: this.aimYaw, pitch: this.aimPitch };
+    const msg: ClientMessage = { t: 'aim', yaw: this.aimYaw, pitch: this.aimPitch, out: this.leaning };
     socket.send(JSON.stringify(msg));
   }
 

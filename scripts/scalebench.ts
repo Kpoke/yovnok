@@ -71,6 +71,9 @@ function makeSnapshot(vehicleCount: number): SnapshotMessage {
         allRounds: [], allReloads: [], rounds: 17,
         reload: 0,
         alive: true,
+        out: false,
+        outfit: 0,
+        gun: 0,
       });
     }
   }
@@ -186,6 +189,7 @@ for (const count of [2, 8, 30, 60]) {
         seat: (['seat.driver', 'seat.frontRight', 'seat.rearLeft', 'seat.rearRight'] as const)[s],
         hp: 100,
         alive: true,
+        out: s > 0,
       });
     }
   }

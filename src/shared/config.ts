@@ -31,6 +31,10 @@ export const COMBAT = {
    * disagrees with what is drawn is worse than a generous one.
    */
   headRadius: 0.22,
+  /** A leaning gunner's chest, out of the window (shoulders and upper body). */
+  chestRadius: 0.27,
+  /** Seconds to lean out of the window before the first shot can leave. */
+  leanSeconds: 0.25,
   /** How long a downed crew member waits before returning to their seat. */
   crewRespawnSeconds: 8,
   minFireInterval: 0.03,

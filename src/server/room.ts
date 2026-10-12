@@ -220,6 +220,10 @@ type Player = {
   /** Aim relative to vehicle forward, clamped to the seat's arc. */
   aimYaw: number;
   aimPitch: number;
+  /** A window gunner leaning out to aim (exposed; able to fire once fully out). */
+  out: boolean;
+  /** When they leaned out (performance.now()), for `COMBAT.leanSeconds`. */
+  outAt: number;
   /** Highest sequence number ever accepted, to reject duplicates and replays. */
   highSeq: number;
   /** When any message last arrived, for the liveness check. */
@@ -588,6 +592,8 @@ export class Room {
       seat: 'seat.driver',
       aimYaw: 0,
       aimPitch: 0,
+      out: false,
+      outAt: 0,
       highSeq: 0,
       lastSeenAt: performance.now(),
       hp: COMBAT.maxCrewHealth,
@@ -740,6 +746,8 @@ export class Room {
       seat,
       aimYaw: 0,
       aimPitch: 0,
+      out: false,
+      outAt: 0,
       highSeq: 0,
       lastSeenAt: performance.now(),
       hp: COMBAT.maxCrewHealth,
@@ -818,6 +826,7 @@ export class Room {
     const from = player.seat;
     crew.members.set(player.id, seat);
     player.seat = seat;
+    player.out = false;
     if (target.drives) crew.driverId = player.id;
     else if (crew.driverId === player.id) crew.driverId = null;
     player.loadout = this.loadoutFor(target, unpackLook(player.look));
@@ -902,6 +911,8 @@ export class Room {
 
       bot.aimYaw = intent.aimYaw;
       bot.aimPitch = intent.aimPitch;
+      // A window gunner bot leans out while it has someone to shoot at.
+      if (seat.arc && !seat.drives) this.lean(bot, intent.target !== undefined && intent.target !== null, now);
       if (seat.drives) inputs.set(crew.id, intent.input);
       // Each trigger fires at its own point, the way a human's crosshair would
       // (the bot decides when each weapon can bear; the rules still bind it).
@@ -1096,6 +1107,7 @@ export class Room {
     player.joined = true;
     player.crew = crew.id;
     player.seat = seat;
+    player.out = false;
     if (look !== undefined) player.look = packLook(unpackLook(look));
     crew.members.set(player.id, seat);
     if (seatById(crew.cls, seat)?.drives) crew.driverId = player.id;
@@ -1558,6 +1570,7 @@ export class Room {
       // it is the authority on what a window can reach.
       player.aimYaw = clampToArc(seat.arc, msg.yaw);
       player.aimPitch = Math.max(-1.2, Math.min(1.2, msg.pitch));
+      if (!seat.drives) this.lean(player, msg.out === true, performance.now());
       return;
     }
 
@@ -1679,6 +1692,8 @@ export class Room {
     const seat: SeatDef | undefined = seatById(crew.cls, player.seat);
     if (!seat || !seat.arc) return; // the driver is unarmed
     if (!Number.isFinite(seq) || seq <= player.lastFireSeq) return;
+    // A window gunner fires only leaning out, and once fully out.
+    if (!seat.drives && (!player.out || performance.now() - player.outAt < COMBAT.leanSeconds * 1000)) return;
 
     // Each trigger fires its own slot: the car's guns, or a window gunner's
     // primary (left) and launcher (right).
@@ -1849,6 +1864,7 @@ export class Room {
     if (this.mode === 'solo' && crew.driverId === victim.id) return;
     damageMember(victim, amount);
     if (!victim.alive) {
+      victim.out = false;
       victim.respawnIn = COMBAT.crewRespawnSeconds;
       if (crew.driverId === victim.id) crew.driverId = null;
     }
@@ -2075,7 +2091,8 @@ export class Room {
             const vehicle = this.crews.get(member.crew);
             if (!vehicle) continue;
             const seat = seatById(vehicle.cls, member.seat);
-            if (!seat) continue;
+            // Only a gunner leaning out is in the open; inside, the car takes it.
+            if (!seat || !member.out) continue;
             const head = headWorld(vehicle, seat);
             const distance = Math.hypot(head.x - hx, head.y - hy, head.z - hz);
             if (distance > weapon.splash) continue;
@@ -2120,6 +2137,12 @@ export class Room {
     return out;
   }
 
+  /** Lean a window gunner out of (or back into) their window. */
+  private lean(player: Player, out: boolean, now: number): void {
+    if (out && !player.out) player.outAt = now;
+    player.out = out && player.alive;
+  }
+
   private combatMembers(): CombatMember[] {
     const out: CombatMember[] = [];
     for (const player of this.players.values()) {
@@ -2130,6 +2153,7 @@ export class Room {
         seat: player.seat,
         hp: player.hp,
         alive: player.alive,
+        out: player.out,
       });
     }
     return out;
@@ -2798,6 +2822,9 @@ function memberSnapshotOf(player: Player): MemberSnapshot {
     allRounds: [...player.ammo.rounds],
     allReloads: [...player.ammo.reload],
     alive: player.alive,
+    out: player.out,
+    outfit: unpackLook(player.look).outfit,
+    gun: unpackLook(player.look).gunner,
   };
 }
 

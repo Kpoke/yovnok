@@ -25,6 +25,7 @@ import {
   DECALS,
   GLOWS,
   GUN_CHOICES,
+  OUTFITS,
   LIVERIES,
   loadoutOf,
   PATTERNS,
@@ -138,7 +139,7 @@ const profile = (overrides: Partial<Profile> = {}): Profile => ({
 
 {
   // Every field survives the wire, including the guns.
-  const look = { livery: 3, wheels: 5, roof: 4, pattern: 4, accent: 6, glow: 3, primary: 2, secondary: 1, decal: 4, number: 99, gunner: 2 };
+  const look = { livery: 3, wheels: 5, roof: 4, pattern: 4, accent: 6, glow: 3, primary: 2, secondary: 1, decal: 4, number: 99, gunner: 2, outfit: 2 };
   const back = unpackLook(packLook(look));
   check('a full look survives packing', JSON.stringify(back) === JSON.stringify(look), JSON.stringify(back));
   check('the look arms the car', loadoutOf(look).join(',') === 'lancer,swarm', loadoutOf(look).join(','));
@@ -149,7 +150,7 @@ const profile = (overrides: Partial<Profile> = {}): Profile => ({
 
 {
   const catalog = shopCatalog(profile({ matches: 99, kills: 99, wins: 99 }));
-  const lists = [LIVERIES, WHEELS, ROOFS, PATTERNS, GLOWS, DECALS, GUN_CHOICES.primary, GUN_CHOICES.secondary, GUN_CHOICES.gunner];
+  const lists = [LIVERIES, WHEELS, ROOFS, PATTERNS, GLOWS, DECALS, GUN_CHOICES.primary, GUN_CHOICES.secondary, GUN_CHOICES.gunner, OUTFITS];
   const total = lists.reduce((n, l) => n + l.length, 0) + ACCENTS.length;
   check('the catalog lists every cosmetic', catalog.length === total, `${catalog.length} entries`);
   check('with everything earned, everything is unlocked', catalog.every((e) => e.unlocked));

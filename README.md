@@ -34,11 +34,13 @@ Bots fill whatever seats players do not (people are seated together). Alone on
 the server, a match starts in seconds; when others are online, it waits up to a
 minute so people pressing PLAY around the same time share it.
 
-In duos and squads the driver only drives and the gunners only shoot, from
-an over-the-shoulder view: the primary on the left trigger, a grenade launcher
-on the right. A gunner can move to another window (not the wheel); a gunner who
-is shot down is knocked back inside for 8 seconds. The car is out when its hull
-is.
+In duos and squads the driver only drives and the gunners only shoot. Every
+car carries its people — a driver at the wheel and, in team modes, gunners who
+sit tucked inside and **lean out of their window to aim**, gun at the shoulder,
+with an over-the-shoulder view. Tucked in they cannot shoot or be shot; leaning
+out they can do both. A gunner holds a gun and a grenade launcher and swaps
+between them, can move to another window (not the wheel), and when shot down is
+knocked back inside for 8 seconds. The car is out when its hull is.
 - **PRIVATE ROOM** — create a room and send friends its five-letter code or
   invite link. 2–12 players, no bots; the host picks the mode and the map and
   starts, and everyone picks their car and seat.
@@ -56,6 +58,9 @@ a seat frees up.
 | Handbrake | `Space` | `X` | `DRIFT` |
 | Boost | `Shift` | `B` or `L3` | `BOOST` |
 | Reload | `R` | `Y` | `↻` |
+| Lean out and aim (gunner) | hold right click | hold `LT` | thumb on the right |
+| Fire (gunner) | left click | `RT` or `RB` | `FIRE` |
+| Swap gun / launcher (gunner) | `Q` or the wheel | `LB` | `SWAP` |
 | Change window (gunner) | `F` | D-pad left/right | `SEAT` |
 | Menu | `Esc` | `Start` (D-pad + `A`/`B` to choose) | `☰` |
 | Performance overlay | `F3` or `` ` `` | — | — |
@@ -82,9 +87,10 @@ a seat frees up.
 
 **The garage.** Paint, a pattern (stripes, hazard, camo, tiger, checker) in a
 colour of your choice, rim colour, a body kit (bull bar, light bar, rear wing,
-side armour, side exhausts), a door decal with your race number, and underglow —
-some unlocked by playing (matches, kills, wins). And your guns, all open from
-the start:
+side armour, side exhausts), a door decal with your race number, underglow,
+and your outfit (Striker, Tactical or Soldier, in your paint colour) — some
+unlocked by playing (matches, kills, wins). And your guns, all open from the
+start:
 
 | Bumper guns | | Roof weapon | |
 |---|---|---|---|

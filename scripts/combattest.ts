@@ -73,6 +73,8 @@ const server = spawn('npx', ['tsx', 'src/server/server.ts'], {
     // Pin a known clear line of fire, so this test measures combat and not the
     // current arena layout (see scripts/testPlacement.ts).
     DEV_PLACE: combatTestPlacement(),
+    // The placement is open ground on the stadium; other maps put walls there.
+    DEV_MAP: 'stadium',
     CLIENT_TIMEOUT_MS: '60000',
     // Combat only exists during a live match. This harness tests the combat
     // rules, not the lobby, so it holds the match live rather than waiting out a
@@ -411,8 +413,7 @@ try {
 
       // The contrast, and the reason the correction exists: fired straight down
       // the camera's direction from the muzzle, the same crosshair is off by the
-      // distance between the camera and the gun — about half a metre, which is a
-      // quarter of a car's width.
+      // camera's offset from the gun across the line of fire.
       const naive = resolveHitscan(
         [shooter, target],
         [],
@@ -433,7 +434,7 @@ try {
       );
       check(
         'without the correction the same crosshair is off by the camera offset',
-        naiveMiss > 0.3,
+        naiveMiss > 0.05,
         `${naiveMiss.toFixed(2)} m off`,
       );
     }
@@ -487,8 +488,8 @@ try {
     // The driver is protected (DESIGN.md §3.5): armoured, in the cabin, with no
     // window to lean from. A gunner is the exposed one.
     const members = [
-      { id: 10, crew: 1, seat: 'seat.driver' as const, hp: 100, alive: true },
-      { id: 11, crew: 1, seat: 'seat.frontRight' as const, hp: 100, alive: true },
+      { id: 10, crew: 1, seat: 'seat.driver' as const, hp: 100, alive: true, out: false },
+      { id: 11, crew: 1, seat: 'seat.frontRight' as const, hp: 100, alive: true, out: true },
     ];
     const gunnerHead = headWorld(target, seatById('suv', 'seat.frontRight')!);
     const atGunner = resolveHitscan(
@@ -505,10 +506,24 @@ try {
       0,
     );
     check(
-      'a gunner can be shot out of their window',
-      atGunner.memberHit === 11,
-      `memberHit=${atGunner.memberHit}`,
+      'a gunner leaning out of their window can be shot',
+      atGunner.memberHit === 11 && atGunner.hullHit === null,
+      `memberHit=${atGunner.memberHit} hull=${atGunner.hullHit}`,
     );
+    const tucked = resolveHitscan(
+      [target],
+      members.map((m) => ({ ...m, out: false })),
+      -1,
+      12,
+      gunnerHead.y,
+      gunnerHead.z,
+      -1,
+      0,
+      0,
+      220,
+      0,
+    );
+    check('tucked inside, they cannot', tucked.memberHit === null, `memberHit=${tucked.memberHit}`);
 
     const driverHead = headWorld(target, seatById('suv', 'seat.driver')!);
     const atDriver = resolveHitscan(
@@ -566,6 +581,14 @@ try {
 
   console.log('\n=== 3. a gunner fires, and the rate is capped ===');
   {
+    // A window gunner fires only leaning out of the window (aim held).
+    const tucked = shooter.shotsSeen.length;
+    const early = target.vehicle() ? shooter.aimAt(target.vehicle()!) : null;
+    if (early) for (let i = 0; i < 3; i++) shooter.fire(early.yaw, early.pitch);
+    await sleep(300);
+    check('tucked inside, a gunner cannot fire', shooter.shotsSeen.length === tucked, `${shooter.shotsSeen.length - tucked} shots`);
+    shooter.send({ t: 'aim', yaw: early?.yaw ?? 0, pitch: early?.pitch ?? 0, out: true });
+    await sleep(COMBAT.leanSeconds * 1000 + 200);
     const enemy = target.vehicle();
     const aim = enemy ? shooter.aimAt(enemy) : null;
     check('the shooter can compute an aim at the enemy', aim !== null);

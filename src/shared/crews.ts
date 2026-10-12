@@ -37,14 +37,17 @@ import type { WeaponId } from './weapons';
  * server shoots at must be the same place.
  */
 export const EYE_OFFSET = [0, 0.38, 0.05] as const;
-/** Offset to the window aperture the occupant fires through, by side. */
+/**
+ * Where a leaning gunner's shots leave: the rifle's muzzle, held at the
+ * shoulder out of the window (the figure is posed to match), by side.
+ */
 export const FIRE_PORT_OFFSET = {
-  right: [0.46, 0.3, -0.06],
-  left: [-0.46, 0.3, -0.06],
+  right: [0.95, 0.5, -0.35],
+  left: [-0.95, 0.5, -0.35],
 } as const;
 
 /**
- * Where a gunner's head is: at their window, just proud of the bodywork.
+ * Where a LEANING gunner's head is: out of their window, clear of the body.
  *
  * This is the PERSON — what you see leaning out, and what a shot has to find.
  * Deliberately distinct from `WINDOW_EYE_OFFSET`, which is the camera: an
@@ -56,8 +59,14 @@ export const FIRE_PORT_OFFSET = {
  * inside the cabin can never be hit from any angle (see `headWorld`).
  */
 export const HEAD_OFFSET = {
-  right: [0.67, 0.55, 0.15],
-  left: [-0.67, 0.55, 0.15],
+  right: [0.78, 0.66, 0.05],
+  left: [-0.78, 0.66, 0.05],
+} as const;
+
+/** A leaning gunner's chest, under the head, half out of the window. */
+export const CHEST_OFFSET = {
+  right: [0.68, 0.32, 0.05],
+  left: [-0.68, 0.32, 0.05],
 } as const;
 
 /**
@@ -183,19 +192,21 @@ const COUPE_SEATS: SeatDef[] = [
 ];
 
 const SUV_SEATS: SeatDef[] = [
-  { id: 'seat.driver', drives: true, side: 'left', mount: [-0.45, -0.2, -0.4], arc: null },
+  // Seats of the SUV body (scripts/prep/suv.ts): low enough that a seated
+  // head clears its roof, at its front and rear doors.
+  { id: 'seat.driver', drives: true, side: 'left', mount: [-0.45, -0.52, -0.25], arc: null },
   {
     id: 'seat.frontRight',
     drives: false,
     side: 'right',
-    mount: [0.45, -0.2, -0.4],
+    mount: [0.45, -0.52, -0.25],
     arc: [deg(-155), deg(5)],
   },
   {
     id: 'seat.rearLeft',
     drives: false,
     side: 'left',
-    mount: [-0.45, -0.2, 0.9],
+    mount: [-0.45, -0.52, 0.85],
     // Rear left window: left flank round to behind. Left is positive.
     arc: [deg(25), deg(185)],
   },
@@ -203,7 +214,7 @@ const SUV_SEATS: SeatDef[] = [
     id: 'seat.rearRight',
     drives: false,
     side: 'right',
-    mount: [0.45, -0.2, 0.9],
+    mount: [0.45, -0.52, 0.85],
     arc: [deg(-185), deg(-25)],
   },
 ];

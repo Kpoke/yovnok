@@ -21,28 +21,42 @@
  * on the ground below a chassis origin `rideHeight` up.
  */
 
-import { join } from 'node:path';
-import type { Document, Node } from '@gltf-transform/core';
-import { getBounds, prune } from '@gltf-transform/functions';
-import { cloneDocument } from '@gltf-transform/functions';
-import { VEHICLE_CLASSES } from '../../src/shared/config';
-import { bake, io, keepOnly, ROOT, yaw } from './lib';
+import { join } from "node:path";
+import type { Document, Node } from "@gltf-transform/core";
+import { getBounds, prune } from "@gltf-transform/functions";
+import { cloneDocument } from "@gltf-transform/functions";
+import { VEHICLE_CLASSES } from "../../src/shared/config";
+import { bake, io, keepOnly, ROOT, yaw } from "./lib";
 
-const DIR = join(ROOT, 'assets-src', 'vehicles', 'suv');
+const DIR = join(ROOT, "assets-src", "vehicles", "suv");
 const SPEC = VEHICLE_CLASSES.suv;
 
 /** The SUV's nodes: the body, and the wheels that carry its wheel mesh. */
-const isBody = (n: Node): boolean => n.getName() === 'SUV Body';
+const isBody = (n: Node): boolean => n.getName() === "SUV Body";
 const isSuvWheel = (n: Node): boolean =>
-  /^Wheel_E/.test(n.getName()) && n.listChildren().some((c) => c.getMesh()?.listPrimitives()[0]?.getMaterial()?.getName() === 'Wheel_6');
+  /^Wheel_E/.test(n.getName()) &&
+  n
+    .listChildren()
+    .some(
+      (c) =>
+        c.getMesh()?.listPrimitives()[0]?.getMaterial()?.getName() ===
+        "Wheel_6",
+    );
 
 const centre = (n: Node): [number, number, number] => {
   const b = getBounds(n);
-  return [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
+  return [
+    (b.min[0] + b.max[0]) / 2,
+    (b.min[1] + b.max[1]) / 2,
+    (b.min[2] + b.max[2]) / 2,
+  ];
 };
 
 /** Rotate a vector about +Y the way `yaw(θ)` does. */
-const turn = (v: [number, number, number], θ: number): [number, number, number] => [
+const turn = (
+  v: [number, number, number],
+  θ: number,
+): [number, number, number] => [
   v[0] * Math.cos(θ) + v[2] * Math.sin(θ),
   v[1],
   -v[0] * Math.sin(θ) + v[2] * Math.cos(θ),
@@ -56,7 +70,7 @@ function worldVertices(node: Node): Array<[number, number, number]> {
     if (!mesh) return;
     const m = n.getWorldMatrix();
     for (const prim of mesh.listPrimitives()) {
-      const pos = prim.getAttribute('POSITION');
+      const pos = prim.getAttribute("POSITION");
       if (!pos) continue;
       const v = [0, 0, 0];
       for (let i = 0; i < pos.getCount(); i++) {
@@ -72,23 +86,27 @@ function worldVertices(node: Node): Array<[number, number, number]> {
   return out;
 }
 
-const source = await io.read(join(DIR, 'original', 'generic-cars.glb'));
+const source = await io.read(join(DIR, "original", "generic-cars.glb"));
 const nodes = source.getRoot().listNodes();
 const body = nodes.find(isBody);
 const wheels = nodes.filter(isSuvWheel);
-if (!body || wheels.length !== 4) throw new Error(`SUV not found (${wheels.length} wheels)`);
+if (!body || wheels.length !== 4)
+  throw new Error(`SUV not found (${wheels.length} wheels)`);
 
 // ---- the car's frame, from its wheels ---------------------------------------
 const w = wheels.map(centre);
-const mid: [number, number, number] = [0, 1, 2].map((k) => w.reduce((s, p) => s + p[k], 0) / 4) as [number, number, number];
+const mid: [number, number, number] = [0, 1, 2].map(
+  (k) => w.reduce((s, p) => s + p[k], 0) / 4,
+) as [number, number, number];
 // Pair the wheels into axles: project on the diagonal-free principal axis.
 const pairs: Array<{ d: number; axis: [number, number] }> = [];
-for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) {
-  const dx = w[j][0] - w[i][0];
-  const dz = w[j][2] - w[i][2];
-  const d = Math.hypot(dx, dz);
-  pairs.push({ d, axis: [dx / d, dz / d] });
-}
+for (let i = 0; i < 4; i++)
+  for (let j = i + 1; j < 4; j++) {
+    const dx = w[j][0] - w[i][0];
+    const dz = w[j][2] - w[i][2];
+    const d = Math.hypot(dx, dz);
+    pairs.push({ d, axis: [dx / d, dz / d] });
+  }
 pairs.sort((a, b) => a.d - b.d);
 // Sides: two shortest pairs are the axles (track), the next two the wheelbase.
 const track = (pairs[0].d + pairs[1].d) / 2;
@@ -97,17 +115,21 @@ let along = pairs[2].axis;
 
 // Front: the end where the body is lower (the bonnet; the roof runs to the back).
 const verts = worldVertices(body);
-const proj = (p: [number, number, number]): number => (p[0] - mid[0]) * along[0] + (p[2] - mid[2]) * along[1];
+const proj = (p: [number, number, number]): number =>
+  (p[0] - mid[0]) * along[0] + (p[2] - mid[2]) * along[1];
 const span = Math.max(...verts.map((p) => Math.abs(proj(p))));
 const topAt = (sign: number): number =>
-  Math.max(...verts.filter((p) => sign * proj(p) > span * 0.55).map((p) => p[1]));
+  Math.max(
+    ...verts.filter((p) => sign * proj(p) > span * 0.55).map((p) => p[1]),
+  );
 if (topAt(1) > topAt(-1)) along = [-along[0], -along[1]];
 // `along` now points to the front. Turn it to -Z: φ' = φ + θ, target φ = π.
 const φ = Math.atan2(along[0], along[1]);
 const θ = Math.PI - φ;
 const s = SPEC.wheelbase / wheelbase;
 
-const wheelRadius = (getBounds(wheels[0]).max[1] - getBounds(wheels[0]).min[1]) / 2;
+const wheelRadius =
+  (getBounds(wheels[0]).max[1] - getBounds(wheels[0]).min[1]) / 2;
 const ground = Math.min(...w.map((c) => c[1])) - wheelRadius;
 console.log(
   `SUV: wheelbase ${wheelbase.toFixed(2)} track ${track.toFixed(2)} wheel r ${wheelRadius.toFixed(3)} → scale ${s.toFixed(3)}:` +
@@ -115,7 +137,11 @@ console.log(
 );
 
 /** Keep one node (found again in the copy) and bake it around `origin`. */
-async function part(find: (doc: Document) => Node, origin: [number, number, number], file: string): Promise<Document> {
+async function part(
+  find: (doc: Document) => Node,
+  origin: [number, number, number],
+  file: string,
+): Promise<Document> {
   const doc = cloneDocument(source);
   const target = find(doc);
   keepOnly(doc, (n) => n === target);
@@ -128,7 +154,11 @@ async function part(find: (doc: Document) => Node, origin: [number, number, numb
 }
 
 // Chassis: origin at the axle midpoint, `rideHeight` above the ground.
-await part((doc) => doc.getRoot().listNodes().find(isBody)!, [mid[0], ground + SPEC.rideHeight / s, mid[2]], 'chassis.glb');
+await part(
+  (doc) => doc.getRoot().listNodes().find(isBody)!,
+  [mid[0], ground + SPEC.rideHeight / s, mid[2]],
+  "chassis.glb",
+);
 
 // Wheel: the front-left one (after the turn: -Z forward, -X left), on its axle.
 const frontLeft = wheels.find((n) => {
@@ -136,10 +166,20 @@ const frontLeft = wheels.find((n) => {
   return p[2] < 0 && p[0] < 0;
 })!;
 const flCentre = centre(frontLeft);
-const near = (n: Node): number => Math.hypot(...centre(n).map((v, k) => v - flCentre[k]));
+const near = (n: Node): number =>
+  Math.hypot(...centre(n).map((v, k) => v - flCentre[k]));
 await part(
-  (doc) => doc.getRoot().listNodes().filter(isSuvWheel).sort((a, b) => near(a) - near(b))[0],
+  (doc) =>
+    doc
+      .getRoot()
+      .listNodes()
+      .filter(isSuvWheel)
+      .sort((a, b) => near(a) - near(b))[0],
   flCentre,
-  'wheel.glb',
+  "wheel.glb",
 );
-console.log('wrote chassis.glb and wheel.glb (front-left wheel:', frontLeft.getName(), ')');
+console.log(
+  "wrote chassis.glb and wheel.glb (front-left wheel:",
+  frontLeft.getName(),
+  ")",
+);

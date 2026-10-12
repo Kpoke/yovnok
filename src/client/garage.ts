@@ -35,6 +35,7 @@ const KIND_LABELS: Record<CosmeticKind, string> = {
   primary: 'BUMPER GUNS',
   secondary: 'ROOF WEAPON',
   gunner: 'WINDOW GUN',
+  outfit: 'OUTFIT',
 };
 
 const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
@@ -67,7 +68,7 @@ export class Garage {
     this.profile = profile;
     this.stats = root.querySelector('#cos-stats') as HTMLElement;
 
-    for (const kind of ['livery', 'pattern', 'accent', 'wheels', 'roof', 'decal', 'glow', 'primary', 'secondary', 'gunner'] as CosmeticKind[]) {
+    for (const kind of ['livery', 'pattern', 'accent', 'wheels', 'roof', 'decal', 'glow', 'primary', 'secondary', 'gunner', 'outfit'] as CosmeticKind[]) {
       const row = root.querySelector(`#cos-${kind}`) as HTMLElement;
       if (row) this.rows.set(kind, row);
     }

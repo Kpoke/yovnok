@@ -56,6 +56,7 @@ export function loadProfile(): Profile {
         decal: num(parsed.look?.decal, DEFAULT_LOOK.decal),
         number: num(parsed.look?.number, DEFAULT_LOOK.number),
         gunner: num(parsed.look?.gunner, DEFAULT_LOOK.gunner),
+        outfit: num(parsed.look?.outfit, DEFAULT_LOOK.outfit),
       }),
     };
   } catch {

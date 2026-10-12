@@ -12,14 +12,14 @@
  * skin around them is one big island and stays.
  */
 
-import { join } from 'node:path';
-import type { Primitive } from '@gltf-transform/core';
-import { io, ROOT } from './lib';
+import { join } from "node:path";
+import type { Primitive } from "@gltf-transform/core";
+import { io, ROOT } from "./lib";
 
 const BRACKET = { min: [-0.25, 0.05, -1.3], max: [0.7, 0.42, -0.85] };
 
 function cut(prim: Primitive, m: readonly number[]): number {
-  const pos = prim.getAttribute('POSITION');
+  const pos = prim.getAttribute("POSITION");
   const idx = prim.getIndices();
   if (!pos || !idx) return 0;
   const n = pos.getCount();
@@ -36,7 +36,7 @@ function cut(prim: Primitive, m: readonly number[]): number {
   const v = [0, 0, 0];
   for (let i = 0; i < n; i++) {
     pos.getElement(i, v);
-    const key = v.map((x) => x.toFixed(4)).join(',');
+    const key = v.map((x) => x.toFixed(4)).join(",");
     const first = byPosition.get(key);
     if (first === undefined) byPosition.set(key, i);
     else parent[find(i)] = find(first);
@@ -54,24 +54,27 @@ function cut(prim: Primitive, m: readonly number[]): number {
       m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13],
       m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14],
     ];
-    if (w.some((x, k) => x < BRACKET.min[k] || x > BRACKET.max[k])) outside.add(find(i));
+    if (w.some((x, k) => x < BRACKET.min[k] || x > BRACKET.max[k]))
+      outside.add(find(i));
   }
   const kept: number[] = [];
   let removed = 0;
   for (let t = 0; t < idx.getCount(); t += 3) {
-    if (outside.has(find(idx.getScalar(t)))) kept.push(idx.getScalar(t), idx.getScalar(t + 1), idx.getScalar(t + 2));
+    if (outside.has(find(idx.getScalar(t))))
+      kept.push(idx.getScalar(t), idx.getScalar(t + 1), idx.getScalar(t + 2));
     else removed++;
   }
   idx.setArray(n > 65535 ? new Uint32Array(kept) : new Uint16Array(kept));
   return removed;
 }
 
-const DIR = join(ROOT, 'assets-src', 'vehicles', 'brawler');
-const doc = await io.read(join(DIR, 'chassis.glb'));
+const DIR = join(ROOT, "assets-src", "vehicles", "brawler");
+const doc = await io.read(join(DIR, "chassis.glb"));
 let removed = 0;
 for (const node of doc.getRoot().listNodes()) {
   const world = node.getWorldMatrix();
-  for (const prim of node.getMesh()?.listPrimitives() ?? []) removed += cut(prim, world);
+  for (const prim of node.getMesh()?.listPrimitives() ?? [])
+    removed += cut(prim, world);
 }
-await io.write(join(DIR, 'chassis-plain.glb'), doc);
+await io.write(join(DIR, "chassis-plain.glb"), doc);
 console.log(`chassis-plain.glb: bonnet bracket removed (${removed} triangles)`);

@@ -142,6 +142,18 @@ export const GLOWS: readonly { name: string; colour: number; unlock: UnlockRule 
   { name: 'White', colour: 0xf4f8ff, unlock: { type: 'wins', n: 1 } },
 ];
 
+/**
+ * What the people in the car wear (team formats' gunners, and every driver).
+ * Each is a model (`public/assets/characters/<id>/figure.glb`); the livery
+ * colour tints its kit.
+ */
+export const OUTFITS: readonly { id: 'striker' | 'tactical' | 'soldier'; name: string; unlock: UnlockRule }[] = [
+  { id: 'striker', name: 'Striker', unlock: { type: 'default' } },
+  { id: 'tactical', name: 'Tactical', unlock: { type: 'default' } },
+  { id: 'soldier', name: 'Soldier', unlock: { type: 'matches', n: 3 } },
+];
+export type OutfitId = (typeof OUTFITS)[number]['id'];
+
 export type CosmeticLook = {
   /** Index into `LIVERIES`. */
   livery: number;
@@ -168,6 +180,8 @@ export type CosmeticLook = {
   number: number;
   /** A window gunner's primary: index into `GUNNER_PRIMARIES` (team formats). */
   gunner: number;
+  /** Index into `OUTFITS`. */
+  outfit: number;
 };
 
 export const DEFAULT_LOOK: CosmeticLook = {
@@ -182,6 +196,7 @@ export const DEFAULT_LOOK: CosmeticLook = {
   decal: 0,
   number: 0,
   gunner: 0,
+  outfit: 0,
 };
 
 /** Clamp every index into range, so a stale profile cannot crash a render. */
@@ -198,6 +213,7 @@ export function clampLook(look: Partial<CosmeticLook>): CosmeticLook {
     decal: clampIndex(look.decal ?? 0, DECALS.length),
     number: clampIndex(look.number ?? 0, 100),
     gunner: clampIndex(look.gunner ?? 0, GUNNER_PRIMARIES.length),
+    outfit: clampIndex(look.outfit ?? 0, OUTFITS.length),
   };
 }
 
@@ -227,7 +243,7 @@ const HIGH = 2 ** 32;
  *
  *   bits 0–7 livery · 8–11 wheels · 12–15 roof · 16–19 pattern · 20–23 accent
  *   24–26 underglow · 27–28 primary gun · 29–30 secondary gun
- *   above 2^32: decal (4 bits) and race number (7 bits)
+ *   above 2^32: decal (4 bits), race number (7), gunner's gun (2), outfit (3)
  */
 export function packLook(look: Partial<CosmeticLook>): number {
   const l = clampLook(look);
@@ -241,7 +257,7 @@ export function packLook(look: Partial<CosmeticLook>): number {
       ((l.primary & 0x3) << 27) |
       ((l.secondary & 0x3) << 29)) >>>
     0;
-  const high = (l.decal & 0xf) | ((l.number & 0x7f) << 4) | ((l.gunner & 0x3) << 11);
+  const high = (l.decal & 0xf) | ((l.number & 0x7f) << 4) | ((l.gunner & 0x3) << 11) | ((l.outfit & 0x7) << 13);
   return low + high * HIGH;
 }
 
@@ -253,6 +269,7 @@ export function unpackLook(packed: number): CosmeticLook {
     decal: high & 0xf,
     number: (high >> 4) & 0x7f,
     gunner: (high >> 11) & 0x3,
+    outfit: (high >> 13) & 0x7,
     livery: n & 0xff,
     wheels: (n >> 8) & 0xf,
     roof: (n >> 12) & 0xf,
@@ -277,6 +294,7 @@ export function botLook(id: number): CosmeticLook {
     decal: a % 2 === 0 ? 1 : (a * 3) % DECALS.length,
     number: ((a * 37) % 98) + 1,
     gunner: (a * 5) % GUNNER_PRIMARIES.length,
+    outfit: (a * 7 + 2) % OUTFITS.length,
     // Some bots wear a pattern; guns vary too, so the field is not all MGs.
     pattern: a % 3 === 0 ? 0 : (a * 7 + 1) % PATTERNS.length,
     accent: (a * 5 + 2) % ACCENTS.length,
@@ -319,7 +337,8 @@ export type CosmeticKind =
   | 'decal'
   | 'primary'
   | 'secondary'
-  | 'gunner';
+  | 'gunner'
+  | 'outfit';
 
 /** The garage's gun choices, described. Sidegrades: all open from the start. */
 export const GUN_CHOICES: Record<'primary' | 'secondary' | 'gunner', readonly { name: string; blurb: string; unlock: UnlockRule }[]> = {
@@ -374,6 +393,8 @@ function listOf(kind: CosmeticKind): readonly { name: string; unlock: UnlockRule
     case 'secondary':
     case 'gunner':
       return GUN_CHOICES[kind];
+    case 'outfit':
+      return OUTFITS;
   }
 }
 
@@ -445,7 +466,7 @@ export function shopCatalog(profile: Profile): ShopEntry[] {
       });
     });
   };
-  for (const kind of ['livery', 'wheels', 'roof', 'pattern', 'accent', 'glow', 'decal', 'primary', 'secondary', 'gunner'] as const) {
+  for (const kind of ['livery', 'wheels', 'roof', 'pattern', 'accent', 'glow', 'decal', 'primary', 'secondary', 'gunner', 'outfit'] as const) {
     add(kind, listOf(kind));
   }
   return out;

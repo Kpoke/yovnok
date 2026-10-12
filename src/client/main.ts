@@ -45,6 +45,8 @@ import { Music } from './music';
 import { buildVehicle, type VehicleRig } from './vehicle/buildVehicle';
 import { GltfPartLibrary, toLod } from './vehicle/gltfPartLibrary';
 import { partRequestsFor, proceduralPartLibrary, type PartLibrary } from './vehicle/partLibrary';
+import { FigureLibrary } from './vehicle/figures';
+import type { CrewPose } from './net';
 import { CameraRig } from './camera';
 import { RoomUi } from './roomUi';
 import { Hud } from './hud';
@@ -424,6 +426,8 @@ const partLibrary: PartLibrary = new GltfPartLibrary(
 // The map: arena, scenery, materials and time of day; it changes with the
 // match's map (see the frame loop).
 const world = new World(scene, lighting, gltfLoader);
+/** The people in the cars (vehicle/figures.ts): downloaded alongside the cars. */
+const figures = new FigureLibrary(gltfLoader);
 // Everything the title needs, loaded behind the stand-by card: vehicle parts
 // and the first map.
 // (Development: ?map=<id> shows that map on the title, to look at it.)
@@ -444,14 +448,14 @@ function loadClass(cls: VehicleClassId): Promise<void> {
   }
   return pending;
 }
-await Promise.all([loadClass(net.local.spec.id), loadClass('solo'), world.show(isMapId(previewMap) ? previewMap : DEFAULT_MAP)]);
+await Promise.all([figures.load(), loadClass(net.local.spec.id), loadClass('solo'), world.show(isMapId(previewMap) ? previewMap : DEFAULT_MAP)]);
 assetsLoaded = true;
 hud.setStandby(1, 'going live');
 markAssetsReady();
 
 // The local rig is built from the class we asked for; it is rebuilt if the
 // server assigns something different.
-let localCar = buildVehicle(net.local.spec, profile.look, partLibrary);
+let localCar = buildVehicle(net.local.spec, profile.look, partLibrary, figures);
 scene.add(localCar.root);
 let localCarClass = net.local.spec.id;
 
@@ -757,13 +761,23 @@ function frame(now: number): void {
   // weapons fire while held, the rest on the press edge. Each slot is
   // rate-limited HERE to the same schedule the server keeps, so every tracer we
   // draw is a shot the server will accept — the server still has the last word.
-  const triggers: Array<['primary' | 'secondary', boolean, boolean]> = [
-    ['primary', inputs.wantsFire, inputs.consumeFirePress()],
-    ['secondary', inputs.wantsFire2, inputs.consumeFire2Press()],
-  ];
+  //
+  // A window gunner (duos, squads) leans out of the window while holding aim
+  // (right mouse, LT, a thumb on the aim side), fires only the gun in hand,
+  // and swaps gun and launcher with Q / the wheel / LB / SWAP.
+  const gunner = net.windowGunner;
+  net.setLean(playing && !hud.paused && gunner && inputs.wantsAim);
+  if (gunner && inputs.consumeSwap() && playing) net.switchWeapon(net.self.slot === 0 ? 1 : 0);
+  const firePress = inputs.consumeFirePress();
+  const fire2Press = inputs.consumeFire2Press();
+  const triggers: Array<[number | null, boolean, boolean]> = gunner
+    ? [[net.self.slot, inputs.wantsGunnerFire, firePress]]
+    : [
+        [net.slotFor('primary'), inputs.wantsFire, firePress],
+        [net.slotFor('secondary'), inputs.wantsFire2, fire2Press],
+      ];
   if (playing && net.canFire) {
-    for (const [trigger, held, pressedNow] of triggers) {
-      const slot = net.slotFor(trigger);
+    for (const [slot, held, pressedNow] of triggers) {
       if (slot === null) continue;
       const weapon = WEAPONS[net.loadout[slot] ?? 'rifle'];
       if (!(weapon.automatic ? held : pressedNow)) continue;
@@ -887,7 +901,7 @@ function frame(now: number): void {
   else if (net.local.spec.id !== localCarClass || lookKey(profile.look) !== localLookKey) {
     scene.remove(localCar.root);
     localCar.dispose();
-    localCar = buildVehicle(net.local.spec, profile.look, partLibrary);
+    localCar = buildVehicle(net.local.spec, profile.look, partLibrary, figures);
     scene.add(localCar.root);
     localCarClass = net.local.spec.id;
     localLookKey = lookKey(profile.look);
@@ -925,10 +939,17 @@ function frame(now: number): void {
   // there would suggest it is still shootable.
   localCar.root.visible = !net.localDead;
   if (!net.localDead && net.connected) damageFx.emit(net.crewId ?? -1, localCar.root, localCar.damageAnchors, local.vel, localCar.damage, realDt);
-  if (net.crewId !== null) {
-    localCar.setOccupants(net.occupantsOf(net.crewId));
-    localCar.setGunnerAims(net.gunnerAimsOf(net.crewId));
-  }
+  // The people inside; on the title screen, you at the wheel in your outfit.
+  // Development only: `window.__crew = { seatId: CrewPose }` poses the title car's crew.
+  const devCrew = import.meta.env.DEV ? (window as unknown as { __crew?: Record<string, CrewPose> }).__crew : undefined;
+  localCar.setCrew(
+    devCrew
+      ? new Map(Object.entries(devCrew))
+      : net.crewId !== null
+      ? net.crewOf(net.crewId)
+      : new Map([['seat.driver', { yaw: 0, pitch: 0, out: false, outfit: profile.look.outfit, slot: 0, gun: profile.look.gunner, alive: true }]]),
+    realDt,
+  );
   // Our guns follow the crosshair, each only as far as it physically turns.
   localCar.setWeaponAims(net.mountedAims());
 
@@ -949,7 +970,7 @@ function frame(now: number): void {
         scene.remove(rig.root);
         rig.dispose();
       }
-      rig = buildVehicle(state.spec, look, partLibrary);
+      rig = buildVehicle(state.spec, look, partLibrary, figures);
       scene.add(rig.root);
       remoteCars.set(id, rig);
       remoteLookKeys.set(id, key);
@@ -962,8 +983,7 @@ function frame(now: number): void {
     if (rig.root.visible) damageFx.emit(id, rig.root, rig.damageAnchors, state.vel, rig.damage, realDt);
     // A distant car's shadow is a few blurred texels: skip its shadow draws.
     rig.setShadowDetail(Math.hypot(state.pos.x - camera.position.x, state.pos.z - camera.position.z) < SHADOW_CAR_DISTANCE);
-    rig.setOccupants(net.occupantsOf(id));
-    rig.setGunnerAims(net.gunnerAimsOf(id));
+    rig.setCrew(net.crewOf(id), realDt);
     // Their guns follow their driver's aim. The aim message carries the CAMERA
     // pitch (positive looks down), so it is negated into the gun's (positive up).
     const mounted = seatsForRig(state.spec.id);
@@ -1103,6 +1123,10 @@ function frame(now: number): void {
     });
   } else if (net.isDriver) {
     chase.update(camera, view, viewYaw, viewPitch, realDt, obstacles);
+  } else if (seat && net.leanAmount < 0.5) {
+    // A gunner tucked inside sees the car from behind, looking about freely;
+    // leaning out (aim held) puts the view over their shoulder.
+    chase.update(camera, view, inputs.lookYaw, inputs.lookPitch, realDt, obstacles);
   } else if (seat) {
     chase.updateGunner(camera, view, seat, net.aimYaw, net.aimPitch, realDt, obstacles);
   }
@@ -1204,10 +1228,10 @@ function frame(now: number): void {
       hud.showTip(
         gunner
           ? inputs.touch
-            ? 'Drag to aim · FIRE and LAUNCH · SEAT moves you to another window'
+            ? 'Thumb on the right to lean out and aim · FIRE · SWAP to the launcher · SEAT changes window'
             : inputs.padActive
-              ? 'Right stick aim · RB fire · LB launcher · D-pad changes window'
-              : 'Mouse aim · left-click fire · right-click launcher · F changes window'
+              ? 'Hold LT to lean out · right stick aim · RT fire · LB launcher · D-pad changes window'
+              : 'Hold right-click to lean out · mouse aim · left-click fire · Q launcher · F changes window'
           : crewed
             ? inputs.touch
               ? 'You drive — your crew shoots. Left thumb steers and drives'
@@ -1330,6 +1354,7 @@ function frame(now: number): void {
   hud.setPromptVisible(!inputs.locked && playing && !menuOpen && !inputs.padActive && !inputs.touch);
   inputs.touch?.setVisible(playing && !menuOpen);
   document.body.classList.toggle('gunner', net.connected && !net.isDriver);
+  document.body.classList.toggle('tucked', net.connected && net.windowGunner && !net.leaning);
   inputs.touch?.setRole(!net.isDriver ? 'gunner' : net.mounted === null ? 'driver' : 'solo');
   hud.setMatch(net.match, net.crewId, net.localRespawnIn, net.localPlacement, spectateCrew);
   hud.setBoard(net.match.phase === 'results' ? net.board : [], net.crewId);

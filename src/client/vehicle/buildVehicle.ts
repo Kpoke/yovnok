@@ -17,6 +17,9 @@
  * only — the driver is unarmed, DESIGN.md §3.1).
  */
 
+import type { Figure, FigureLibrary } from './figures';
+import type { CrewPose } from '../net';
+import { GUNNER_PRIMARIES, GUNNER_SECONDARY } from '../../shared/weapons';
 import * as THREE from 'three';
 import { DAMAGE_FX, type VehicleSpec } from '../../shared/config';
 import { damageOf, type DamageAnchors } from '../damageFx';
@@ -69,16 +72,17 @@ export type VehicleRig = {
   part(id: PartId): VehiclePart | undefined;
   /** Every seat the crew can occupy, driver first. */
   seats: PartId[];
-  /** Show a body only at the windows someone is actually sitting at. */
-  setOccupants: (occupied: ReadonlySet<string>) => void;
+  /**
+   * The people inside, by seat (`Net.crewOf`): a figure in each occupied
+   * seat, posed for what they are doing. Seats not listed are empty.
+   */
+  setCrew: (crew: ReadonlyMap<string, CrewPose>, dt: number) => void;
   /**
    * Turn the car-mounted guns: one aim per mounted weapon (slot order), relative
    * to the car's nose, already clamped to that weapon's limits. Every gun of a
    * weapon turns together (twin guns converge by firing from their muzzles).
    */
   setWeaponAims: (aims: ReadonlyArray<{ yaw: number; pitch: number }>) => void;
-  /** Turn each window gunner's figure to their aim (car-relative yaw, by seat). */
-  setGunnerAims: (aims: ReadonlyMap<string, number>) => void;
   /** Where its headlights and tail lights are, car-local (left side; mirror x). */
   lightAnchors: LightAnchors;
   /** Cast shadows (the big meshes only) or none: off for distant cars. */
@@ -114,6 +118,7 @@ export function buildVehicle(
   spec: VehicleSpec,
   look: CosmeticLook = DEFAULT_LOOK,
   library: PartLibrary = proceduralPartLibrary,
+  figures: FigureLibrary | null = null,
 ): VehicleRig {
   const skin = clampLook(look);
   const livery = LIVERIES[skin.livery];
@@ -405,24 +410,47 @@ export function buildVehicle(
   };
 
   /**
-   * Show a body at each window that is actually occupied (DESIGN.md §3.2).
-   *
-   * Seat ids of living crew, for this vehicle. Anything not listed is hidden, so
-   * an empty seat reads as empty from outside — which is the whole point of
-   * seating gunners at windows rather than mounting turrets.
+   * The people (DESIGN.md §3.2): a figure in every occupied seat, wearing that
+   * person's outfit in the car's paint, posed each frame. An empty seat is
+   * empty, so you can see which windows hold a gunner.
    */
-  const setOccupants = (occupied: ReadonlySet<string>): void => {
-    for (const [seatId, meshes] of occupantMeshes) {
-      const on = occupied.has(seatId);
-      for (const mesh of meshes) mesh.visible = on;
+  const seated = new Map<string, { figure: Figure; outfit: number }>();
+  const seatDefs = new Map(seatsFor(spec.id).map((seat) => [seat.id as string, seat]));
+  const setCrew = (crew: ReadonlyMap<string, CrewPose>, dt: number): void => {
+    for (const [seatId, entry] of seated) {
+      const pose = crew.get(seatId);
+      if (pose && pose.outfit === entry.outfit) continue;
+      root.remove(entry.figure.root);
+      entry.figure.dispose();
+      seated.delete(seatId);
     }
-  };
-
-  const setGunnerAims = (aims: ReadonlyMap<string, number>): void => {
-    for (const [seatId, meshes] of occupantMeshes) {
-      const yaw = aims.get(seatId);
-      if (yaw === undefined) continue;
-      for (const figure of meshes) figure.rotation.y = yaw;
+    if (!figures?.ready) return;
+    for (const [seatId, pose] of crew) {
+      const seat = seatDefs.get(seatId);
+      if (!seat) continue;
+      let entry = seated.get(seatId);
+      if (!entry) {
+        const figure = figures.create(pose.outfit, livery.body);
+        if (!figure) continue;
+        entry = { figure, outfit: pose.outfit };
+        seated.set(seatId, entry);
+        root.add(figure.root);
+      }
+      const driver = seat.drives;
+      entry.figure.pose(
+        {
+          role: driver ? 'driver' : 'gunner',
+          side: seat.side,
+          hip: new THREE.Vector3(seat.mount[0], seat.mount[1] + 0.1, seat.mount[2] + 0.06),
+          yaw: pose.yaw,
+          // The aim carries the CAMERA pitch (positive looks down).
+          pitch: -pose.pitch,
+          out: pose.out,
+          alive: pose.alive,
+          gun: driver ? null : pose.slot === 1 ? GUNNER_SECONDARY : GUNNER_PRIMARIES[pose.gun] ?? GUNNER_PRIMARIES[0],
+        },
+        dt,
+      );
     }
   };
 
@@ -432,6 +460,7 @@ export function buildVehicle(
       if (mesh.geometry) mesh.geometry.dispose();
     });
     for (const material of scorched.values()) material.dispose();
+    for (const entry of seated.values()) entry.figure.dispose();
     disposeMaterials(materials);
   };
 
@@ -443,9 +472,8 @@ export function buildVehicle(
     part: (id) => parts.get(id),
     seats,
     update,
-    setOccupants,
+    setCrew,
     setWeaponAims,
-    setGunnerAims,
     setShadowDetail,
     damageAnchors,
     lightAnchors,

@@ -16,6 +16,7 @@ import { COMBAT, COMPONENT, VEHICLE_CLASSES, type VehicleClassId } from './confi
 import {
   clampToArc,
   EYE_OFFSET,
+  CHEST_OFFSET,
   FIRE_PORT_OFFSET,
   HEAD_OFFSET,
   mountMuzzleLocal,
@@ -53,6 +54,8 @@ export type CombatMember = {
   seat: SeatId;
   hp: number;
   alive: boolean;
+  /** Leaning out of the window (aiming): exposed, and able to fire. */
+  out: boolean;
 };
 
 const vec = (x: number, y: number, z: number) => ({ x, y, z });
@@ -171,6 +174,11 @@ export function muzzleWorld(vehicle: CombatVehicle, seat: SeatDef): { x: number;
 export function headWorld(vehicle: CombatVehicle, seat: SeatDef): { x: number; y: number; z: number } {
   const offset = seat.drives ? EYE_OFFSET : HEAD_OFFSET[seat.side];
   return seatPointWorld(vehicle.state, seat, offset);
+}
+
+/** A leaning gunner's chest, out of the window below their head. */
+export function chestWorld(vehicle: CombatVehicle, seat: SeatDef): { x: number; y: number; z: number } {
+  return seatPointWorld(vehicle.state, seat, CHEST_OFFSET[seat.side]);
 }
 
 /**
@@ -447,35 +455,29 @@ export function resolveHitscan(
     hullHit = vehicle.id;
     memberHit = null;
     component = componentHit(vehicle, ox, oy, oz, dx, dy, dz, hit.distance, hit.exit) ?? null;
+  }
 
-    // Crew heads are small, so this only fires on a genuinely good shot — and
-    // only for the crew whose hull the ray would have struck anyway.
-    const seatList = seatsFor(vehicle.cls);
-    for (const member of members) {
-      if (member.crew !== vehicle.id || !member.alive) continue;
-      const seat = seatList.find((s) => s.id === member.seat);
-      if (!seat) continue;
-      // The driver is protected (DESIGN.md §3.5) — armoured, in the cabin, and
-      // never exposed through a window, because they have no window to fire from.
-      // They die with the vehicle and in no other way. This covers the solo
-      // brawler too: the car is the team, so the car dying IS the driver dying.
-      if (seat.drives) continue;
-      const head = headWorld(vehicle, seat);
-      const t = raycastSphere(
-        ox,
-        oy,
-        oz,
-        dx,
-        dy,
-        dz,
-        head.x,
-        head.y,
-        head.z,
-        COMBAT.headRadius,
-        best,
-      );
-      if (t !== null && (memberHit === null || t < best - 1e-6)) {
+  // A gunner LEANING OUT of a window is outside the car (DESIGN.md §3.5): their
+  // head and chest are hit-tested on their own, and a ray that finds one
+  // before any hull or wall hits the person, not the car. Tucked inside, or at
+  // the wheel, nobody can be shot; they go down with the vehicle.
+  for (const member of members) {
+    if (!member.alive || !member.out || member.crew === shooterCrew) continue;
+    const original = vehicles.find((v) => v.id === member.crew);
+    if (!original) continue;
+    const seat = seatsFor(original.cls).find((s) => s.id === member.seat);
+    if (!seat || seat.drives) continue;
+    const vehicle = rewindVehicle(original, rewindSeconds);
+    for (const [point, radius] of [
+      [headWorld(vehicle, seat), COMBAT.headRadius],
+      [chestWorld(vehicle, seat), COMBAT.chestRadius],
+    ] as const) {
+      const t = raycastSphere(ox, oy, oz, dx, dy, dz, point.x, point.y, point.z, radius, best);
+      if (t !== null && t < best) {
+        best = t;
         memberHit = member.id;
+        hullHit = null;
+        component = null;
       }
     }
   }
