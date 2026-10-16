@@ -70,6 +70,8 @@ export const LIVERIES: readonly Livery[] = [
   { id: 'sunburst', name: 'Sunburst', body: 0xffc542, finish: 'gloss', unlock: { type: 'kills', n: 15 } },
   { id: 'pearl', name: 'Pearl White', body: 0xf2f4f7, finish: 'pearl', unlock: { type: 'wins', n: 1 } },
   { id: 'chrome', name: 'Chrome', body: 0xdfe6ee, finish: 'chrome', unlock: { type: 'kills', n: 50 } },
+  // The theme's ice blue, and the default paint. Added last: saved looks store an index.
+  { id: 'ice', name: 'Ice Blue', body: 0x8fd0ff, finish: 'gloss', unlock: { type: 'default' } },
 ];
 
 /**
@@ -185,7 +187,7 @@ export type CosmeticLook = {
 };
 
 export const DEFAULT_LOOK: CosmeticLook = {
-  livery: 0,
+  livery: LIVERIES.findIndex((l) => l.id === 'ice'),
   wheels: 0,
   roof: 0,
   pattern: 0,

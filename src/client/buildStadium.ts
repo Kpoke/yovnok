@@ -431,7 +431,7 @@ function crowdAtlas(): THREE.CanvasTexture {
   canvas.width = fw * CROWD_COLUMNS;
   canvas.height = fh * CROWD_ROWS;
   const ctx = canvas.getContext('2d')!;
-  const shirts = ['#c0392b', '#e67e22', '#f1c40f', '#ecf0f1', '#2c3e50', '#16a085', '#8e44ad', '#d35400', '#7f8c8d', '#2980b9', '#ff8a3d', '#1b1d22'];
+  const shirts = ['#c0392b', '#e67e22', '#f1c40f', '#ecf0f1', '#2c3e50', '#16a085', '#8e44ad', '#d35400', '#7f8c8d', '#2980b9', '#8fd0ff', '#1b1d22'];
   const skin = ['#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#ffdbac', '#6b4423'];
   const hair = ['#1b1410', '#3b2a1e', '#6b4a2b', '#a87b4f', '#d8c08a', '#111111'];
   const rand = seeded(23);
@@ -482,7 +482,7 @@ function crowdAtlas(): THREE.CanvasTexture {
         ctx.fill();
       }
       if (p.scarf) {
-        ctx.fillStyle = '#ff8a3d';
+        ctx.fillStyle = '#8fd0ff';
         ctx.fillRect(cx - p.width / 2 - (cheer ? 8 : 0), cheer ? top - 30 : top + 4, p.width + (cheer ? 16 : 0), 7);
       }
       // Head.
@@ -684,7 +684,7 @@ function bigScreens(): { object: THREE.Group; update: (dt: number) => void; show
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.fillText('LIVE', 70, 48);
-    ctx.fillStyle = '#ff8a3d';
+    ctx.fillStyle = '#8fd0ff';
     ctx.textAlign = 'right';
     ctx.fillText('YOVNOK', canvas.width - 30, 48);
     ctx.textAlign = 'center';
@@ -868,7 +868,7 @@ function banners(): THREE.Mesh {
   canvas.height = H * BANNERS.length;
   const ctx = canvas.getContext('2d')!;
   const palettes = [
-    ['#ff8a3d', '#0b0d12'],
+    ['#8fd0ff', '#27303a'],
     ['#0b0d12', '#ffffff'],
     ['#f2f2ee', '#c0392b'],
     ['#1b2a3a', '#f2c94c'],
@@ -989,7 +989,7 @@ function flags(): { mesh: THREE.Mesh; update: (t: number) => void } {
   const colours: number[] = [];
   const phases: number[] = [];
   const colour = new THREE.Color();
-  const palette = [0xff8a3d, 0xf2f2ee, 0x1b1d22, 0xc0392b, 0x2a3c55];
+  const palette = [0x8fd0ff, 0xf2f2ee, 0x1b1d22, 0xc0392b, 0x2a3c55];
   const rand = seeded(41);
   const segments = 6;
   const poles: THREE.BufferGeometry[] = [];
