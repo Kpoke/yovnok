@@ -525,14 +525,26 @@
         animation: repair-pulse 1.2s ease-in-out infinite;
       }
       .hero-side { display: flex; flex-direction: column; cursor: default; }
-      #join .title {
-        margin-top: 12px;
-        /* Sized to its column, so an open panel beside it never overlaps it. */
-        font-size: clamp(40px, 4.4vw, 72px);
-        font-weight: 800;
-        letter-spacing: 0.12em;
-        line-height: 0.95;
+      /* The wordmark's stencil face (SIL OFL 1.1; public/fonts), served with the game. */
+      @font-face {
+        font-family: 'Black Ops One';
+        src: url('/fonts/black-ops-one.woff2') format('woff2');
+        font-display: swap;
       }
+      #join .title {
+        margin: 12px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 0.32em;
+        /* Sized to its column, so an open panel beside it never overlaps it. */
+        font-family: 'Black Ops One', Impact, sans-serif;
+        font-size: clamp(34px, 3.6vw, 60px);
+        font-weight: 400;
+        letter-spacing: 0.1em;
+        line-height: 1;
+      }
+      /* The badge beside the name. */
+      #join .title img { width: 1.7em; height: 1.7em; flex: none; }
 
       /* Vertical menu: shared by the title and the in-game menu. */
       .menu { margin-top: 38px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
@@ -875,7 +887,7 @@
           gap: 18px;
           align-items: start;
         }
-        #join .title { margin-top: 4px; font-size: 32px; }
+        #join .title { margin-top: 4px; font-size: 26px; }
         .menu { margin-top: 10px; gap: 0; }
         .menu-item { padding: 5px 0 5px 20px; font-size: 12px; letter-spacing: 4px; }
         .menu-item.primary { margin-bottom: 8px; padding: 9px 34px 9px 20px; font-size: 16px; }
@@ -1128,7 +1140,7 @@
       <div id="join" class="hidden">
         <div class="hero-side">
           <div class="kicker">LIVE</div>
-          <div class="title">YOVNOK</div>
+          <h1 class="title"><img src="/logo.svg" alt="" />YOVNOK</h1>
           <nav class="menu">
             <button id="join-button" class="menu-item primary">PLAY</button>
             <div id="play-choices" class="play-choices hidden">

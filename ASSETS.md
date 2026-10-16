@@ -81,7 +81,7 @@ NoDerivatives (ND) licences are rejected** by the check, which runs in
 
 | Title | Author | Licence | Changes | Files |
 |---|---|---|---|---|
-| [YOVNOK logo](https://github.com/Kpoke/yovnok/blob/main/public/icon.svg) | [YOVNOK contributors](https://github.com/Kpoke/yovnok) | [GPL-3.0-or-later](https://www.gnu.org/licenses/gpl-3.0.html) | Original artwork made for YOVNOK: a Y cut like a road fork. The PNGs are renders of icon.svg. | `public/icon.svg`<br>`public/icon-192.png`<br>`public/icon-512.png`<br>`public/apple-touch-icon.png` |
+| [YOVNOK logo](https://github.com/Kpoke/yovnok/blob/main/public/icon.svg) | [YOVNOK contributors](https://github.com/Kpoke/yovnok) | [GPL-3.0-or-later](https://www.gnu.org/licenses/gpl-3.0.html) | Original artwork made for YOVNOK: an armoured patrol vehicle head-on in a ring, drawn by hand as a vector (logo.svg), with a simplified version for browser tabs (icon.svg). The PNGs are renders of logo.svg on its background colour. | `public/logo.svg`<br>`public/icon.svg`<br>`public/icon-192.png`<br>`public/icon-512.png`<br>`public/apple-touch-icon.png` |
 
 ## Music
 
@@ -101,3 +101,9 @@ NoDerivatives (ND) licences are rejected** by the check, which runs in
 | [Q009's weapon sounds (minigun2, rlauncher, grenade2)](https://opengameart.org/content/q009s-weapon-sounds) | Q009 | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) | Renamed only (minigun2.ogg → mg-shot.ogg, rlauncher.ogg → rpg-launch.ogg, grenade2.ogg → explosion-body.ogg). Layered in game with synthesised sub-bass and an echo tail. | `public/audio/sfx/mg-shot.ogg`<br>`public/audio/sfx/rpg-launch.ogg`<br>`public/audio/sfx/explosion-body.ogg` |
 | [25 CC0 bang / firework SFX (cannon_01)](https://opengameart.org/content/25-cc0-bang-firework-sfx) | rubberduck | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Peak-normalised to -1 dBFS and renamed; layered under explosions as the rolling tail. | `public/audio/sfx/explosion-tail.ogg` |
 | [Metal Impact Sounds (clink3, clink2, bing1, thud3, bong1)](https://opengameart.org/content/metal-impact-sounds) | Brian MacIntosh (BMacZero) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Converted from WAV to Ogg Vorbis, peak-normalised to -1 dBFS and renamed. | `public/audio/sfx/hit-metal-1.ogg`<br>`public/audio/sfx/hit-metal-2.ogg`<br>`public/audio/sfx/hit-metal-3.ogg`<br>`public/audio/sfx/hit-thud.ogg`<br>`public/audio/sfx/hull-clang.ogg` |
+
+## Fonts
+
+| Title | Author | Licence | Changes | Files |
+|---|---|---|---|---|
+| [Black Ops One](https://fonts.google.com/specimen/Black+Ops+One) | [James Grieshaber, Eben Sorkin](https://github.com/SorkinType/Black-Ops) | [SIL OFL 1.1](https://openfontlicense.org/) | The Latin subset as served by Google Fonts (WOFF2), unmodified; used for the YOVNOK wordmark on the title screen. Licence text alongside. | `public/fonts/black-ops-one.woff2`<br>`public/fonts/black-ops-one-OFL.txt` |

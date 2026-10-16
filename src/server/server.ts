@@ -241,6 +241,7 @@ const MIME: Record<string, string> = {
   '.gltf': 'model/gltf+json',
   '.wasm': 'application/wasm',
   '.webmanifest': 'application/manifest+json',
+  '.woff2': 'font/woff2',
 };
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {

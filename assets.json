@@ -925,6 +925,7 @@
     },
     {
       "files": [
+        "public/logo.svg",
         "public/icon.svg",
         "public/icon-192.png",
         "public/icon-512.png",
@@ -936,7 +937,20 @@
       "authorUrl": "https://github.com/Kpoke/yovnok",
       "source": "https://github.com/Kpoke/yovnok/blob/main/public/icon.svg",
       "license": "GPL-3.0-or-later",
-      "changes": "Original artwork made for YOVNOK: a Y cut like a road fork. The PNGs are renders of icon.svg."
+      "changes": "Original artwork made for YOVNOK: an armoured patrol vehicle head-on in a ring, drawn by hand as a vector (logo.svg), with a simplified version for browser tabs (icon.svg). The PNGs are renders of logo.svg on its background colour."
+    },
+    {
+      "files": [
+        "public/fonts/black-ops-one.woff2",
+        "public/fonts/black-ops-one-OFL.txt"
+      ],
+      "kind": "font",
+      "title": "Black Ops One",
+      "author": "James Grieshaber, Eben Sorkin",
+      "authorUrl": "https://github.com/SorkinType/Black-Ops",
+      "source": "https://fonts.google.com/specimen/Black+Ops+One",
+      "license": "OFL-1.1",
+      "changes": "The Latin subset as served by Google Fonts (WOFF2), unmodified; used for the YOVNOK wordmark on the title screen. Licence text alongside."
     }
   ]
 }

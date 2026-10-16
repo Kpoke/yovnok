@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+  <!-- YOVNOK badge: the patrol vehicle head-on, low, in a ring. Arctic: field #e8ecef, ink #27303a, shade #5b6772. -->
+  <defs>
+    <clipPath id="disc"><circle cx="320" cy="320" r="282"/></clipPath>
+  </defs>
+  <g clip-path="url(#disc)">
+    <rect width="640" height="640" fill="#e8ecef"/>
+    <!-- wheels and running gear, in shade -->
+    <path d="M0 400 H140 V640 H0 Z M500 400 H640 V640 H500 Z" fill="#5b6772"/>
+    <path d="M140 472 H500 V610 H140 Z" fill="#5b6772"/>
+    <g stroke="#27303a" stroke-width="12">
+      <path d="M0 500 H128 M0 532 H128 M0 564 H128 M0 596 H128 M512 500 H640 M512 532 H640 M512 564 H640 M512 596 H640"/>
+    </g>
+    <g fill="none" stroke="#27303a" stroke-width="10" stroke-linecap="round">
+      <path d="M140 492 H195 M140 516 H195 M140 540 H195 M140 564 H195"/>
+      <path d="M445 492 H500 M445 516 H500 M445 540 H500 M445 564 H500"/>
+      <path d="M205 488 C260 500 270 540 270 600 M435 488 C380 500 370 540 370 600"/>
+    </g>
+    <rect x="262" y="540" width="116" height="66" rx="6" fill="#27303a"/>
+    <!-- mirrors and posts -->
+    <g fill="#27303a">
+      <rect x="0" y="142" width="46" height="92" rx="10"/>
+      <rect x="594" y="142" width="46" height="92" rx="10"/>
+      <rect x="100" y="30" width="22" height="100" rx="4"/>
+      <rect x="518" y="0" width="22" height="110" rx="4"/>
+    </g>
+    <path d="M44 196 L118 150 M596 196 L522 150" stroke="#27303a" stroke-width="12" stroke-linecap="round"/>
+    <!-- cabin -->
+    <path d="M140 52 Q140 42 152 42 H488 Q500 42 500 52 L540 232 H100 Z" fill="#27303a"/>
+    <!-- body / front face -->
+    <path d="M40 252 Q40 230 62 230 H578 Q600 230 600 252 V420 H40 Z" fill="#27303a"/>
+    <!-- bumper -->
+    <rect x="58" y="422" width="524" height="52" rx="6" fill="#27303a"/>
+    <!-- bold lines -->
+    <g fill="none" stroke="#e8ecef" stroke-width="9" stroke-linejoin="round" stroke-linecap="round">
+      <!-- windscreen -->
+      <path d="M158 120 H294 L312 140 V208 H130 Z"/>
+      <path d="M482 120 H346 L328 140 V208 H510 Z"/>
+      <!-- roof lights and beacon -->
+      <rect x="180" y="70" width="70" height="28" rx="3"/>
+      <rect x="390" y="70" width="70" height="28" rx="3"/>
+      <rect x="292" y="62" width="56" height="34" rx="8"/>
+      <!-- headlight pods -->
+      <rect x="56" y="308" width="102" height="80" rx="12"/>
+      <rect x="482" y="308" width="102" height="80" rx="12"/>
+      <circle cx="132" cy="347" r="22"/><circle cx="508" cy="347" r="22"/>
+      <!-- grille -->
+      <rect x="196" y="320" width="248" height="50" rx="4"/>
+      <!-- bumper plate and lower bar -->
+      <rect x="150" y="372" width="340" height="48" rx="4"/>
+      <rect x="62" y="426" width="516" height="44" rx="4"/>
+    </g>
+    <g fill="none" stroke="#e8ecef" stroke-width="5" stroke-linecap="round">
+      <path d="M320 324 V366 M206 338 H312 M206 352 H312 M328 338 H434 M328 352 H434"/>
+      <path d="M262 390 H378 M262 402 H378"/>
+      <path d="M180 300 H460"/>
+      <circle cx="84" cy="326" r="10"/><circle cx="80" cy="360" r="13"/>
+      <circle cx="556" cy="326" r="10"/><circle cx="560" cy="360" r="13"/>
+      <circle cx="96" cy="448" r="15"/><circle cx="134" cy="448" r="15"/>
+      <circle cx="506" cy="448" r="15"/><circle cx="544" cy="448" r="15"/>
+      <path d="M210 456 H312 M328 456 H430"/>
+      <rect x="160" y="386" width="30" height="22" rx="3"/><rect x="450" y="386" width="30" height="22" rx="3"/>
+    </g>
+  </g>
+  <!-- the ring -->
+  <circle cx="320" cy="320" r="288" fill="none" stroke="#e8ecef" stroke-width="12"/>
+  <circle cx="320" cy="320" r="306" fill="none" stroke="#27303a" stroke-width="24"/>
+</svg>

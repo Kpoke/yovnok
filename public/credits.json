@@ -511,6 +511,18 @@
       "attribution": "Brian MacIntosh (BMacZero)",
       "license": "CC0 1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "heading": "FONTS",
+      "items": [
+        {
+          "title": "Black Ops One",
+          "source": "https://fonts.google.com/specimen/Black+Ops+One"
+        }
+      ],
+      "attribution": "James Grieshaber, Eben Sorkin (github.com/SorkinType/Black-Ops)",
+      "license": "SIL OFL 1.1",
+      "licenseUrl": "https://openfontlicense.org/"
     }
   ]
 }
