@@ -77,6 +77,12 @@ NoDerivatives (ND) licences are rejected** by the check, which runs in
 | [Kloofendal 48d Partly Cloudy (Pure Sky)](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky) | [Greg Zaal, Jarod Guest](https://polyhaven.com) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Unmodified 1K HDR; used as the environment (image-based) lighting, not shown as the sky. | `public/assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr` |
 | [Mud Road (Pure Sky)](https://polyhaven.com/a/mud_road_puresky) | [Sergey Rudavin, Jarod Guest](https://polyhaven.com) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Unmodified 1K HDR; used as the environment (image-based) lighting, not shown as the sky. | `public/assets/hdri/mud_road_puresky_1k.hdr` |
 
+## Images
+
+| Title | Author | Licence | Changes | Files |
+|---|---|---|---|---|
+| [YOVNOK logo](https://github.com/Kpoke/yovnok/blob/main/public/icon.svg) | [YOVNOK contributors](https://github.com/Kpoke/yovnok) | [GPL-3.0-or-later](https://www.gnu.org/licenses/gpl-3.0.html) | Original artwork made for YOVNOK: a Y cut like a road fork. The PNGs are renders of icon.svg. | `public/icon.svg`<br>`public/icon-192.png`<br>`public/icon-512.png`<br>`public/apple-touch-icon.png` |
+
 ## Music
 
 | Title | Author | Licence | Changes | Files |

@@ -433,6 +433,18 @@
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
     },
     {
+      "heading": "IMAGES",
+      "items": [
+        {
+          "title": "YOVNOK logo",
+          "source": "https://github.com/Kpoke/yovnok/blob/main/public/icon.svg"
+        }
+      ],
+      "attribution": "YOVNOK contributors (github.com/Kpoke/yovnok)",
+      "license": "GPL-3.0-or-later",
+      "licenseUrl": "https://www.gnu.org/licenses/gpl-3.0.html"
+    },
+    {
       "heading": "MUSIC",
       "items": [
         {

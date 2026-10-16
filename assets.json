@@ -922,6 +922,21 @@
       "source": "https://sketchfab.com/3d-models/army-soldier-character-cc995450452744ec8f852d8bf5f335d6",
       "license": "CC-BY-4.0",
       "changes": "Rebound to its saved pose, finger weights moved onto the hands, materials converted to metal/rough and made opaque, turned to face -Z and scaled to 1.8 m, simplified to about 7,000 triangles; textures resized to 512 px; recompressed (KTX2, meshopt). Its jacket is tinted with the player's paint colour in game; the game poses the skeleton (no animation is used). Built by scripts/prep/characters.ts and scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "public/icon.svg",
+        "public/icon-192.png",
+        "public/icon-512.png",
+        "public/apple-touch-icon.png"
+      ],
+      "kind": "image",
+      "title": "YOVNOK logo",
+      "author": "YOVNOK contributors",
+      "authorUrl": "https://github.com/Kpoke/yovnok",
+      "source": "https://github.com/Kpoke/yovnok/blob/main/public/icon.svg",
+      "license": "GPL-3.0-or-later",
+      "changes": "Original artwork made for YOVNOK: a Y cut like a road fork. The PNGs are renders of icon.svg."
     }
   ]
 }
