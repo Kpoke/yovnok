@@ -8,17 +8,21 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <!-- Phones: installable full screen, landscape (Add to Home Screen). -->
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#050608" />
+    <meta name="theme-color" content="#27303a" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>YOVNOK</title>
     <style>
+      /* Arctic, from the badge (public/logo.svg): charcoal and light grey, with
+         an ice-blue highlight. Red and green stay for damage and health. */
       :root {
         color-scheme: dark;
-        --accent: #ff8a3d;
-        --panel: rgba(10, 12, 16, 0.55);
-        --edge: rgba(255, 255, 255, 0.1);
+        --accent: #8fd0ff;
+        --accent-ink: #0f1b26;
+        --accent-light: #d6efff;
+        --panel: rgba(39, 48, 58, 0.78);
+        --edge: rgba(232, 236, 239, 0.16);
       }
 
       * { box-sizing: border-box; }
@@ -27,9 +31,9 @@
         margin: 0;
         height: 100%;
         overflow: hidden;
-        background: #0a0b0e;
+        background: #141a20;
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        color: #e8edf2;
+        color: #e8ecef;
       }
 
       /* Pinned to the viewport like the HUD: in the page flow it could be pushed
@@ -89,7 +93,7 @@
       #combat .row { display: flex; justify-content: space-between; gap: 12px; margin-top: 5px; font-size: 11px; }
       #combat .row b { color: var(--accent); font-weight: 600; }
       #combat .bar { margin-top: 5px; }
-      #combat .bar > i { background: linear-gradient(90deg, #ffd27a, #ff8a3d); }
+      #combat .bar > i { background: linear-gradient(90deg, var(--accent-light), var(--accent)); }
 
       /*
        * Component pips (DESIGN.md §4.2). Health is drawn as a filled track that
@@ -152,7 +156,7 @@
         display: block;
         height: 100%;
         width: 0%;
-        background: linear-gradient(90deg, #ffb347, var(--accent));
+        background: linear-gradient(90deg, var(--accent-light), var(--accent));
         transition: width 60ms linear;
       }
 
@@ -378,7 +382,7 @@
         font: inherit;
         font-size: 12px;
         letter-spacing: 3px;
-        color: #0a0b0e;
+        color: var(--accent-ink);
         background: var(--accent);
         border: 0;
         border-radius: 7px;
@@ -508,8 +512,8 @@
         cursor: grab;
         pointer-events: auto;
         /* Dark where the menu is, clear where the car stands. */
-        background: linear-gradient(90deg, rgba(5, 6, 8, 0.92) 0%, rgba(5, 6, 8, 0.6) 32%, rgba(5, 6, 8, 0) 62%),
-          linear-gradient(0deg, rgba(5, 6, 8, 0.65) 0%, rgba(5, 6, 8, 0) 28%);
+        background: linear-gradient(90deg, rgba(20, 26, 32, 0.92) 0%, rgba(20, 26, 32, 0.6) 32%, rgba(20, 26, 32, 0) 62%),
+          linear-gradient(0deg, rgba(20, 26, 32, 0.65) 0%, rgba(20, 26, 32, 0) 28%);
       }
       #join.hidden { display: none; }
       .kicker { font-size: 10px; letter-spacing: 5px; color: var(--accent); }
@@ -583,12 +587,12 @@
         padding: 14px 44px 14px 26px;
         font-size: 20px;
         font-weight: 800;
-        color: #0a0b0e;
+        color: var(--accent-ink);
         background: var(--accent);
         border-radius: 4px;
       }
       .menu-item.primary::before { display: none; }
-      .menu-item.primary:hover { color: #0a0b0e; padding-left: 30px; filter: brightness(1.08); }
+      .menu-item.primary:hover { color: var(--accent-ink); padding-left: 30px; filter: brightness(1.08); }
       .menu-item:disabled { opacity: 0.5; cursor: default; }
       .menu-item.danger:hover { color: #ff6b6b; }
       .menu-item.danger::before { background: #ff6b6b; }
@@ -613,7 +617,7 @@
         gap: 8px;
         font-size: 10px;
         letter-spacing: 3px;
-        color: #e8edf2;
+        color: #e8ecef;
         opacity: 0.45;
         text-decoration: none;
         cursor: pointer;
@@ -663,7 +667,7 @@
         font-size: 10px;
         letter-spacing: 1px;
         cursor: pointer;
-        color: #e8edf2;
+        color: #e8ecef;
         background: rgba(255, 255, 255, 0.06);
         border: 1px solid var(--edge);
         border-radius: 4px;
@@ -672,7 +676,7 @@
       .cos-option.selected, .chip.on {
         border-color: var(--accent);
         color: var(--accent);
-        background: rgba(255, 138, 61, 0.12);
+        background: rgba(143, 208, 255, 0.12);
       }
       .cos-option.locked { opacity: 0.5; cursor: default; }
       .cos-need { font-size: 9px; letter-spacing: 1px; opacity: 0.85; }
@@ -733,15 +737,15 @@
       #touch .stick-base.hidden { display: none; }
       #touch .stick-knob {
         position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; border-radius: 50%;
-        background: rgba(255, 138, 61, 0.75); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+        background: rgba(143, 208, 255, 0.75); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
       }
       #touch .touch-btn {
         position: absolute; pointer-events: auto; border-radius: 50%; font: inherit; font-weight: 700; letter-spacing: 1px;
         color: #fff; background: rgba(10, 12, 16, 0.42); border: 2px solid rgba(255, 255, 255, 0.35);
         display: flex; align-items: center; justify-content: center; touch-action: none;
       }
-      #touch .touch-btn.held { background: rgba(255, 138, 61, 0.55); border-color: var(--accent); }
-      #touch .fire { right: max(24px, env(safe-area-inset-right)); bottom: 28px; width: 92px; height: 92px; font-size: 16px; border-color: rgba(255, 138, 61, 0.8); }
+      #touch .touch-btn.held { background: rgba(143, 208, 255, 0.55); border-color: var(--accent); }
+      #touch .fire { right: max(24px, env(safe-area-inset-right)); bottom: 28px; width: 92px; height: 92px; font-size: 16px; border-color: rgba(143, 208, 255, 0.8); }
       #touch .fire2 { right: calc(max(24px, env(safe-area-inset-right)) + 14px); bottom: 136px; width: 66px; height: 66px; font-size: 13px; }
       #touch .boost { right: calc(max(24px, env(safe-area-inset-right)) + 108px); bottom: 22px; width: 62px; height: 62px; font-size: 10px; }
       #touch .drift { right: calc(max(24px, env(safe-area-inset-right)) + 110px); bottom: 96px; width: 56px; height: 56px; font-size: 10px; }
@@ -761,7 +765,7 @@
       @media (orientation: portrait) {
         body.touch #rotate {
           position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center;
-          justify-content: center; gap: 18px; padding: 24px; text-align: center; background: #050608; color: #e8edf2;
+          justify-content: center; gap: 18px; padding: 24px; text-align: center; background: #141a20; color: #e8ecef;
         }
         body.touch #rotate .phone {
           width: 46px; height: 78px; border: 3px solid var(--accent); border-radius: 9px;
@@ -775,7 +779,7 @@
       /* ---- a new map loading under a live connection ---- */
       #map-loading {
         position: absolute; inset: 0; z-index: 17; display: flex; flex-direction: column; align-items: center;
-        justify-content: center; gap: 14px; background: rgba(5, 6, 8, 0.92); pointer-events: auto;
+        justify-content: center; gap: 14px; background: rgba(20, 26, 32, 0.92); pointer-events: auto;
       }
       #map-loading.hidden { display: none; }
       #map-loading-name { font-size: clamp(28px, 5vw, 52px); font-weight: 800; letter-spacing: 0.18em; }
@@ -794,7 +798,7 @@
       #room-code:focus { outline: none; border-color: var(--accent); }
       #room-lobby {
         position: absolute; inset: 0; z-index: 18; display: flex; align-items: center; justify-content: center;
-        padding: 4vh 5vw; background: linear-gradient(90deg, rgba(5, 6, 8, 0.88), rgba(5, 6, 8, 0.6));
+        padding: 4vh 5vw; background: linear-gradient(90deg, rgba(20, 26, 32, 0.88), rgba(20, 26, 32, 0.6));
         pointer-events: auto;
       }
       #room-lobby.hidden { display: none; }
@@ -810,12 +814,12 @@
       #room-players li.me { color: var(--accent); }
       #room-maps { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
       .map-option {
-        display: grid; gap: 2px; text-align: left; padding: 8px 12px; font: inherit; color: #e8edf2; cursor: pointer;
+        display: grid; gap: 2px; text-align: left; padding: 8px 12px; font: inherit; color: #e8ecef; cursor: pointer;
         background: rgba(255, 255, 255, 0.05); border: 1px solid var(--edge); border-radius: 4px; pointer-events: auto;
       }
       .map-option b { font-size: 12px; letter-spacing: 2px; font-weight: 600; }
       .map-option span { font-size: 10px; opacity: 0.6; letter-spacing: 0.5px; }
-      .map-option.selected { border-color: var(--accent); background: rgba(255, 138, 61, 0.12); }
+      .map-option.selected { border-color: var(--accent); background: rgba(143, 208, 255, 0.12); }
       .map-option.selected b { color: var(--accent); }
       .map-option:disabled { cursor: default; }
       .map-option:disabled:not(.selected) { opacity: 0.45; }
@@ -843,7 +847,7 @@
         align-items: center;
         gap: 28px;
         padding: 6vh 5vw;
-        background: linear-gradient(90deg, rgba(5, 6, 8, 0.9) 0%, rgba(5, 6, 8, 0.55) 45%, rgba(5, 6, 8, 0.25) 100%);
+        background: linear-gradient(90deg, rgba(20, 26, 32, 0.9) 0%, rgba(20, 26, 32, 0.55) 45%, rgba(20, 26, 32, 0.25) 100%);
         pointer-events: auto;
       }
       #pause.hidden { display: none; }
@@ -860,7 +864,7 @@
         align-items: center;
         justify-content: center;
         gap: 18px;
-        background: rgba(5, 6, 8, 0.85);
+        background: rgba(20, 26, 32, 0.85);
         pointer-events: auto;
       }
       #loading.hidden { display: none; }
@@ -873,7 +877,7 @@
 
       @media (max-width: 760px) {
         #join, #pause { grid-template-columns: 1fr; align-content: start; overflow-y: auto; padding: 24px 16px; gap: 16px; }
-        #join { background: linear-gradient(180deg, rgba(5, 6, 8, 0.92) 0%, rgba(5, 6, 8, 0.4) 70%); }
+        #join { background: linear-gradient(180deg, rgba(20, 26, 32, 0.92) 0%, rgba(20, 26, 32, 0.4) 70%); }
         .menu { margin-top: 20px; }
         .hero-hint { display: none; }
         .hero-source { position: static; margin-top: 4px; }

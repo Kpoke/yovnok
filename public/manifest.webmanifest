@@ -5,8 +5,8 @@
   "start_url": "/",
   "display": "fullscreen",
   "orientation": "landscape",
-  "background_color": "#050608",
-  "theme_color": "#050608",
+  "background_color": "#27303a",
+  "theme_color": "#27303a",
   "icons": [
     {
       "src": "/icon.svg",
