@@ -691,9 +691,9 @@ export const CAMERA = {
   soloDistance: 5.4,
   /** Window gunner, over the shoulder: distance behind the head, height, and
    * how far to the side of the line of sight. */
-  gunnerDistance: 2.2,
-  gunnerHeight: 0.45,
-  gunnerShoulder: 0.9,
+  gunnerDistance: 1.5,
+  gunnerHeight: 0.3,
+  gunnerShoulder: 0.7,
   soloHeight: 1.75,
   /** How far ahead the camera looks. Larger flattens the aim feel. */
   soloLookAhead: 26,

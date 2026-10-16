@@ -64,6 +64,7 @@ import {
   type WeaponDef,
   type WeaponId,
   scheduleShot,
+  shotInterval,
 } from '../shared/weapons';
 import { clamp } from '../shared/math';
 import {
@@ -249,6 +250,8 @@ type Player = {
    * still cannot exceed the weapon's.
    */
   nextFireAt: number[];
+  /** Rounds fired from each slot, for a burst weapon's rhythm (`shotInterval`). */
+  shotsFired: number[];
   /** Per slot: which mount fires next, so twin guns alternate barrels. */
   barrel: number[];
   /** Seconds until a downed crew member returns to their seat. */
@@ -610,6 +613,7 @@ export class Room {
       ammo: createAmmoState(),
       lastFireSeq: 0,
       nextFireAt: [0, 0, 0],
+      shotsFired: [0, 0, 0],
       barrel: [0, 0, 0],
       respawnIn: 0,
       name: '',
@@ -766,6 +770,7 @@ export class Room {
       ammo: createAmmoState(loadout),
       lastFireSeq: 0,
       nextFireAt: [0, 0, 0],
+      shotsFired: [0, 0, 0],
       barrel: [0, 0, 0],
       respawnIn: 0,
       name: botCallsign(id),
@@ -1721,7 +1726,9 @@ export class Room {
 
     const weapon = weaponInSlot(player.loadout, slot);
     const now = performance.now();
-    const interval = Math.max(fireInterval(weapon), COMBAT.minFireInterval) * 1000;
+    // A burst weapon rests after each burst; counted here, so the pause holds.
+    const fired = (player.shotsFired[slot] ?? 0) + 1;
+    const interval = Math.max(shotInterval(weapon, fired), COMBAT.minFireInterval) * 1000;
     const nextDue = scheduleShot(player.nextFireAt[slot] ?? 0, now, interval, FIRE_JITTER);
     if (nextDue === null) return;
 
@@ -1732,6 +1739,7 @@ export class Room {
 
     player.lastFireSeq = seq;
     player.nextFireAt[slot] = nextDue;
+    player.shotsFired[slot] = fired;
     player.ammo.rounds[slot] -= 1;
 
     // The crosshair's world point, when the client sent one. Validated: finite,

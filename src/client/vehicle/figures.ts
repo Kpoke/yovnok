@@ -18,6 +18,7 @@ import * as THREE from 'three';
 import type { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { COMBAT } from '../../shared/config';
+import { FIGURE_SCALE, HAND_GUN_SCALE } from '../../shared/crews';
 import { OUTFITS } from '../../shared/cosmetics';
 import type { WeaponId } from '../../shared/weapons';
 
@@ -58,10 +59,16 @@ export type FigurePose = {
  * (or pump, or foregrip), and the magazine for a reload.
  */
 const GRIPS: Record<WeaponId, { grip: [number, number, number]; fore: [number, number, number]; mag: [number, number, number] }> = {
-  rifle: { grip: [0, -0.08, 0.27], fore: [0, -0.02, 0.52], mag: [0, -0.1, 0.38] },
-  marksman: { grip: [0, -0.08, 0.3], fore: [0, -0.02, 0.62], mag: [0, -0.1, 0.42] },
-  shotgun: { grip: [0, -0.06, 0.3], fore: [0, -0.04, 0.6], mag: [0, -0.03, 0.42] },
-  launcher: { grip: [0, -0.1, 0.27], fore: [0, -0.12, 0.5], mag: [0, -0.03, 0.4] },
+  // Measured on YOVNOK's own guns (scripts/blender/guns.py).
+  rifle: { grip: [0, -0.08, 0.27], fore: [0, -0.04, 0.58], mag: [0, -0.1, 0.38] },
+  marksman: { grip: [0, -0.08, 0.29], fore: [0, -0.05, 0.62], mag: [0, -0.1, 0.42] },
+  shotgun: { grip: [0, -0.08, 0.29], fore: [0, -0.06, 0.64], mag: [0, -0.05, 0.42] },
+  launcher: { grip: [0, -0.1, 0.27], fore: [0, -0.12, 0.55], mag: [0, -0.06, 0.37] },
+  smg: { grip: [0, -0.08, 0.22], fore: [0, -0.1, 0.42], mag: [0, -0.12, 0.31] },
+  lmg: { grip: [0, -0.08, 0.29], fore: [0, -0.06, 0.62], mag: [0, -0.12, 0.42] },
+  // Held out at arm's length: both hands round the grip, well forward of the shoulder.
+  revolver: { grip: [0, -0.07, 0.46], fore: [0.01, -0.09, 0.47], mag: [0, -0.01, 0.53] },
+  burst: { grip: [0, -0.1, 0.4], fore: [0, -0.05, 0.55], mag: [0, -0.12, 0.24] },
   mg: { grip: [0, -0.08, 0.27], fore: [0, -0.02, 0.52], mag: [0, -0.1, 0.38] },
   rocket: { grip: [0, -0.08, 0.27], fore: [0, -0.02, 0.52], mag: [0, -0.1, 0.38] },
   scatter: { grip: [0, -0.08, 0.27], fore: [0, -0.02, 0.52], mag: [0, -0.1, 0.38] },
@@ -99,10 +106,10 @@ export class FigureLibrary {
               mesh.receiveShadow = true;
               mesh.frustumCulled = false; // a posed skin's bounds are stale
               const material = mesh.material as THREE.MeshStandardMaterial;
-              // The jacket takes the paint colour, so a crew reads as one team
-              // (not skin, gloves, trousers or kit): "Topmat" on the SWAT and
-              // Mechanic, "lambert1" on the Soldier.
-              if (/^(Topmat|lambert1)$/.test(material.name)) tintable.add(material.name);
+              // The crew's team-colour kit takes the paint colour, so a crew
+              // reads as one team: the material the generator names "Team"
+              // (carrier, helmet rim, scarf, shoulder plate…).
+              if (/^Team(\.\d+)?$/.test(material.name)) tintable.add(material.name);
             });
             this.outfits.set(index, { scene: gltf.scene, tintable });
           } catch (error) {
@@ -112,7 +119,7 @@ export class FigureLibrary {
       )
         .then(() =>
           Promise.all(
-            (['rifle', 'shotgun', 'marksman', 'launcher'] as const).map(async (id) => {
+            (['rifle', 'shotgun', 'marksman', 'launcher', 'smg', 'lmg', 'revolver', 'burst'] as const).map(async (id) => {
               try {
                 const gltf = await this.loader.loadAsync(`/assets/weapons/hand-${id}/gun.glb`);
                 gltf.scene.traverse((o) => {
@@ -297,10 +304,14 @@ export class Figure {
     private readonly makeGun: (id: WeaponId) => THREE.Object3D = handGun,
   ) {
     this.root.name = 'figure';
+    // Larger than life, so they read from the chase camera (crews.FIGURE_SCALE);
+    // set before the limbs are measured, so the reach lengths include it.
+    this.root.scale.setScalar(FIGURE_SCALE);
+    // The gun is larger again (HAND_GUN_SCALE overall).
+    this.gunHolder.scale.setScalar(HAND_GUN_SCALE / FIGURE_SCALE);
     this.root.add(model, this.gunHolder);
-    // Strong enough to read on the dark jackets (a multiply can only darken,
-    // so the paint is lifted above 1 to brighten them back toward the colour).
-    const paint = new THREE.Color(0xffffff).lerp(new THREE.Color(tint), 0.9).multiplyScalar(1.5);
+    // The team kit is modelled light, so it takes the paint colour as it is.
+    const paint = new THREE.Color(tint).multiplyScalar(1.15);
     const materials = new Map<THREE.Material, THREE.Material>();
     model.traverse((o) => {
       if ((o as THREE.Bone).isBone) {
@@ -451,7 +462,7 @@ export class Figure {
     // they rise and swing out together; the body settles with the car's heave.
     const hip = p.seat.clone().lerp(this.outHips, lean);
     hip.y += THREE.MathUtils.clamp(-g.y * 0.004, -0.04, 0.04);
-    this.root.position.copy(hip).sub(this.hipsRest);
+    this.root.position.copy(hip).addScaledVector(this.hipsRest, -FIGURE_SCALE);
     this.root.updateMatrixWorld(true);
 
     // Development: `window.__figureRest = true` shows the model unposed.
@@ -598,7 +609,11 @@ export class Figure {
     const lowReady = toWorld(p.seat.clone().add(new THREE.Vector3(0.18, 0.18, -0.2)));
     const butt = new THREE.Vector3().lerpVectors(lowReady, pocket, lean);
     const onGun = (local: readonly [number, number, number]): THREE.Vector3 =>
-      butt.clone().addScaledVector(gunRight, local[0]).addScaledVector(gunUp, local[1]).addScaledVector(gunDir, local[2]);
+      butt
+        .clone()
+        .addScaledVector(gunRight, local[0] * HAND_GUN_SCALE)
+        .addScaledVector(gunUp, local[1] * HAND_GUN_SCALE)
+        .addScaledVector(gunDir, local[2] * HAND_GUN_SCALE);
     const grip = onGun(grips.grip);
     // Reloading, the front hand goes down to the magazine and back.
     const reach = reloadAmount * (0.5 - 0.5 * Math.cos(this.reloadPhase * 5));

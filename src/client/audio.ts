@@ -402,6 +402,15 @@ export class GameAudio {
     if (now < this.nextGunAt) return;
     this.nextGunAt = now + 0.025;
 
+    // The window guns: real recordings (CC0), a random take per shot and a
+    // little pitch variation, so automatic fire never sounds like one loop.
+    const takes = GUN_TAKES[weapon];
+    if (takes) {
+      const take = takes[Math.floor(Math.random() * takes.length)];
+      this.sample(take, x, y, z, local, local ? 0.9 : 0.62, 0.96 + Math.random() * 0.08, local ? 0.14 : 0.32);
+      return;
+    }
+
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
     const band = ctx.createBiquadFilter();
@@ -707,8 +716,23 @@ export class GameAudio {
   }
 }
 
+/**
+ * The window guns' recorded shots (public/audio/sfx/guns/, cut from The Free
+ * Firearm Sound Library, CC0, by scripts/prep/gunshots.py): takes per gun.
+ */
+const GUN_TAKES: Partial<Record<WeaponId, string[]>> = {
+  rifle: ['guns/rifle-1', 'guns/rifle-2', 'guns/rifle-3'],
+  burst: ['guns/burst-1', 'guns/burst-2', 'guns/burst-3'],
+  marksman: ['guns/marksman-1', 'guns/marksman-2'],
+  shotgun: ['guns/shotgun-1', 'guns/shotgun-2'],
+  smg: ['guns/smg-1', 'guns/smg-2', 'guns/smg-3'],
+  lmg: ['guns/lmg-1', 'guns/lmg-2', 'guns/lmg-3'],
+  revolver: ['guns/revolver-1', 'guns/revolver-2'],
+};
+
 /** Recorded samples loaded from public/audio/sfx/ (see ASSETS.md for credits). */
 const SAMPLES = [
+  ...Object.values(GUN_TAKES).flat(),
   'mg-shot',
   'rpg-launch',
   'explosion-body',

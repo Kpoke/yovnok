@@ -56,7 +56,7 @@ import {
   type CombatVehicle,
 } from '../shared/combat';
 import { COMBAT } from '../shared/config';
-import { DEFAULT_LOADOUT, weaponInSlot, WEAPONS, type WeaponId } from '../shared/weapons';
+import { DEFAULT_LOADOUT, shotInterval, weaponInSlot, WEAPONS, type WeaponId } from '../shared/weapons';
 import { DEFAULT_LOOK, gunnerLoadoutOf, packLook, loadoutOf, unpackLook } from '../shared/cosmetics';
 import type { FormatId } from '../shared/formats';
 import type {
@@ -238,6 +238,8 @@ export class NetClient {
   private barrels: number[] = [0, 0, 0];
   /** Per slot: earliest time (ms) the next shot may be sent. */
   private nextFireAt: number[] = [0, 0, 0];
+  /** Rounds fired per slot, in step with the server's (burst rhythm). */
+  private shotsFired: number[] = [0, 0, 0];
 
   /** Our own combat state, mirrored from the authoritative snapshot. */
   self: {
@@ -616,6 +618,7 @@ export class NetClient {
         this.loadout = this.loadoutForSeat(msg.cls, msg.seat);
         this.barrels = [0, 0, 0];
         this.nextFireAt = [0, 0, 0];
+        this.shotsFired = [0, 0, 0];
         this.onStatus(this.conditioned ? 'in game (simulated network)' : 'in game');
 
         this.resumed = msg.resumed === true;
@@ -698,6 +701,7 @@ export class NetClient {
           this.loadout = this.loadoutForSeat(this.vehicleClass, msg.seat);
           this.barrels = [0, 0, 0];
           this.nextFireAt = [0, 0, 0];
+          this.shotsFired = [0, 0, 0];
         }
         break;
       }
@@ -832,7 +836,8 @@ export class NetClient {
     const weapon = weaponInSlot(this.loadout, slot);
     // Schedule rather than "last + interval": a late frame then doesn't push
     // every following shot late too, so the felt rate matches the real one.
-    this.nextFireAt[slot] = Math.max(now, this.nextFireAt[slot] ?? 0) + 1000 / weapon.rate;
+    this.shotsFired[slot] = (this.shotsFired[slot] ?? 0) + 1;
+    this.nextFireAt[slot] = Math.max(now, this.nextFireAt[slot] ?? 0) + 1000 * shotInterval(weapon, this.shotsFired[slot]);
     // Count the round locally until the next snapshot says otherwise, so an
     // emptying magazine stops drawing tracers on time.
     if (this.self.allRounds[slot] !== undefined) this.self.allRounds[slot] -= 1;

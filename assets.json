@@ -827,104 +827,6 @@
     },
     {
       "files": [
-        "assets-src/weapons/hand-rifle/original/rifle.glb",
-        "assets-src/weapons/hand-rifle/gun.glb",
-        "public/assets/weapons/hand-rifle/gun.glb"
-      ],
-      "kind": "model",
-      "title": "Low-Poly M4a1",
-      "author": "TastyTony",
-      "authorUrl": "https://sketchfab.com/TastyTony",
-      "source": "https://sketchfab.com/3d-models/low-poly-m4a1-8cab1cbeb82c4396a154f9fc8771417b",
-      "license": "CC-BY-4.0",
-      "changes": "Its animation rig baked into plain meshes. Turned to point -Z with its top up, the origin at the butt, scaled to its real length; textures resized to 512 px; recompressed (KTX2, meshopt). Held by the window gunners in duos and squads. Built by scripts/prep/hand-guns.ts and scripts/assetbuild.ts."
-    },
-    {
-      "files": [
-        "assets-src/weapons/hand-marksman/original/marksman.glb",
-        "assets-src/weapons/hand-marksman/gun.glb",
-        "public/assets/weapons/hand-marksman/gun.glb"
-      ],
-      "kind": "model",
-      "title": "Low-Poly SR-25",
-      "author": "TastyTony",
-      "authorUrl": "https://sketchfab.com/TastyTony",
-      "source": "https://sketchfab.com/3d-models/low-poly-sr-25-81976c51d61543a288cf135fd7485951",
-      "license": "CC-BY-4.0",
-      "changes": "Its animation rig baked into plain meshes. Turned to point -Z with its top up, the origin at the butt, scaled to its real length; textures resized to 512 px; recompressed (KTX2, meshopt). Held by the window gunners in duos and squads. Built by scripts/prep/hand-guns.ts and scripts/assetbuild.ts."
-    },
-    {
-      "files": [
-        "assets-src/weapons/hand-shotgun/original/shotgun.glb",
-        "assets-src/weapons/hand-shotgun/gun.glb",
-        "public/assets/weapons/hand-shotgun/gun.glb"
-      ],
-      "kind": "model",
-      "title": "Remington 870 Shotgun",
-      "author": "milinam2002",
-      "authorUrl": "https://sketchfab.com/milinam2002",
-      "source": "https://sketchfab.com/3d-models/remington-870-shotgun-6db0ad4764d14eee8f063eea3600071b",
-      "license": "CC-BY-4.0",
-      "changes": "Turned to point -Z with its top up, the origin at the butt, scaled to its real length; textures resized to 512 px; recompressed (KTX2, meshopt). Held by the window gunners in duos and squads. Built by scripts/prep/hand-guns.ts and scripts/assetbuild.ts."
-    },
-    {
-      "files": [
-        "assets-src/weapons/hand-launcher/original/launcher.glb",
-        "assets-src/weapons/hand-launcher/gun.glb",
-        "public/assets/weapons/hand-launcher/gun.glb"
-      ],
-      "kind": "model",
-      "title": "low-poly Milkor MGL",
-      "author": "DU1701",
-      "authorUrl": "https://sketchfab.com/DU1701",
-      "source": "https://sketchfab.com/3d-models/low-poly-milkor-mgl-0e35ba04be5443eea3386e10b643ec77",
-      "license": "CC-BY-4.0",
-      "changes": "Its four loose grenades removed. Turned to point -Z with its top up, the origin at the butt, scaled to its real length; textures resized to 512 px; recompressed (KTX2, meshopt). Held by the window gunners in duos and squads. Built by scripts/prep/hand-guns.ts and scripts/assetbuild.ts."
-    },
-    {
-      "files": [
-        "assets-src/characters/swat/original/swat.glb",
-        "assets-src/characters/swat/figure.glb",
-        "public/assets/characters/swat/figure.glb"
-      ],
-      "kind": "model",
-      "title": "Swat",
-      "author": "doctortex",
-      "authorUrl": "https://sketchfab.com/doctortex",
-      "source": "https://sketchfab.com/3d-models/swat-d821ff6ab1e4455c8313db4658a56097",
-      "license": "CC-BY-4.0",
-      "changes": "Rebound to its saved pose, finger weights moved onto the hands, materials converted to metal/rough and made opaque, turned to face -Z and scaled to 1.8 m, simplified to about 7,000 triangles; textures resized to 512 px; recompressed (KTX2, meshopt). Its jacket is tinted with the player's paint colour in game; the game poses the skeleton (no animation is used). Built by scripts/prep/characters.ts and scripts/assetbuild.ts."
-    },
-    {
-      "files": [
-        "assets-src/characters/mechanic/original/mechanic.glb",
-        "assets-src/characters/mechanic/figure.glb",
-        "public/assets/characters/mechanic/figure.glb"
-      ],
-      "kind": "model",
-      "title": "US Navy Mechanic",
-      "author": "doctortex",
-      "authorUrl": "https://sketchfab.com/doctortex",
-      "source": "https://sketchfab.com/3d-models/us-navy-mechanic-e937e93ff2b643f799b67270ed3dbd9d",
-      "license": "CC-BY-4.0",
-      "changes": "Rebound to its saved pose, finger weights moved onto the hands, materials converted to metal/rough and made opaque, turned to face -Z and scaled to 1.8 m, simplified to about 7,000 triangles; textures resized to 512 px; recompressed (KTX2, meshopt). Its jacket is tinted with the player's paint colour in game; the game poses the skeleton (no animation is used). Built by scripts/prep/characters.ts and scripts/assetbuild.ts."
-    },
-    {
-      "files": [
-        "assets-src/characters/soldier/original/soldier.glb",
-        "assets-src/characters/soldier/figure.glb",
-        "public/assets/characters/soldier/figure.glb"
-      ],
-      "kind": "model",
-      "title": "Army soldier Character",
-      "author": "joneborden123",
-      "authorUrl": "https://sketchfab.com/joneborden123",
-      "source": "https://sketchfab.com/3d-models/army-soldier-character-cc995450452744ec8f852d8bf5f335d6",
-      "license": "CC-BY-4.0",
-      "changes": "Rebound to its saved pose, finger weights moved onto the hands, materials converted to metal/rough and made opaque, turned to face -Z and scaled to 1.8 m, simplified to about 7,000 triangles; textures resized to 512 px; recompressed (KTX2, meshopt). Its jacket is tinted with the player's paint colour in game; the game poses the skeleton (no animation is used). Built by scripts/prep/characters.ts and scripts/assetbuild.ts."
-    },
-    {
-      "files": [
         "public/logo.svg",
         "public/icon.svg",
         "public/icon-192.png",
@@ -951,6 +853,104 @@
       "source": "https://fonts.google.com/specimen/Black+Ops+One",
       "license": "OFL-1.1",
       "changes": "The Latin subset as served by Google Fonts (WOFF2), unmodified; used for the YOVNOK wordmark on the title screen. Licence text alongside."
+    },
+    {
+      "files": [
+        "assets-src/characters/raider/original/raider.glb",
+        "assets-src/characters/raider/figure.glb",
+        "public/assets/characters/raider/figure.glb"
+      ],
+      "kind": "model",
+      "title": "YOVNOK crew: Raider (tactical crew)",
+      "author": "YOVNOK contributors",
+      "authorUrl": "https://github.com/Kpoke/yovnok",
+      "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/people.py",
+      "license": "GPL-3.0-or-later",
+      "changes": "Original character generated by scripts/blender/people.py with MPFB (MakeHuman for Blender) from MakeHuman's CC0 assets (body, skin, eyes, hair, shoes); the clothes and gear are YOVNOK's own, cut from the body or modelled in that script. Prepared by scripts/prep/characters.ts; recompressed by scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/characters/drifter/original/drifter.glb",
+        "assets-src/characters/drifter/figure.glb",
+        "public/assets/characters/drifter/figure.glb"
+      ],
+      "kind": "model",
+      "title": "YOVNOK crew: Drifter (t-shirt and trousers)",
+      "author": "YOVNOK contributors",
+      "authorUrl": "https://github.com/Kpoke/yovnok",
+      "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/people.py",
+      "license": "GPL-3.0-or-later",
+      "changes": "Original character generated by scripts/blender/people.py with MPFB (MakeHuman for Blender) from MakeHuman's CC0 assets (body, skin, eyes, hair, shoes); the clothes and gear are YOVNOK's own, cut from the body or modelled in that script. Prepared by scripts/prep/characters.ts; recompressed by scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/characters/bruiser/original/bruiser.glb",
+        "assets-src/characters/bruiser/figure.glb",
+        "public/assets/characters/bruiser/figure.glb"
+      ],
+      "kind": "model",
+      "title": "YOVNOK crew: Bruiser (shirtless crew)",
+      "author": "YOVNOK contributors",
+      "authorUrl": "https://github.com/Kpoke/yovnok",
+      "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/people.py",
+      "license": "GPL-3.0-or-later",
+      "changes": "Original character generated by scripts/blender/people.py with MPFB (MakeHuman for Blender) from MakeHuman's CC0 assets (body, skin, eyes, hair, shoes); the clothes and gear are YOVNOK's own, cut from the body or modelled in that script. Prepared by scripts/prep/characters.ts; recompressed by scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "assets-src/weapons/hand-rifle/gun.glb",
+        "public/assets/weapons/hand-rifle/gun.glb",
+        "assets-src/weapons/hand-burst/gun.glb",
+        "public/assets/weapons/hand-burst/gun.glb",
+        "assets-src/weapons/hand-marksman/gun.glb",
+        "public/assets/weapons/hand-marksman/gun.glb",
+        "assets-src/weapons/hand-shotgun/gun.glb",
+        "public/assets/weapons/hand-shotgun/gun.glb",
+        "assets-src/weapons/hand-smg/gun.glb",
+        "public/assets/weapons/hand-smg/gun.glb",
+        "assets-src/weapons/hand-lmg/gun.glb",
+        "public/assets/weapons/hand-lmg/gun.glb",
+        "assets-src/weapons/hand-revolver/gun.glb",
+        "public/assets/weapons/hand-revolver/gun.glb",
+        "assets-src/weapons/hand-launcher/gun.glb",
+        "public/assets/weapons/hand-launcher/gun.glb"
+      ],
+      "kind": "model",
+      "title": "YOVNOK window guns (eight)",
+      "author": "YOVNOK contributors",
+      "authorUrl": "https://github.com/Kpoke/yovnok",
+      "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/guns.py",
+      "license": "GPL-3.0-or-later",
+      "changes": "Original firearms (rifle, burst rifle, marksman rifle, pump shotgun, SMG, LMG, revolver, grenade launcher) modelled for YOVNOK in scripts/blender/guns.py; realistic in style, no real-world model. Recompressed by scripts/assetbuild.ts."
+    },
+    {
+      "files": [
+        "public/audio/sfx/guns/rifle-1.ogg",
+        "public/audio/sfx/guns/rifle-2.ogg",
+        "public/audio/sfx/guns/rifle-3.ogg",
+        "public/audio/sfx/guns/burst-1.ogg",
+        "public/audio/sfx/guns/burst-2.ogg",
+        "public/audio/sfx/guns/burst-3.ogg",
+        "public/audio/sfx/guns/marksman-1.ogg",
+        "public/audio/sfx/guns/marksman-2.ogg",
+        "public/audio/sfx/guns/shotgun-1.ogg",
+        "public/audio/sfx/guns/shotgun-2.ogg",
+        "public/audio/sfx/guns/smg-1.ogg",
+        "public/audio/sfx/guns/smg-2.ogg",
+        "public/audio/sfx/guns/smg-3.ogg",
+        "public/audio/sfx/guns/lmg-1.ogg",
+        "public/audio/sfx/guns/lmg-2.ogg",
+        "public/audio/sfx/guns/lmg-3.ogg",
+        "public/audio/sfx/guns/revolver-1.ogg",
+        "public/audio/sfx/guns/revolver-2.ogg"
+      ],
+      "kind": "sound",
+      "title": "The Free Firearm Sound Library (gunshots)",
+      "author": "Ben Jaszczak, Brian Nelson, Kevin Heras, Matthew Nanney",
+      "authorUrl": "https://opengameart.org/content/the-free-firearm-sound-library",
+      "source": "https://opengameart.org/content/the-free-firearm-sound-library",
+      "license": "CC0-1.0",
+      "changes": "Single shots cut from the AR-15, AK-47, Savage 10 .300 Blackout, Nova, Carl Gustav M45, 1917 and Ruger Single Six recordings by scripts/prep/gunshots.py: trimmed, faded, normalised, mono Ogg Vorbis; the LMG takes are AK-47 shots pitched lower."
     }
   ]
 }

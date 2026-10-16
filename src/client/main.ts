@@ -653,6 +653,8 @@ const obstacles: THREE.Object3D[] = [world.group];
 
 /** Last known alive state per crew, so a death explosion fires on the edge. */
 const wasAlive = new Map<number, boolean>();
+/** Rounds still to fire in a burst gun's current burst, by slot. */
+const burstQueue = [0, 0, 0];
 /** Crew members we hit, and when (ms): a gunner going down soon after is ours. */
 const recentHits = new Map<number, number>();
 /** Each crew member alive last frame, to catch them going down. */
@@ -784,8 +786,16 @@ function frame(now: number): void {
     for (const [slot, held, pressedNow] of triggers) {
       if (slot === null) continue;
       const weapon = WEAPONS[net.loadout[slot] ?? 'rifle'];
-      if (!(weapon.automatic ? held : pressedNow)) continue;
-      if (!net.canShoot(slot, now)) continue;
+      // A burst gun: one pull queues the whole burst, fired at its rate.
+      if (weapon.burst && pressedNow && !(burstQueue[slot] > 0)) burstQueue[slot] = weapon.burst;
+      const wants = weapon.automatic ? held : weapon.burst ? burstQueue[slot] > 0 : pressedNow;
+      if (!wants) continue;
+      if (!net.canShoot(slot, now)) {
+        // Out of rounds (or reloading) mid-burst: the rest of it is dropped.
+        if (weapon.burst && net.self.rounds <= 0) burstQueue[slot] = 0;
+        continue;
+      }
+      if (weapon.burst) burstQueue[slot] -= 1;
 
       // Draw our own shot NOW, from a local prediction, so the gun feels
       // attached to the trigger rather than to the network.
@@ -886,7 +896,7 @@ function frame(now: number): void {
       hud.flashDamage(wrapAngle(sourceYaw - (me.yaw + viewYaw)));
     }
   }
-  tracers.update(realDt);
+  tracers.update(realDt, camera);
 
   // Rockets in flight. A projectile id we have not seen is a fresh launch: give
   // other players' rockets a launch flash and sound (our own fired at the trigger).

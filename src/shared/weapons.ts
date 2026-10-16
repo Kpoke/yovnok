@@ -23,7 +23,11 @@ export type WeaponId =
   | 'rocket'
   | 'scatter'
   | 'lancer'
-  | 'swarm';
+  | 'swarm'
+  | 'smg'
+  | 'lmg'
+  | 'revolver'
+  | 'burst';
 
 export type WeaponDef = {
   id: WeaponId;
@@ -54,6 +58,13 @@ export type WeaponDef = {
   pellets?: number;
   /** Projectile: rockets per shot, fanned out by `spread`. */
   salvo?: number;
+  /**
+   * Burst fire: each trigger pull fires this many rounds at `rate`, then the
+   * gun rests `burstPause` seconds. The server enforces the pause too, so a
+   * burst gun cannot be driven like an automatic.
+   */
+  burst?: number;
+  burstPause?: number;
 };
 
 export const WEAPONS: Record<WeaponId, WeaponDef> = {
@@ -198,6 +209,70 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     splash: 0,
     automatic: false,
   },
+  /**
+   * The window gunners' new guns. The SMG shreds at close range and falls off
+   * fast; the LMG holds a long stream from a big box; the revolver is six
+   * heavy, accurate shots (the gunner-hunter); the burst rifle rewards holding
+   * a target for three quick rounds.
+   */
+  smg: {
+    id: 'smg',
+    name: 'SMG',
+    delivery: 'hitscan',
+    damage: 11,
+    rate: 14,
+    magazine: 32,
+    reloadSeconds: 1.9,
+    spread: 0.03,
+    range: 90,
+    speed: 0,
+    splash: 0,
+    automatic: true,
+  },
+  lmg: {
+    id: 'lmg',
+    name: 'LMG',
+    delivery: 'hitscan',
+    damage: 15,
+    rate: 11,
+    magazine: 100,
+    reloadSeconds: 4.8,
+    spread: 0.022,
+    range: 200,
+    speed: 0,
+    splash: 0,
+    automatic: true,
+  },
+  revolver: {
+    id: 'revolver',
+    name: 'Revolver',
+    delivery: 'hitscan',
+    damage: 45,
+    rate: 1.8,
+    magazine: 6,
+    reloadSeconds: 2.8,
+    spread: 0.004,
+    range: 160,
+    speed: 0,
+    splash: 0,
+    automatic: false,
+  },
+  burst: {
+    id: 'burst',
+    name: 'Burst Rifle',
+    delivery: 'hitscan',
+    damage: 20,
+    rate: 12,
+    magazine: 30,
+    reloadSeconds: 2.3,
+    spread: 0.009,
+    range: 240,
+    speed: 0,
+    splash: 0,
+    automatic: false,
+    burst: 3,
+    burstPause: 0.32,
+  },
   launcher: {
     id: 'launcher',
     name: 'Launcher',
@@ -218,7 +293,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
 export const PRIMARIES: readonly WeaponId[] = ['mg', 'scatter', 'lancer'];
 export const SECONDARIES: readonly WeaponId[] = ['rocket', 'swarm'];
 /** A window gunner's choice of personal primary; the launcher is always second. */
-export const GUNNER_PRIMARIES: readonly WeaponId[] = ['rifle', 'shotgun', 'marksman'];
+export const GUNNER_PRIMARIES: readonly WeaponId[] = ['rifle', 'shotgun', 'marksman', 'smg', 'lmg', 'revolver', 'burst'];
 export const GUNNER_SECONDARY: WeaponId = 'launcher';
 
 /** Slot order a player cycles through. Slot 0 is what they spawn holding. */
@@ -239,6 +314,16 @@ export const fireInterval = (weapon: WeaponDef): number => 1 / weapon.rate;
  * whenever network jitter bunched two of them; the schedule absorbs that while
  * still holding the AVERAGE rate to the weapon's (at most one early shot banked).
  */
+/**
+ * The wait after a shot, in seconds: the weapon's interval, plus, for a burst
+ * weapon, its pause after the last round of each burst. `shot` counts the
+ * rounds fired so far (this one included).
+ */
+export function shotInterval(weapon: WeaponDef, shot: number): number {
+  const base = fireInterval(weapon);
+  return weapon.burst && shot % weapon.burst === 0 ? base + (weapon.burstPause ?? 0) : base;
+}
+
 export function scheduleShot(due: number, now: number, interval: number, jitter: number): number | null {
   if (now < due - interval * jitter) return null;
   return Math.max(now, due) + interval;

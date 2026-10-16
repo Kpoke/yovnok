@@ -412,8 +412,11 @@ export function gunnerBody(
     return { hips: [s * c.hatch.x, c.roof - 0.26, c.hatch.z], spine: [v[0] / n, v[1] / n, v[2] / n], roof: 0 };
   }
   const z = seat.mount[2] + 0.05;
-  const window = [s * (c.side - 0.1), c.belt + 0.12, z];
-  const over = [s * (c.side - 0.02), c.roof - 0.26, z];
+  // Sat up on the door frame, the whole torso above the roofline (legs inside),
+  // so they read from every side, from behind most of all; over the roof, a
+  // little further in, leaning across it.
+  const window = [s * c.side, c.roof - 0.18, z];
+  const over = [s * (c.side - 0.06), c.roof - 0.12, z];
   const hips = [0, 1, 2].map((k) => window[k] + (over[k] - window[k]) * roof) as [number, number, number];
   // Leaning a little out at the window, in over the roof up there, and into
   // the gun either way (a shooter's weight goes forward onto it).
@@ -424,13 +427,27 @@ export function gunnerBody(
 }
 
 /**
- * Points along a gunner's body, from the hips (the people are 1.8 m, their
- * joints measured from the models): the spine starts 0.1 m above the hips and
- * runs along `spine`; the chest is 0.22 m up it, the head 0.6 m, and the
- * shooting shoulder — where the butt sits — 0.3 m up and 0.13 m to the right
- * of the aim (the chest squares to the gun).
+ * The crew are drawn this much larger than life (1.8 m models at ~2.07 m), and
+ * their guns larger again: at true scale on a full-size car they read as small,
+ * dark smudges from the chase camera.
  */
-const BODY = { base: 0.1, chest: 0.22, head: 0.6, shoulder: 0.3, shoulderOut: 0.13 } as const;
+export const FIGURE_SCALE = 1.15;
+export const HAND_GUN_SCALE = 1.25;
+
+/**
+ * Points along a gunner's body, from the hips (joints measured from the 1.8 m
+ * models, times FIGURE_SCALE): the spine starts 0.1 m above the hips and runs
+ * along `spine`; the chest is 0.22 m up it, the head 0.6 m, and the shooting
+ * shoulder — where the butt sits — 0.3 m up and 0.13 m to the right of the aim
+ * (the chest squares to the gun).
+ */
+const BODY = {
+  base: 0.1 * FIGURE_SCALE,
+  chest: 0.22 * FIGURE_SCALE,
+  head: 0.6 * FIGURE_SCALE,
+  shoulder: 0.3 * FIGURE_SCALE,
+  shoulderOut: 0.13 * FIGURE_SCALE,
+} as const;
 
 /**
  * A window gunner's body (what a shot has to find) and muzzle, car-local, for
@@ -453,7 +470,7 @@ export function gunnerPoint(
   // The muzzle: a gun's length along the aim from the shooting shoulder.
   const c = Math.cos(aimPitch);
   const shoulder = up(BODY.shoulder);
-  const length = 0.82;
+  const length = 0.82 * HAND_GUN_SCALE;
   return [
     shoulder[0] + Math.cos(aimYaw) * BODY.shoulderOut - Math.sin(aimYaw) * c * length,
     shoulder[1] + Math.sin(aimPitch) * length,

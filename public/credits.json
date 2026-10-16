@@ -160,69 +160,25 @@
       "heading": "3D MODELS",
       "items": [
         {
-          "title": "Low-Poly M4a1",
-          "source": "https://sketchfab.com/3d-models/low-poly-m4a1-8cab1cbeb82c4396a154f9fc8771417b"
+          "title": "YOVNOK crew: Raider (tactical crew)",
+          "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/people.py"
         },
         {
-          "title": "Low-Poly SR-25",
-          "source": "https://sketchfab.com/3d-models/low-poly-sr-25-81976c51d61543a288cf135fd7485951"
-        }
-      ],
-      "attribution": "TastyTony (sketchfab.com/TastyTony)",
-      "license": "CC BY 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
-    },
-    {
-      "heading": "3D MODELS",
-      "items": [
-        {
-          "title": "Remington 870 Shotgun",
-          "source": "https://sketchfab.com/3d-models/remington-870-shotgun-6db0ad4764d14eee8f063eea3600071b"
-        }
-      ],
-      "attribution": "milinam2002 (sketchfab.com/milinam2002)",
-      "license": "CC BY 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
-    },
-    {
-      "heading": "3D MODELS",
-      "items": [
-        {
-          "title": "low-poly Milkor MGL",
-          "source": "https://sketchfab.com/3d-models/low-poly-milkor-mgl-0e35ba04be5443eea3386e10b643ec77"
-        }
-      ],
-      "attribution": "DU1701 (sketchfab.com/DU1701)",
-      "license": "CC BY 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
-    },
-    {
-      "heading": "3D MODELS",
-      "items": [
-        {
-          "title": "Swat",
-          "source": "https://sketchfab.com/3d-models/swat-d821ff6ab1e4455c8313db4658a56097"
+          "title": "YOVNOK crew: Drifter (t-shirt and trousers)",
+          "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/people.py"
         },
         {
-          "title": "US Navy Mechanic",
-          "source": "https://sketchfab.com/3d-models/us-navy-mechanic-e937e93ff2b643f799b67270ed3dbd9d"
-        }
-      ],
-      "attribution": "doctortex (sketchfab.com/doctortex)",
-      "license": "CC BY 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
-    },
-    {
-      "heading": "3D MODELS",
-      "items": [
+          "title": "YOVNOK crew: Bruiser (shirtless crew)",
+          "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/people.py"
+        },
         {
-          "title": "Army soldier Character",
-          "source": "https://sketchfab.com/3d-models/army-soldier-character-cc995450452744ec8f852d8bf5f335d6"
+          "title": "YOVNOK window guns (eight)",
+          "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/guns.py"
         }
       ],
-      "attribution": "joneborden123 (sketchfab.com/joneborden123)",
-      "license": "CC BY 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      "attribution": "YOVNOK contributors (github.com/Kpoke/yovnok)",
+      "license": "GPL-3.0-or-later",
+      "licenseUrl": "https://www.gnu.org/licenses/gpl-3.0.html"
     },
     {
       "heading": "TEXTURES",
@@ -509,6 +465,18 @@
         }
       ],
       "attribution": "Brian MacIntosh (BMacZero)",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "heading": "SOUND EFFECTS",
+      "items": [
+        {
+          "title": "The Free Firearm Sound Library (gunshots)",
+          "source": "https://opengameart.org/content/the-free-firearm-sound-library"
+        }
+      ],
+      "attribution": "Ben Jaszczak, Brian Nelson, Kevin Heras, Matthew Nanney (opengameart.org/content/the-free-firearm-sound-library)",
       "license": "CC0 1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
     },

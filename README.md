@@ -36,10 +36,11 @@ minute so people pressing PLAY around the same time share it.
 
 In duos and squads the driver only drives and the gunners only shoot. Every
 car carries its people — a driver at the wheel and, in team modes, gunners who
-sit tucked inside and **lean out of their window to aim**, gun at the shoulder,
-with an over-the-shoulder view — all the way round: aiming across the car they
-climb onto the sill and shoot over the roof, where more of them shows. Tucked
-in they cannot shoot or be shot; leaning out they can do both. A gunner holds a gun and a grenade launcher and swaps
+sit tucked inside and **climb out to aim**, sitting up on the door frame with
+their upper body above the roof (the duos car's gunner stands up through a roof
+hatch), gun at the shoulder, with an over-the-shoulder view — all the way round:
+aiming across the car they turn and shoot over the roof. Tucked in they cannot
+shoot or be shot; out they can do both. A gunner holds a gun and a grenade launcher and swaps
 between them, can move to another window (not the wheel), and when shot down is
 knocked back inside for 8 seconds. The car is out when its hull is.
 - **PRIVATE ROOM** — create a room and send friends its five-letter code or
@@ -89,7 +90,8 @@ a seat frees up.
 **The garage.** Paint, a pattern (stripes, hazard, camo, tiger, checker) in a
 colour of your choice, rim colour, a body kit (bull bar, light bar, rear wing,
 side armour, side exhausts), a door decal with your race number, underglow,
-and your outfit (SWAT, Mechanic or Soldier, in your paint colour) — some
+and your crew's look (Raider in tactical kit, Drifter in a t-shirt and
+trousers, or a shirtless Bruiser; their team kit takes your paint colour) — some
 unlocked by playing (matches, kills, wins). And your guns, all open from the
 start:
 
@@ -98,6 +100,18 @@ start:
 | Twin .50 | a steady stream, all-rounder | RPG | one heavy rocket, big splash |
 | Scattergun | seven pellets a shot, deadly up close, nothing past 70 m | Swarm | four rockets at once, fanned out |
 | Lancer | slow, heavy, pin-point rail shots at long range | | |
+
+| Window guns (team modes) | |
+|---|---|
+| Rifle | the all-rounder |
+| Burst rifle | three-round bursts, accurate at range |
+| Marksman | slow, precise, long range |
+| Shotgun | six pellets, close passes |
+| SMG | very fast, short range, quick reload |
+| LMG | a 100-round box for long chases, slow reload |
+| Revolver | six heavy, accurate shots |
+
+Every gunner also carries a grenade launcher.
 
 Your callsign, look and loadout live in your browser; there are no accounts
 yet.

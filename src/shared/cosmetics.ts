@@ -149,10 +149,10 @@ export const GLOWS: readonly { name: string; colour: number; unlock: UnlockRule 
  * Each is a model (`public/assets/characters/<id>/figure.glb`); the livery
  * colour tints its kit.
  */
-export const OUTFITS: readonly { id: 'swat' | 'mechanic' | 'soldier'; name: string; unlock: UnlockRule }[] = [
-  { id: 'swat', name: 'SWAT', unlock: { type: 'default' } },
-  { id: 'mechanic', name: 'Mechanic', unlock: { type: 'default' } },
-  { id: 'soldier', name: 'Soldier', unlock: { type: 'matches', n: 3 } },
+export const OUTFITS: readonly { id: 'raider' | 'drifter' | 'bruiser'; name: string; unlock: UnlockRule }[] = [
+  { id: 'raider', name: 'Raider', unlock: { type: 'default' } },
+  { id: 'drifter', name: 'Drifter', unlock: { type: 'default' } },
+  { id: 'bruiser', name: 'Bruiser', unlock: { type: 'matches', n: 3 } },
 ];
 export type OutfitId = (typeof OUTFITS)[number]['id'];
 
@@ -245,7 +245,7 @@ const HIGH = 2 ** 32;
  *
  *   bits 0–7 livery · 8–11 wheels · 12–15 roof · 16–19 pattern · 20–23 accent
  *   24–26 underglow · 27–28 primary gun · 29–30 secondary gun
- *   above 2^32: decal (4 bits), race number (7), gunner's gun (2), outfit (3)
+ *   above 2^32: decal (4 bits), race number (7), gunner's gun (2), outfit (3), gunner's gun high bit (1)
  */
 export function packLook(look: Partial<CosmeticLook>): number {
   const l = clampLook(look);
@@ -259,7 +259,9 @@ export function packLook(look: Partial<CosmeticLook>): number {
       ((l.primary & 0x3) << 27) |
       ((l.secondary & 0x3) << 29)) >>>
     0;
-  const high = (l.decal & 0xf) | ((l.number & 0x7f) << 4) | ((l.gunner & 0x3) << 11) | ((l.outfit & 0x7) << 13);
+  // The gunner's gun: two bits at 11, and a third at 16 (added when the
+  // window guns grew past four; older saved looks read the same).
+  const high = (l.decal & 0xf) | ((l.number & 0x7f) << 4) | ((l.gunner & 0x3) << 11) | ((l.outfit & 0x7) << 13) | (((l.gunner >> 2) & 0x1) << 16);
   return low + high * HIGH;
 }
 
@@ -270,7 +272,7 @@ export function unpackLook(packed: number): CosmeticLook {
   return clampLook({
     decal: high & 0xf,
     number: (high >> 4) & 0x7f,
-    gunner: (high >> 11) & 0x3,
+    gunner: ((high >> 11) & 0x3) | (((high >> 16) & 0x1) << 2),
     outfit: (high >> 13) & 0x7,
     livery: n & 0xff,
     wheels: (n >> 8) & 0xf,

@@ -33,12 +33,12 @@ import { WEAPONS } from '../src/shared/weapons';
 import { wrapAngle } from '../src/shared/math';
 import {
   aimAnglesAt,
-  chestWorld,
   headWorld,
   muzzleWorld,
   resolveAimPoint,
   resolveHitscan,
   rewindVehicle,
+  waistWorld,
   type CombatVehicle,
 } from '../src/shared/combat';
 import type { VehicleState } from '../src/shared/vehicle';
@@ -504,7 +504,6 @@ try {
       { id: 11, crew: 1, seat: 'seat.frontRight' as const, hp: 100, alive: true, out: true, aimYaw: -Math.PI / 2, aimPitch: 0 },
     ];
     const gunnerHead = headWorld(target, seatById('suv', 'seat.frontRight')!, -Math.PI / 2, 0);
-    const gunnerChest = chestWorld(target, seatById('suv', 'seat.frontRight')!, -Math.PI / 2, 0);
     const atGunner = resolveHitscan(
       [target],
       members,
@@ -567,9 +566,11 @@ try {
       0,
     );
     check('tucked inside, they cannot', tucked.memberHit === null, `memberHit=${tucked.memberHit}`);
-    // Leaning out of the RIGHT window, a shot from the LEFT at their chest has
-    // to go through the car to reach them: it does not.
-    const throughCar = resolveHitscan([target], members, -1, -12, gunnerChest.y, gunnerChest.z, 1, 0, 0, 220, 0);
+    // Sat up on the RIGHT window frame, their upper body is above the roof and
+    // open from both sides; but a shot from the LEFT at their waist has to go
+    // through the car body to reach them: it does not.
+    const gunnerWaist = waistWorld(target, seatById('suv', 'seat.frontRight')!, -Math.PI / 2, 0)!;
+    const throughCar = resolveHitscan([target], members, -1, -12, gunnerWaist.y, gunnerWaist.z, 1, 0, 0, 220, 0);
     check('a shot through the car does not reach them', throughCar.memberHit === null, `memberHit=${throughCar.memberHit}`);
 
     const driverHead = headWorld(target, seatById('suv', 'seat.driver')!);
