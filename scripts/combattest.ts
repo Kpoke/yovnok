@@ -19,25 +19,25 @@ import { COMBAT, VEHICLE_CLASSES } from '../src/shared/config';
 import { componentBoxes } from '../src/shared/components';
 import { combatTestPlacement } from './testPlacement';
 import {
+  CABIN,
   clampToArc,
   gunnerPoint,
   roofAmount,
   seatById,
   seatsFor,
   withinArc,
-  WINDOW_EYE_OFFSET,
   type SeatId,
 } from '../src/shared/crews';
 import { WEAPONS } from '../src/shared/weapons';
 import { wrapAngle } from '../src/shared/math';
 import {
   aimAnglesAt,
+  chestWorld,
   headWorld,
   muzzleWorld,
   resolveAimPoint,
   resolveHitscan,
   rewindVehicle,
-  seatPointWorld,
   type CombatVehicle,
 } from '../src/shared/combat';
 import type { VehicleState } from '../src/shared/vehicle';
@@ -300,22 +300,25 @@ try {
     // the player's own car; and the shot has to be aimed from the muzzle at what
     // the crosshair is over, because the camera and the muzzle are not in the
     // same place.
-    console.log('  -- window anchors --');
+    console.log('  -- window gunners --');
     for (const cls of ['coupe', 'suv'] as const) {
-      const spec = VEHICLE_CLASSES[cls];
-      const rest = warp({ crew: 0, cls, x: 0, y: 0, z: 0, yaw: 0 }).state;
+      const cabin = CABIN[cls]!;
       for (const seat of seatsFor(cls)) {
         if (!seat.arc) continue; // the driver has no window camera
-        const anchor = seatPointWorld(rest, seat, WINDOW_EYE_OFFSET[seat.side]);
+        // Out of their own side, they sit in the window: chest and head out
+        // past the cabin's side, the head above the door's edge.
+        const outward = seat.side === 'right' ? -Math.PI / 2 : Math.PI / 2;
+        const head = gunnerPoint(cls, seat, outward, 0, 'head')!;
+        const chest = gunnerPoint(cls, seat, outward, 0, 'chest')!;
         check(
-          `${cls} ${seat.id}: the camera clears the bodywork`,
-          Math.abs(anchor.x) > spec.halfWidth,
-          `|x| ${Math.abs(anchor.x).toFixed(2)} vs half-width ${spec.halfWidth}`,
+          `${cls} ${seat.id}: the head is out of the window`,
+          Math.abs(head[0]) > cabin.side && head[1] > cabin.belt + 0.5,
+          `head x ${head[0].toFixed(2)} y ${head[1].toFixed(2)}`,
         );
         check(
-          `${cls} ${seat.id}: the camera is below the roof`,
-          anchor.y < spec.boxHeight / 2,
-          `y ${anchor.y.toFixed(2)} vs roof ${(spec.boxHeight / 2).toFixed(2)}`,
+          `${cls} ${seat.id}: the chest is in the window opening`,
+          Math.abs(chest[0]) > cabin.side - 0.15 && chest[1] > cabin.belt,
+          `chest x ${chest[0].toFixed(2)} y ${chest[1].toFixed(2)}`,
         );
       }
     }
@@ -337,8 +340,8 @@ try {
     const seat = seatById('suv', 'seat.frontRight')!;
     const muzzle = muzzleWorld(shooter, seat);
 
-    // The camera, from the same shared data the renderer uses.
-    const cam = seatPointWorld(shooter.state, seat, WINDOW_EYE_OFFSET[seat.side]);
+    // The camera's anchor — the gunner's head — from the same shared data the renderer uses.
+    const cam = headWorld(shooter, seat);
     check(
       'the camera and the muzzle are genuinely apart',
       Math.hypot(cam.x - muzzle.x, cam.y - muzzle.y, cam.z - muzzle.z) > 0.2,
@@ -494,7 +497,8 @@ try {
       { id: 10, crew: 1, seat: 'seat.driver' as const, hp: 100, alive: true, out: false, aimYaw: 0, aimPitch: 0 },
       { id: 11, crew: 1, seat: 'seat.frontRight' as const, hp: 100, alive: true, out: true, aimYaw: -Math.PI / 2, aimPitch: 0 },
     ];
-    const gunnerHead = headWorld(target, seatById('suv', 'seat.frontRight')!);
+    const gunnerHead = headWorld(target, seatById('suv', 'seat.frontRight')!, -Math.PI / 2, 0);
+    const gunnerChest = chestWorld(target, seatById('suv', 'seat.frontRight')!, -Math.PI / 2, 0);
     const atGunner = resolveHitscan(
       [target],
       members,
@@ -553,9 +557,9 @@ try {
       0,
     );
     check('tucked inside, they cannot', tucked.memberHit === null, `memberHit=${tucked.memberHit}`);
-    // Leaning out of the RIGHT window, a shot from the LEFT has to go through
-    // the car to reach them: it does not.
-    const throughCar = resolveHitscan([target], members, -1, -12, gunnerHead.y, gunnerHead.z, 1, 0, 0, 220, 0);
+    // Leaning out of the RIGHT window, a shot from the LEFT at their chest has
+    // to go through the car to reach them: it does not.
+    const throughCar = resolveHitscan([target], members, -1, -12, gunnerChest.y, gunnerChest.z, 1, 0, 0, 220, 0);
     check('a shot through the car does not reach them', throughCar.memberHit === null, `memberHit=${throughCar.memberHit}`);
 
     const driverHead = headWorld(target, seatById('suv', 'seat.driver')!);

@@ -24,27 +24,30 @@ import type { WeaponId } from '../../shared/weapons';
 /** What one seat's person is doing, for `Figure.pose`. */
 export type FigurePose = {
   role: 'driver' | 'gunner';
-  /** Which window a gunner leans out of. */
+  /** Which window a gunner rides out of. */
   side: 'left' | 'right';
-  /** Where their hips sit (on the seat), car frame. */
-  hip: THREE.Vector3;
+  /** Where their hips are on the seat, car frame. */
+  seat: THREE.Vector3;
   /**
-   * Where the hips go up on the window sill to shoot over the roof, car frame,
-   * and how far up there they are for this aim (0 at the window … 1 over the
-   * roof; `roofAmount`).
+   * Out of the window, car frame: where the hips go, which way the spine runs
+   * (crews.gunnerBody — the same body a shot is tested against) and how far
+   * round over the roof they are (0 at the window … 1 over the roof).
    */
-  sill: THREE.Vector3;
+  hips: THREE.Vector3;
+  spine: THREE.Vector3;
   roof: number;
   /** Aim relative to the car's nose (+ = left) and pitch (+ = up), radians. */
   yaw: number;
   pitch: number;
-  /** Leaning out of the window to aim (held aim). */
+  /** Out of the window to aim (held aim). */
   out: boolean;
   alive: boolean;
   /** What a gunner holds (null: empty hands, e.g. the driver). */
   gun: WeaponId | null;
   /** Reloading the gun in hand. */
   reload: boolean;
+  /** The driver's steering, -1 (left) … 1 (right). */
+  steer: number;
 };
 
 /**
@@ -234,6 +237,16 @@ type Limb = {
 
 const SPINE = ['Spine', 'Spine1', 'Spine2', 'Neck'] as const;
 
+/** An angle brought into -π … π. */
+function wrapAngle(a: number): number {
+  return a - Math.PI * 2 * Math.round(a / (Math.PI * 2));
+}
+
+/** From angle `a` toward `b` by `t`, the short way round. */
+function lerpAngle(a: number, b: number, t: number): number {
+  return a + wrapAngle(b - a) * t;
+}
+
 export class Figure {
   readonly root = new THREE.Group();
   private readonly bones = new Map<string, THREE.Bone>();
@@ -257,6 +270,22 @@ export class Figure {
   private lean = 0;
   /** 0 at the window … 1 up on the sill over the roof, eased toward the aim's. */
   private roof = 0;
+  /** Out of the window: the hips and spine, eased toward the aim's. */
+  private readonly outHips = new THREE.Vector3();
+  private readonly outSpine = new THREE.Vector3(0, 1, 0);
+  private posed = false;
+  /** Which way the hips face (+ = left of the car's nose), and the head on top of the chest. */
+  private pelvis = 0;
+  private headYaw = 0;
+  private steer = 0;
+  /** Idle glances about: where the eyes go next, and when. */
+  private glance = 0;
+  private glanceAt = 0;
+  /** The car's motion, felt in the body: its acceleration, car frame, smoothed. */
+  private readonly g = new THREE.Vector3();
+  private readonly lastPos = new THREE.Vector3();
+  private readonly lastVel = new THREE.Vector3();
+  private moving = 0;
   private readonly tinted: THREE.Material[] = [];
 
   constructor(
@@ -371,6 +400,28 @@ export class Figure {
     else aimBone(limb.mid, limb.end, end.sub(joint));
   }
 
+  /**
+   * Feel the car move: its acceleration in its own frame, smoothed, so bodies
+   * sway into corners, pitch under braking and settle over bumps.
+   */
+  private sense(car: THREE.Object3D, dt: number): void {
+    const pos = car.getWorldPosition(_a);
+    if (dt <= 0) return;
+    const vel = _b.subVectors(pos, this.lastPos).divideScalar(dt);
+    this.lastPos.copy(pos);
+    if (this.moving < 2 || vel.lengthSq() > 90 * 90) {
+      // The first frames, or a jump (respawn): nothing to feel yet.
+      this.moving++;
+      this.lastVel.copy(vel.lengthSq() > 90 * 90 ? _d.set(0, 0, 0) : vel);
+      return;
+    }
+    const acc = _d.subVectors(vel, this.lastVel).divideScalar(dt);
+    this.lastVel.copy(vel);
+    car.getWorldQuaternion(_w);
+    acc.applyQuaternion(_w.invert()).clampLength(0, 30);
+    this.g.lerp(acc, 1 - Math.exp(-dt * 5));
+  }
+
   /** Pose for this frame. The figure must be a child of the car's root. */
   pose(p: FigurePose, dt: number): void {
     const car = this.root.parent;
@@ -380,16 +431,22 @@ export class Figure {
     this.lean = want > this.lean ? Math.min(want, this.lean + step) : Math.max(want, this.lean - step * 1.5);
     const lean = this.lean * this.lean * (3 - 2 * this.lean); // eased
     const side = p.side === 'right' ? 1 : -1;
+    const ease = this.posed ? 1 - Math.exp(-dt * 10) : 1;
+    this.outHips.lerp(p.hips, ease);
+    this.outSpine.lerp(p.spine, ease).normalize();
+    this.roof += (p.roof - this.roof) * ease;
+    this.steer += (p.steer - this.steer) * ease;
+    this.posed = true;
+    this.time += dt;
+    this.sense(car, dt);
+    const g = this.g;
+    const roof = this.roof * lean;
 
     for (const [bone, q] of this.rest) bone.quaternion.copy(q);
-    // Hips on the seat; leaning out shifts them a little up and toward the
-    // window — the person stays seated and leans out from the waist.
-    // Aiming across the car they climb onto the sill instead and shoot over
-    // the roof (eased in with the lean, and as the aim swings across).
-    this.roof += (p.roof - this.roof) * Math.min(1, dt * 8);
-    const roof = this.roof * lean;
-    const window = p.hip.clone().add(new THREE.Vector3(side * 0.25 * lean, 0.5 * lean, 0));
-    const hip = window.lerp(p.sill, roof);
+    // The hips: on the seat, or out in the window (gunnerBody). Climbing out,
+    // they rise and swing out together; the body settles with the car's heave.
+    const hip = p.seat.clone().lerp(this.outHips, lean);
+    hip.y += THREE.MathUtils.clamp(-g.y * 0.004, -0.04, 0.04);
     this.root.position.copy(hip).sub(this.hipsRest);
     this.root.updateMatrixWorld(true);
 
@@ -400,67 +457,107 @@ export class Figure {
     const toWorld = (v: THREE.Vector3): THREE.Vector3 => v.clone().applyMatrix4(car.matrixWorld);
     const carUp = toWorldDir(0, 1, 0);
 
-    // Legs: seated, knees forward, feet on the floor ahead of the seat.
-    for (const [limb, sx] of [
-      [this.legs.left, -1],
-      [this.legs.right, 1],
-    ] as const) {
-      // Up on the sill the feet stay inside, on the seat, knees bent inward.
-      const seated = p.hip.clone().add(new THREE.Vector3(sx * 0.16, -0.3, -0.62));
-      const onSeat = p.hip.clone().add(new THREE.Vector3(sx * 0.14 - side * 0.05, 0.02, -0.28));
-      const foot = toWorld(seated.lerp(onSeat, roof));
-      this.reach(limb, foot, toWorldDir(-side * 0.8 * roof, 0.4 - 0.2 * roof, -1 + 0.4 * roof));
-    }
-
-    // Spine: upright (a little reclined); out of the window it bends outward;
-    // knocked down it slumps forward.
-    // Over the roof the body is upright, leaning in over it.
-    const spineDir = !p.alive
-      ? toWorldDir(0.1 * side, 0.55, -0.8)
-      : toWorldDir(side * (0.6 * lean * (1 - roof) - 0.35 * roof), 1, 0.3 * (1 - lean));
-    for (let i = 0; i < SPINE.length - 1; i++) aimBone(this.bone(SPINE[i]), this.bone(SPINE[i + 1]), spineDir);
-
     // Aim, car frame (+yaw = left).
     const cosP = Math.cos(p.pitch);
     const aim = new THREE.Vector3(-Math.sin(p.yaw) * cosP, Math.sin(p.pitch), -Math.cos(p.yaw) * cosP);
     const aimWorld = aim.clone().transformDirection(car.matrixWorld);
-    if (lean > 0) {
-      // Turn the chest toward the aim (about the car's up), the head the rest.
-      const flat = Math.atan2(-aim.x, -aim.z); // yaw from forward, + = left
-      twistBone(this.bone('Spine2'), carUp, flat * 0.75 * lean);
+
+    // The hips face the way the legs can go: forward on the seat; out of the
+    // window, outward and turned part way to the aim; over the roof, inward.
+    // The chest turns the rest of the way, so it is square to the gun.
+    const outward = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+    const toward = (base: number): number => base + THREE.MathUtils.clamp(wrapAngle(p.yaw - base), -1.2, 1.2) * 0.45;
+    const pelvisOut = lerpAngle(toward(outward), toward(-outward), this.roof);
+    this.pelvis = lerpAngle(this.pelvis, p.alive ? lerpAngle(0, pelvisOut, lean) : 0, ease);
+    twistBone(this.bone('Hips'), carUp, this.pelvis);
+
+    // Legs. Seated: knees forward, feet on the floor ahead of the seat. Out of
+    // the window: knelt up on the seat, feet back toward the middle of the car.
+    // Over the roof: stood up on the seat, knees toward the middle. (Below the
+    // door's edge, all of this is out of sight but for glimpses.)
+    for (const [limb, sx] of [
+      [this.legs.left, -1],
+      [this.legs.right, 1],
+    ] as const) {
+      const seated = p.seat.clone().add(new THREE.Vector3(sx * 0.16, -0.3, -0.62));
+      const knelt = p.seat.clone().add(new THREE.Vector3(-side * 0.3 + sx * 0.12, -0.05, 0.3));
+      const stood = p.seat.clone().add(new THREE.Vector3(-side * 0.15 + sx * 0.14, -0.02, 0.05));
+      const foot = toWorld(seated.lerp(knelt.lerp(stood, this.roof), lean));
+      const pole = new THREE.Vector3(0, 0.4, -1).lerp(new THREE.Vector3(-side * (0.8 * this.roof), -0.3, -1 + 0.6 * this.roof), lean);
+      this.reach(limb, foot, pole.transformDirection(car.matrixWorld));
     }
+
+    // Spine: seated, a little reclined; out, along gunnerBody's spine; knocked
+    // down, slumped forward. It sways against the car's acceleration (less when
+    // braced out of the window), breathes, and rocks back with each shot.
+    const spineDir = !p.alive
+      ? toWorldDir(0.1 * side, 0.55, -0.8)
+      : new THREE.Vector3().lerpVectors(toWorldDir(0, 1, 0.12), this.outSpine.clone().transformDirection(car.matrixWorld), lean);
+    if (p.alive) {
+      const give = 0.014 * (1 - 0.4 * lean);
+      spineDir.add(toWorldDir(-g.x * give, 0, -g.z * give));
+      spineDir.add(toWorldDir(0, 0, Math.sin(this.time * 1.7 + this.phase) * 0.015));
+      spineDir.addScaledVector(aimWorld, -this.recoil * 0.07 * lean);
+    }
+    spineDir.normalize();
+    for (let i = 0; i < SPINE.length - 1; i++) aimBone(this.bone(SPINE[i]), this.bone(SPINE[i + 1]), spineDir);
+    if (p.alive && lean > 0) {
+      const twist = wrapAngle(p.yaw - this.pelvis) * lean;
+      twistBone(this.bone('Spine1'), spineDir, twist * 0.45);
+      twistBone(this.bone('Spine2'), spineDir, twist * 0.55);
+    }
+
+    // The head, held level whatever the body does. Out: square to the aim,
+    // tipped toward the sights. In: the
+    // gunner looks the way they are aiming; the driver into the turn, with
+    // the odd glance about.
+    if (this.time > this.glanceAt) {
+      this.glanceAt = this.time + 2 + Math.random() * 4;
+      this.glance = Math.random() < 0.5 ? 0 : (Math.random() - 0.5) * 1.2;
+    }
+    const chestYaw = this.pelvis + (p.alive && lean > 0 ? wrapAngle(p.yaw - this.pelvis) * lean : 0);
+    const lookYaw =
+      p.role === 'driver'
+        ? -this.steer * 0.35 + this.glance * 0.6
+        : lean > 0.5
+          ? p.yaw
+          : THREE.MathUtils.clamp(wrapAngle(p.yaw), -1.1, 1.1) * 0.8 + this.glance * 0.3;
+    this.headYaw = lerpAngle(this.headYaw, THREE.MathUtils.clamp(wrapAngle(lookYaw - chestYaw), -1.2, 1.2), 1 - Math.exp(-dt * 6));
     const headDir = !p.alive
       ? toWorldDir(0, -0.4, -1)
-      : p.role === 'driver' || lean === 0
-        ? toWorldDir(0, 1, -0.05)
-        : new THREE.Vector3().lerpVectors(toWorldDir(0, 1, 0), aimWorld.clone().add(carUp.clone().multiplyScalar(1.4)), lean);
+      : new THREE.Vector3()
+          .lerpVectors(carUp, aimWorld, 0.18 * lean)
+          .add(toWorldDir(-g.x * 0.006, 0, -g.z * 0.006))
+          .normalize();
     aimBone(this.bone('Neck'), this.bone('Head'), headDir);
+    if (p.alive) twistBone(this.bone('Head'), carUp, this.headYaw);
 
     // Arms and the gun.
     const shoulder = this.arms.right.root.getWorldPosition(new THREE.Vector3());
-    const hipWorld = toWorld(p.hip);
     this.setGun(p.gun);
     if (!p.alive) {
-      this.reach(this.arms.left, toWorld(p.hip.clone().add(new THREE.Vector3(-0.22, 0.05, -0.28))), toWorldDir(-1, 0, 0.3));
-      this.reach(this.arms.right, toWorld(p.hip.clone().add(new THREE.Vector3(0.22, 0.05, -0.28))), toWorldDir(1, 0, 0.3));
+      this.reach(this.arms.left, toWorld(p.seat.clone().add(new THREE.Vector3(-0.22, 0.05, -0.28))), toWorldDir(-1, 0, 0.3));
+      this.reach(this.arms.right, toWorld(p.seat.clone().add(new THREE.Vector3(0.22, 0.05, -0.28))), toWorldDir(1, 0, 0.3));
       this.gunHolder.visible = false;
       return;
     }
     if (p.role === 'driver') {
-      // Hands at ten to two on a wheel ahead of the chest.
-      const wheel = p.hip.clone().add(new THREE.Vector3(0, 0.38, -0.5));
-      this.reach(this.arms.left, toWorld(wheel.clone().add(new THREE.Vector3(-0.17, 0.05, 0))), toWorldDir(-1, -1, 0.2));
-      this.reach(this.arms.right, toWorld(wheel.clone().add(new THREE.Vector3(0.17, 0.05, 0))), toWorldDir(1, -1, 0.2));
+      // Hands at ten to two on a wheel ahead of the chest, turning it.
+      const wheel = p.seat.clone().add(new THREE.Vector3(0, 0.38, -0.5));
+      const turn = this.steer * 1.4;
+      const onWheel = (angle: number): THREE.Vector3 =>
+        toWorld(wheel.clone().add(new THREE.Vector3(Math.sin(angle) * 0.17, Math.cos(angle) * 0.17, 0)));
+      this.reach(this.arms.left, onWheel(-1.15 + turn), toWorldDir(-1, -1, 0.2));
+      this.reach(this.arms.right, onWheel(1.15 + turn), toWorldDir(1, -1, 0.2));
       this.gunHolder.visible = false;
       return;
     }
     // A gunner. Out of the window (or over the roof) the gun is shouldered
     // along the aim: butt in the shoulder pocket, rear hand on the grip, front
-    // hand on the handguard, head down behind the sights. Tucked in, it is held
-    // at low ready across the body, muzzle up. On top: idle sway and breathing,
-    // the kick of each shot, a reload (gun canted, hand to the magazine) and a
-    // swap (gun lowered out of view, the other raised).
-    this.time += dt;
+    // hand on the handguard. Tucked in, it is held at low ready across the
+    // body, muzzle up. On top: idle sway and breathing, the kick of each shot,
+    // a reload (gun canted, hand to the magazine) and a swap (gun lowered out
+    // of view, the other raised).
     this.recoil = Math.max(0, this.recoil - dt * 9);
     const grips = GRIPS[this.gunId ?? 'rifle'];
     // Swap: the gun goes down and the new one comes up (`setGun` starts it).
@@ -476,7 +573,7 @@ export class Figure {
     const low = toWorldDir(0.25 * side, 0.75, -0.6).normalize();
     const gunDir = new THREE.Vector3()
       .lerpVectors(low, aimWorld, lean)
-      .addScaledVector(carUp, breathe + this.recoil * 0.12 - swapDip * 0.8 - reloadAmount * 0.35)
+      .addScaledVector(carUp, breathe + this.recoil * 0.15 - swapDip * 0.8 - reloadAmount * 0.35)
       .addScaledVector(right0, drift)
       .normalize();
     const right = new THREE.Vector3().crossVectors(gunDir, carUp).normalize();
@@ -491,8 +588,8 @@ export class Figure {
       .clone()
       .addScaledVector(gunRight, -0.06)
       .addScaledVector(gunUp, -0.04)
-      .addScaledVector(gunDir, -0.02 - this.recoil * 0.05);
-    const lowReady = toWorld(p.hip.clone().add(new THREE.Vector3(0.18, 0.18, -0.2)));
+      .addScaledVector(gunDir, -0.02 - this.recoil * 0.06);
+    const lowReady = toWorld(p.seat.clone().add(new THREE.Vector3(0.18, 0.18, -0.2)));
     const butt = new THREE.Vector3().lerpVectors(lowReady, pocket, lean);
     const onGun = (local: readonly [number, number, number]): THREE.Vector3 =>
       butt.clone().addScaledVector(gunRight, local[0]).addScaledVector(gunUp, local[1]).addScaledVector(gunDir, local[2]);
@@ -504,11 +601,6 @@ export class Figure {
     // arm tucked under the gun.
     this.reach(this.arms.right, grip, gunRight.clone().multiplyScalar(0.8).addScaledVector(carUp, -0.6));
     this.reach(this.arms.left, fore, gunRight.clone().multiplyScalar(-0.3).addScaledVector(carUp, -1));
-    // The head: down to the sights when out, looking over the gun.
-    if (p.alive && lean > 0.2) {
-      const sight = gunDir.clone().addScaledVector(carUp, 0.35).normalize();
-      aimBone(this.bone('Neck'), this.bone('Head'), new THREE.Vector3().lerpVectors(headDir, sight, lean));
-    }
 
     // Place the gun: butt at `butt`, barrel along `gunDir`.
     this.gunHolder.visible = this.gunId !== null;

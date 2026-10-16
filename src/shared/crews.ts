@@ -70,16 +70,6 @@ export const CHEST_OFFSET = {
 } as const;
 
 /**
- * A leaning gunner's shooting shoulder, where the butt sits: the muzzle is a
- * gun's length from here along the aim. (These three are measured from the
- * posed figure — vehicle/figures.ts — so a shot finds the body that is drawn.)
- */
-export const SHOULDER_OFFSET = {
-  right: [0.44, 0.88, 0.25],
-  left: [-0.44, 0.88, 0.25],
-} as const;
-
-/**
  * The camera-gunner's viewpoint, by side: an observer a little outside the body.
  *
  * A gunner's view is anchored to a specific window on a specific side, so a rear
@@ -95,11 +85,7 @@ export const WINDOW_EYE_OFFSET = {
   left: [-0.95, 0.55, 0.15],
 } as const;
 
-export type SeatId =
-  | 'seat.driver'
-  | 'seat.frontRight'
-  | 'seat.rearLeft'
-  | 'seat.rearRight';
+export type SeatId = 'seat.driver' | 'seat.frontRight' | 'seat.rearLeft' | 'seat.rearRight';
 
 /**
  * What a seat can do. `driverGunner` is the one-man brawler: the same person
@@ -167,10 +153,7 @@ export function mountedLoadout(seat: SeatDef): WeaponId[] {
  * pivot. Pitch is left out: the guns are short, and moving the muzzle with pitch
  * would shift shots for reasons the player cannot see.
  */
-export function mountMuzzleLocal(
-  mount: { pivot: V3; muzzle: V3 },
-  relYaw: number,
-): [number, number, number] {
+export function mountMuzzleLocal(mount: { pivot: V3; muzzle: V3 }, relYaw: number): [number, number, number] {
   const c = Math.cos(relYaw);
   const s = Math.sin(relYaw);
   // Same yaw convention as the vehicle: +yaw turns left, forward is -Z.
@@ -363,10 +346,58 @@ export function roofAmount(seat: SeatDef, aimYaw: number): number {
 export type GunnerPart = 'head' | 'chest' | 'waist' | 'muzzle';
 
 /**
+ * The window opening of each car a gunner rides in, car-local, measured from
+ * the bodies (scripts/prep): the door's top edge (`belt`), the side of the
+ * cabin there (`side`, |x|) and the roof.
+ */
+export const CABIN: Partial<Record<VehicleClassId, { belt: number; side: number; roof: number }>> = {
+  coupe: { belt: 0.2, side: 0.72, roof: 0.71 },
+  suv: { belt: 0.2, side: 0.86, roof: 0.82 },
+};
+const DEFAULT_CABIN = { belt: 0.2, side: 0.8, roof: 0.75 };
+
+/**
+ * A window gunner's body for an aim, car-local: where their hips are and which
+ * way their spine runs. ONE description for the drawn figure (vehicle/figures.ts
+ * poses its skeleton along it) and for what a shot has to find (`gunnerPoint`).
+ *
+ * At the window they sit in the opening on the door's edge, upright and
+ * leaning a little out, the chest and head clear of the car — the way the
+ * people in Fortnite's cars ride. Aiming across the car they sit up on the
+ * frame, turned to face over the roof, leaning in over it.
+ */
+export function gunnerBody(
+  cls: VehicleClassId,
+  seat: SeatDef,
+  aimYaw: number,
+): { hips: [number, number, number]; spine: [number, number, number]; roof: number } {
+  const c = CABIN[cls] ?? DEFAULT_CABIN;
+  const s = seat.side === 'right' ? 1 : -1;
+  const roof = roofAmount(seat, aimYaw);
+  const z = seat.mount[2] + 0.05;
+  const window = [s * (c.side - 0.1), c.belt + 0.12, z];
+  const over = [s * (c.side - 0.02), c.roof - 0.26, z];
+  const hips = [0, 1, 2].map((k) => window[k] + (over[k] - window[k]) * roof) as [number, number, number];
+  // Leaning a little out at the window, in over the roof up there, and into
+  // the gun either way (a shooter's weight goes forward onto it).
+  const out = s * (0.25 - 0.6 * roof);
+  const v = [out - Math.sin(aimYaw) * 0.18, 1, -Math.cos(aimYaw) * 0.18];
+  const n = Math.hypot(v[0], v[1], v[2]);
+  return { hips, spine: [v[0] / n, v[1] / n, v[2] / n], roof };
+}
+
+/**
+ * Points along a gunner's body, from the hips (the people are 1.8 m, their
+ * joints measured from the models): the spine starts 0.1 m above the hips and
+ * runs along `spine`; the chest is 0.22 m up it, the head 0.6 m, and the
+ * shooting shoulder — where the butt sits — 0.3 m up and 0.13 m to the right
+ * of the aim (the chest squares to the gun).
+ */
+const BODY = { base: 0.1, chest: 0.22, head: 0.6, shoulder: 0.3, shoulderOut: 0.13 } as const;
+
+/**
  * A window gunner's body (what a shot has to find) and muzzle, car-local, for
- * their aim: out of the window, or up on the sill over the roof, blended. Up
- * there more of them shows — the waist counts as well (and is null at the
- * window, where the door covers it).
+ * their aim: out of the window, or up on the sill over the roof, blended.
  */
 export function gunnerPoint(
   cls: VehicleClassId,
@@ -375,36 +406,18 @@ export function gunnerPoint(
   aimPitch: number,
   part: GunnerPart,
 ): [number, number, number] | null {
-  const spec = VEHICLE_CLASSES[cls];
-  const s = seat.side === 'right' ? 1 : -1;
-  const roof = roofAmount(seat, aimYaw);
-  const top = spec.boxHeight - spec.rideHeight;
-  const [mx, my, mz] = seat.mount;
-  const at = (o: readonly number[]): [number, number, number] => [mx + o[0], my + o[1], mz + o[2]];
-  // Up on the sill (measured from the posed figure, like the offsets above).
-  const head: [number, number, number][] = [at(HEAD_OFFSET[seat.side]), [s * spec.halfWidth * 0.44, top + 0.39, mz + 0.12]];
-  const chest: [number, number, number][] = [at(CHEST_OFFSET[seat.side]), [s * spec.halfWidth * 0.56, top + 0.22, mz + 0.07]];
-  const mix = (pair: [number, number, number][]): [number, number, number] => [
-    pair[0][0] + (pair[1][0] - pair[0][0]) * roof,
-    pair[0][1] + (pair[1][1] - pair[0][1]) * roof,
-    pair[0][2] + (pair[1][2] - pair[0][2]) * roof,
-  ];
-  if (part === 'head') return mix(head);
-  if (part === 'chest') return mix(chest);
-  if (part === 'waist') return roof > 0.5 ? [s * spec.halfWidth * 0.62, top - 0.02, mz] : null;
-  // The muzzle: a gun's length along the aim from the shooting shoulder — at
-  // the window, or over the roof (well above it, so the car never blocks it).
+  const { hips, spine } = gunnerBody(cls, seat, aimYaw);
+  const up = (d: number): [number, number, number] => [hips[0] + spine[0] * d, hips[1] + BODY.base + spine[1] * d, hips[2] + spine[2] * d];
+  if (part === 'head') return up(BODY.head);
+  if (part === 'chest') return up(BODY.chest);
+  if (part === 'waist') return up(0);
+  // The muzzle: a gun's length along the aim from the shooting shoulder.
   const c = Math.cos(aimPitch);
-  const along = (from: readonly number[], length: number): [number, number, number] => [
-    from[0] - Math.sin(aimYaw) * c * length,
-    from[1] + Math.sin(aimPitch) * length,
-    from[2] - Math.cos(aimYaw) * c * length,
-  ];
-  const window = along(at(SHOULDER_OFFSET[seat.side]), 0.82);
-  const over = along([s * spec.halfWidth * 0.64, top + 0.35, mz - 0.06], 0.82);
+  const shoulder = up(BODY.shoulder);
+  const length = 0.82;
   return [
-    window[0] + (over[0] - window[0]) * roof,
-    window[1] + (over[1] - window[1]) * roof,
-    window[2] + (over[2] - window[2]) * roof,
+    shoulder[0] + Math.cos(aimYaw) * BODY.shoulderOut - Math.sin(aimYaw) * c * length,
+    shoulder[1] + Math.sin(aimPitch) * length,
+    shoulder[2] - Math.sin(aimYaw) * BODY.shoulderOut - Math.cos(aimYaw) * c * length,
   ];
 }
