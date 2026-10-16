@@ -22,6 +22,7 @@ import {
   CABIN,
   clampToArc,
   gunnerPoint,
+  nextRoof,
   roofAmount,
   seatById,
   seatsFor,
@@ -310,6 +311,11 @@ try {
         const outward = seat.side === 'right' ? -Math.PI / 2 : Math.PI / 2;
         const head = gunnerPoint(cls, seat, outward, 0, 'head')!;
         const chest = gunnerPoint(cls, seat, outward, 0, 'chest')!;
+        if (cabin.hatch) {
+          // Stood up through a roof hatch: head and chest clear of the roof.
+          check(`${cls} ${seat.id}: up through the hatch, head and chest above the roof`, head[1] > cabin.roof + 0.25 && chest[1] > cabin.roof, `head y ${head[1].toFixed(2)}, chest y ${chest[1].toFixed(2)}, roof ${cabin.roof}`);
+          continue;
+        }
         check(
           `${cls} ${seat.id}: the head is out of the window`,
           Math.abs(head[0]) > cabin.side && head[1] > cabin.belt + 0.5,
@@ -524,6 +530,10 @@ try {
     check('a window gunner can aim all the way round', clampToArc(gunnerSeat.arc!, Math.PI * 0.9) === Math.PI * 0.9);
     check('aiming out of their own side, they are at the window', roofAmount(gunnerSeat, -Math.PI / 2) === 0);
     check('aiming across the car, they are up over the roof', roofAmount(gunnerSeat, Math.PI / 2) === 1);
+    // Climbing up and down is sticky: near the line, they stay where they are.
+    const off = (d: number) => -Math.PI / 2 + d * Math.PI / 180; // d° off their own side
+    check('they climb up only well across the car', !nextRoof(gunnerSeat, off(110), false) && nextRoof(gunnerSeat, off(125), false));
+    check('and come down only once clearly back', nextRoof(gunnerSeat, off(100), true) && !nextRoof(gunnerSeat, off(90), true));
     const overHead = gunnerPoint('suv', gunnerSeat, Math.PI / 2, 0, 'head')!;
     const overMuzzle = gunnerPoint('suv', gunnerSeat, Math.PI / 2, 0, 'muzzle')!;
     check('up there, head and muzzle are above the roof', overHead[1] > roofTop + 0.3 && overMuzzle[1] > roofTop + 0.1, `head ${overHead[1].toFixed(2)}, muzzle ${overMuzzle[1].toFixed(2)}, roof ${roofTop.toFixed(2)}`);

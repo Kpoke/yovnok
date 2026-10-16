@@ -944,6 +944,9 @@
         transform: translate(-50%, -50%) rotate(45deg) scale(1);
         border-color: var(--accent);
       }
+      /* A person hit: white and bigger. A gunner knocked down: red, biggest. */
+      #hitmarker.on.person { border-color: #ffffff; border-width: 3px; transform: translate(-50%, -50%) rotate(45deg) scale(1.2); }
+      #hitmarker.on.down { border-color: #ff5a5a; border-width: 3px; transform: translate(-50%, -50%) rotate(45deg) scale(1.45); }
 
       /*
        * Weapon reticles: where each mounted gun will ACTUALLY hit. On the

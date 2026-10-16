@@ -64,6 +64,7 @@ function makeSnapshot(vehicleCount: number): SnapshotMessage {
         id: i * 4 + seat,
         crew: i,
         seat: (['seat.driver', 'seat.frontRight', 'seat.rearLeft', 'seat.rearRight'] as const)[seat],
+        roof: false,
         aimYaw: -1.2345,
         aimPitch: 0.1234,
         hp: 87,

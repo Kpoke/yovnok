@@ -22,12 +22,21 @@ import * as THREE from 'three';
 import { CAMERA, FEEL, VEHICLE } from '../shared/config';
 import { clamp, damp, wrapAngle } from '../shared/math';
 import { vehiclePointWorld } from '../shared/combat';
-import { gunnerPoint, roofAmount, type SeatDef } from '../shared/crews';
+import { gunnerPoint, type SeatDef } from '../shared/crews';
 import type { VehicleState } from '../shared/vehicle';
 
 export class CameraRig {
   private camYaw = 0;
   private ready = false;
+  /** The window gunner over the roof (0 … 1), eased. */
+  private roof = 0;
+  /** Recoil: the view tips up with each shot and settles back (radians). */
+  private recoil = 0;
+
+  /** A shot was fired: tip the gunner's view up a touch. */
+  kick(amount: number): void {
+    this.recoil = Math.min(0.06, this.recoil + amount);
+  }
   private raycaster = new THREE.Raycaster();
   private focal = new THREE.Vector3();
   private desired = new THREE.Vector3();
@@ -114,6 +123,8 @@ export class CameraRig {
     seat: SeatDef,
     aimYaw: number,
     aimPitch: number,
+    /** Up over the roof rather than at the window (crews.nextRoof). */
+    overRoof: boolean,
     dt: number,
     obstacles: THREE.Object3D[],
   ): void {
@@ -123,8 +134,10 @@ export class CameraRig {
     // Rigid, not damped: a lagging camera is a crosshair that lies.
     // From the gunner's own head — at the window or up over the roof — shared
     // with the hit test and the drawn figure.
-    const roof = roofAmount(seat, aimYaw);
-    const head = vehiclePointWorld(state, gunnerPoint(state.spec.id, seat, aimYaw, 0, 'head')!);
+    // Eased, so climbing up or down glides rather than cuts.
+    this.roof += ((overRoof ? 1 : 0) - this.roof) * Math.min(1, dt * 8);
+    const roof = this.roof;
+    const head = vehiclePointWorld(state, gunnerPoint(state.spec.id, seat, aimYaw, 0, 'head', roof)!);
     head.y += 0.15 * roof;
     const yaw = state.yaw + aimYaw;
     const cosPitch = Math.cos(aimPitch);
@@ -158,9 +171,11 @@ export class CameraRig {
     // you change seat — which is exactly the bug this negates. The chase camera
     // already follows this (a positive pitch raises it to look down); the
     // window and solo cameras look along the aim and so must negate.
+    // Recoil tips the view up and settles in about a fifth of a second.
+    this.recoil *= Math.exp(-dt * 14);
     this.look.set(
       this.desired.x - Math.sin(yaw) * cosPitch,
-      this.desired.y - Math.sin(aimPitch),
+      this.desired.y - Math.sin(aimPitch) + this.recoil,
       this.desired.z - Math.cos(yaw) * cosPitch,
     );
     camera.lookAt(this.look);

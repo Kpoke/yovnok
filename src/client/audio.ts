@@ -562,6 +562,39 @@ export class GameAudio {
     osc.stop(now + 0.1);
   }
 
+  /** A confirmed hit on a PERSON (not bodywork): a dull thump and a higher, sharper tick. */
+  personHit(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfx || !this.enabled) return;
+    this.sample('hit-thud', 0, 0, 0, true, 0.7, 1.35 + Math.random() * 0.15);
+    this.tone(2100, 1400, 0.07, 0.26, 'square');
+  }
+
+  /** We knocked an enemy gunner down: two falling tones, unmistakable. */
+  knockdown(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfx || !this.enabled) return;
+    this.tone(1250, 1000, 0.11, 0.3, 'triangle');
+    this.tone(900, 620, 0.16, 0.3, 'triangle', 0.1);
+  }
+
+  /** One short gliding tone into the effects bus. */
+  private tone(from: number, to: number, seconds: number, volume: number, type: OscillatorType, delay = 0): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfx) return;
+    const at = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(from, at);
+    osc.frequency.exponentialRampToValueAtTime(to, at + seconds * 0.8);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(volume, at);
+    gain.gain.exponentialRampToValueAtTime(0.001, at + seconds);
+    osc.connect(gain).connect(this.sfx);
+    osc.start(at);
+    osc.stop(at + seconds + 0.02);
+  }
+
   // --------------------------------------------------------------------- zone
 
   private startZoneTone(): void {

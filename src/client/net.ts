@@ -30,6 +30,7 @@ export type RoomState = Extract<ServerMessage, { t: 'room' }>;
 import {
   clampToArc,
   seatById,
+  stepRoof,
   type SeatId,
   mountedLoadout,
   type MountedWeapon,
@@ -129,6 +130,8 @@ export type CrewPose = {
   yaw: number;
   pitch: number;
   out: boolean;
+  /** Up over the roof rather than at the window (crews.nextRoof). */
+  roof: boolean;
   outfit: number;
   /** The weapon in their hands: 0 their window gun (`gun`), 1 the launcher. */
   slot: number;
@@ -343,6 +346,18 @@ export class NetClient {
   /** A window gunner (team formats): must lean out of the window to fire. */
   get windowGunner(): boolean {
     return this.canFire && !this.isDriver;
+  }
+
+  private readonly ownRoof = { roof: false, at: 0 };
+  /**
+   * Our own gunner over the roof rather than at the window: predicted from our
+   * aim with the server's hysteresis and dwell (crews.stepRoof), so the camera and our
+   * figure do not wait a round trip.
+   */
+  get roof(): boolean {
+    const seat = this.seat === null ? null : seatById(this.vehicleClass, this.seat);
+    if (!seat || !this.windowGunner) return false;
+    return stepRoof(this.ownRoof, seat, this.aimYaw, this.leaning, performance.now());
   }
 
   /** Leaning out of the window (held aim), and since when. */
@@ -663,6 +678,7 @@ export class NetClient {
             reload: 0,
             alive: true,
             out: false,
+            roof: false,
             outfit: 0,
             gun: 0,
           });
@@ -1070,6 +1086,7 @@ export class NetClient {
         yaw: mine ? this.aimYaw : m.aimYaw,
         pitch: mine ? this.aimPitch : m.aimPitch,
         out: mine ? this.leaning : m.out,
+        roof: mine ? this.roof : m.roof,
         outfit: m.outfit,
         slot: mine ? this.self.slot : m.slot,
         gun: m.gun,

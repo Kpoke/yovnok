@@ -50,6 +50,7 @@ import {
   crewSize,
   mountedLoadout,
   seatById,
+  stepRoof,
   seatsFor,
   type SeatDef,
   type SeatId,
@@ -106,7 +107,7 @@ import {
   type ZoneRules,
   type ZoneState,
 } from '../shared/zone';
-import { botLook, DEFAULT_LOOK, gunnerLoadoutOf, loadoutOf, packLook, unpackLook, type CosmeticLook } from '../shared/cosmetics';
+import { botLook, DEFAULT_LOOK, OUTFITS, gunnerLoadoutOf, loadoutOf, packLook, unpackLook, type CosmeticLook } from '../shared/cosmetics';
 import { createBotMemory, decideBot, type BotEnemy, type BotMemory } from './bot';
 import { botCallsign, callsignAllowed, sanitiseCallsign } from '../shared/callsign';
 import { record } from './stats';
@@ -224,6 +225,10 @@ type Player = {
   out: boolean;
   /** When they leaned out (performance.now()), for `COMBAT.leanSeconds`. */
   outAt: number;
+  /** Up over the roof rather than at the window, kept with hysteresis (crews.stepRoof). */
+  roof: boolean;
+  /** When `roof` last changed (performance.now()). */
+  roofAt: number;
   /** Highest sequence number ever accepted, to reject duplicates and replays. */
   highSeq: number;
   /** When any message last arrived, for the liveness check. */
@@ -594,6 +599,8 @@ export class Room {
       aimPitch: 0,
       out: false,
       outAt: 0,
+      roof: false,
+      roofAt: 0,
       highSeq: 0,
       lastSeenAt: performance.now(),
       hp: COMBAT.maxCrewHealth,
@@ -748,6 +755,8 @@ export class Room {
       aimPitch: 0,
       out: false,
       outAt: 0,
+      roof: false,
+      roofAt: 0,
       highSeq: 0,
       lastSeenAt: performance.now(),
       hp: COMBAT.maxCrewHealth,
@@ -827,6 +836,7 @@ export class Room {
     crew.members.set(player.id, seat);
     player.seat = seat;
     player.out = false;
+    player.roof = false;
     if (target.drives) crew.driverId = player.id;
     else if (crew.driverId === player.id) crew.driverId = null;
     player.loadout = this.loadoutFor(target, unpackLook(player.look));
@@ -911,8 +921,14 @@ export class Room {
 
       bot.aimYaw = intent.aimYaw;
       bot.aimPitch = intent.aimPitch;
-      // A window gunner bot leans out while it has someone to shoot at.
-      if (seat.arc && !seat.drives) this.lean(bot, intent.target !== undefined && intent.target !== null, now);
+      // A window gunner bot leans out while it has someone to shoot at — once
+      // a target has held for a moment, and it stays out a while after losing
+      // one. Following the target tick by tick, a target flickering in and out
+      // of sight had it popping in and out of the window many times a second.
+      if (seat.arc && !seat.drives) {
+        this.lean(bot, this.botWantsOut(bot.id, intent.target !== undefined && intent.target !== null, now), now);
+        this.stepRoof(bot, seat, now);
+      }
       if (seat.drives) inputs.set(crew.id, intent.input);
       // Each trigger fires at its own point, the way a human's crosshair would
       // (the bot decides when each weapon can bear; the rules still bind it).
@@ -1570,7 +1586,10 @@ export class Room {
       // it is the authority on what a window can reach.
       player.aimYaw = clampToArc(seat.arc, msg.yaw);
       player.aimPitch = Math.max(-1.2, Math.min(1.2, msg.pitch));
-      if (!seat.drives) this.lean(player, msg.out === true, performance.now());
+      if (!seat.drives) {
+        this.lean(player, msg.out === true, performance.now());
+        this.stepRoof(player, seat, performance.now());
+      }
       return;
     }
 
@@ -1744,7 +1763,7 @@ export class Room {
       // clamps too, for feel; this is the authority.
       // Where the gun is depends on the posture (window, or over the roof),
       // which follows the aim.
-      muzzle = muzzleWorld(crew, seat, player.aimYaw, -player.aimPitch);
+      muzzle = muzzleWorld(crew, seat, player.aimYaw, -player.aimPitch, player.roof ? 1 : 0);
       const aim = target ? relativeAim(crew.state.yaw, muzzle, target) : { yaw: aimYawRequested, pitch: pitchRequested };
       aimYaw = clampToArc(seat.arc, aim.yaw);
       pitch = clamp(aim.pitch, -1.2, 1.2);
@@ -2095,7 +2114,7 @@ export class Room {
             const seat = seatById(vehicle.cls, member.seat);
             // Only a gunner leaning out is in the open; inside, the car takes it.
             if (!seat || !member.out) continue;
-            const head = headWorld(vehicle, seat, member.aimYaw, member.aimPitch);
+            const head = headWorld(vehicle, seat, member.aimYaw, member.aimPitch, member.roof ? 1 : 0);
             const distance = Math.hypot(head.x - hx, head.y - hy, head.z - hz);
             if (distance > weapon.splash) continue;
             const victim = this.players.get(member.id);
@@ -2140,6 +2159,38 @@ export class Room {
   }
 
   /** Lean a window gunner out of (or back into) their window. */
+  /**
+   * What a crew member wears. A human wears their own pick; a bot avoids what
+   * its crewmates wear (humans first, then bots with lower ids), so one car is
+   * never a row of clones while there are outfits enough to go round.
+   */
+  private outfitOf(player: Player): number {
+    const own = unpackLook(player.look).outfit;
+    if (!player.bot) return own;
+    const crew = this.crews.get(player.crew);
+    if (!crew) return own;
+    const worn = new Set<number>();
+    const mates = [...crew.members.keys()]
+      .map((id) => this.players.get(id))
+      .filter((p): p is Player => !!p && p.id !== player.id)
+      .sort((a, b) => Number(a.bot) - Number(b.bot) || a.id - b.id);
+    for (const mate of mates) {
+      if (mate.bot && mate.id > player.id) continue;
+      worn.add(mate.bot ? this.outfitOf(mate) : unpackLook(mate.look).outfit);
+    }
+    for (let k = 0; k < OUTFITS.length; k++) {
+      const pick = (own + k) % OUTFITS.length;
+      if (!worn.has(pick)) return pick;
+    }
+    return own;
+  }
+
+  private stepRoof(player: Player, seat: SeatDef, now: number): void {
+    const state = { roof: player.roof, at: player.roofAt };
+    player.roof = stepRoof(state, seat, player.aimYaw, player.out, now);
+    player.roofAt = state.at;
+  }
+
   private lean(player: Player, out: boolean, now: number): void {
     if (out && !player.out) player.outAt = now;
     player.out = out && player.alive;
@@ -2159,6 +2210,7 @@ export class Room {
         // The aim message carries the camera pitch (positive looks down).
         aimYaw: player.aimYaw,
         aimPitch: -player.aimPitch,
+        roof: player.roof,
       });
     }
     return out;
@@ -2430,6 +2482,23 @@ export class Room {
   private seenPhase: MatchState['phase'] = 'lobby';
   /** When each window-gunner bot may next fire its launcher (ms). */
   private launchAt = new Map<number, number>();
+  /** Bot gunners' leaning: since when a target has been held, when it was last seen (ms), and whether out. */
+  private botTarget = new Map<number, { since: number; seen: number; out: boolean }>();
+
+  /** Lean out after 0.3 s on a target; back in 2 s after the last sighting. */
+  private botWantsOut(botId: number, hasTarget: boolean, now: number): boolean {
+    let t = this.botTarget.get(botId);
+    if (!t) this.botTarget.set(botId, (t = { since: -1, seen: -Infinity, out: false }));
+    if (hasTarget) {
+      if (t.since < 0) t.since = now;
+      t.seen = now;
+      if (now - t.since >= 300) t.out = true;
+    } else {
+      if (now - t.seen > 300) t.since = -1;
+      if (now - t.seen > 2000) t.out = false;
+    }
+    return t.out;
+  }
 
   /** Fresh field at the top of a match: crews home, healed, full crates. */
   private resetForMatch(): void {
@@ -2604,7 +2673,7 @@ export class Room {
 
     const allMembers: MemberSnapshot[] = [];
     for (const player of this.players.values()) {
-      if (player.joined) allMembers.push(memberSnapshotOf(player));
+      if (player.joined) allMembers.push(memberSnapshotOf(player, this.outfitOf(player)));
     }
 
     const allProjectiles: ProjectileSnapshot[] = this.projectiles.map((p) => ({
@@ -2813,7 +2882,7 @@ const BENCH_STATS = process.env.BENCH_STATS === '1';
 /** Furthest crosshair point a shot will aim at; beyond any weapon's range. */
 const MAX_TARGET_DISTANCE = 600;
 
-function memberSnapshotOf(player: Player): MemberSnapshot {
+function memberSnapshotOf(player: Player, outfit: number): MemberSnapshot {
   return {
     id: player.id,
     crew: player.crew,
@@ -2828,7 +2897,8 @@ function memberSnapshotOf(player: Player): MemberSnapshot {
     allReloads: [...player.ammo.reload],
     alive: player.alive,
     out: player.out,
-    outfit: unpackLook(player.look).outfit,
+    roof: player.roof,
+    outfit,
     gun: unpackLook(player.look).gunner,
   };
 }

@@ -36,6 +36,8 @@ export type FigurePose = {
   hips: THREE.Vector3;
   spine: THREE.Vector3;
   roof: number;
+  /** Stood up through a roof hatch (crews.CABIN.hatch) rather than at a window. */
+  hatch: boolean;
   /** Aim relative to the car's nose (+ = left) and pitch (+ = up), radians. */
   yaw: number;
   pitch: number;
@@ -296,7 +298,9 @@ export class Figure {
   ) {
     this.root.name = 'figure';
     this.root.add(model, this.gunHolder);
-    const paint = new THREE.Color(0xffffff).lerp(new THREE.Color(tint), 0.6);
+    // Strong enough to read on the dark jackets (a multiply can only darken,
+    // so the paint is lifted above 1 to brighten them back toward the colour).
+    const paint = new THREE.Color(0xffffff).lerp(new THREE.Color(tint), 0.9).multiplyScalar(1.5);
     const materials = new Map<THREE.Material, THREE.Material>();
     model.traverse((o) => {
       if ((o as THREE.Bone).isBone) {
@@ -467,7 +471,8 @@ export class Figure {
     // The chest turns the rest of the way, so it is square to the gun.
     const outward = side > 0 ? -Math.PI / 2 : Math.PI / 2;
     const toward = (base: number): number => base + THREE.MathUtils.clamp(wrapAngle(p.yaw - base), -1.2, 1.2) * 0.45;
-    const pelvisOut = lerpAngle(toward(outward), toward(-outward), this.roof);
+    // In a hatch there is no window to face: the hips turn most of the way to the aim.
+    const pelvisOut = p.hatch ? p.yaw * 0.6 : lerpAngle(toward(outward), toward(-outward), this.roof);
     this.pelvis = lerpAngle(this.pelvis, p.alive ? lerpAngle(0, pelvisOut, lean) : 0, ease);
     twistBone(this.bone('Hips'), carUp, this.pelvis);
 
@@ -482,7 +487,8 @@ export class Figure {
       const seated = p.seat.clone().add(new THREE.Vector3(sx * 0.16, -0.3, -0.62));
       const knelt = p.seat.clone().add(new THREE.Vector3(-side * 0.3 + sx * 0.12, -0.05, 0.3));
       const stood = p.seat.clone().add(new THREE.Vector3(-side * 0.15 + sx * 0.14, -0.02, 0.05));
-      const foot = toWorld(seated.lerp(knelt.lerp(stood, this.roof), lean));
+      const upright = p.hatch ? p.seat.clone().add(new THREE.Vector3(sx * 0.14, -0.08, 0.02)) : knelt.lerp(stood, this.roof);
+      const foot = toWorld(seated.lerp(upright, lean));
       const pole = new THREE.Vector3(0, 0.4, -1).lerp(new THREE.Vector3(-side * (0.8 * this.roof), -0.3, -1 + 0.6 * this.roof), lean);
       this.reach(limb, foot, pole.transformDirection(car.matrixWorld));
     }

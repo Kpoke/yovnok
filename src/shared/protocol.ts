@@ -115,6 +115,8 @@ export type MemberSnapshot = {
   alive: boolean;
   /** Leaning out of the window to aim (a window gunner holding aim). */
   out: boolean;
+  /** Up over the roof rather than at the window (crews.nextRoof). */
+  roof: boolean;
   /** Index into `OUTFITS`: what the figure in this seat wears. */
   outfit: number;
   /** Index into `GUNNER_PRIMARIES`: the window gun in their hands. */

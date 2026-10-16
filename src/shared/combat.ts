@@ -60,6 +60,8 @@ export type CombatMember = {
   /** Their aim (car-relative): out of the window, or up over the roof. */
   aimYaw: number;
   aimPitch: number;
+  /** Up over the roof (crews.nextRoof); by default, from the aim alone. */
+  roof?: boolean;
 };
 
 const vec = (x: number, y: number, z: number) => ({ x, y, z });
@@ -162,8 +164,9 @@ export function muzzleWorld(
   seat: SeatDef,
   aimYaw = 0,
   aimPitch = 0,
+  roof?: number,
 ): { x: number; y: number; z: number } {
-  if (isWindowGunner(seat)) return vehiclePointWorld(vehicle.state, gunnerPoint(vehicle.cls, seat, aimYaw, aimPitch, 'muzzle')!);
+  if (isWindowGunner(seat)) return vehiclePointWorld(vehicle.state, gunnerPoint(vehicle.cls, seat, aimYaw, aimPitch, 'muzzle', roof)!);
   const port = seat.firePort ?? FIRE_PORT_OFFSET[seat.side];
   return seatPointWorld(vehicle.state, seat, port);
 }
@@ -184,21 +187,39 @@ const isWindowGunner = (seat: SeatDef): boolean => seat.arc !== null && !seat.dr
  * The driver stays on the cabin offset and is skipped outright by role, so they
  * are doubly unreachable: armoured, and with no window to lean from.
  */
-export function headWorld(vehicle: CombatVehicle, seat: SeatDef, aimYaw = 0, aimPitch = 0): { x: number; y: number; z: number } {
-  if (isWindowGunner(seat)) return vehiclePointWorld(vehicle.state, gunnerPoint(vehicle.cls, seat, aimYaw, aimPitch, 'head')!);
+export function headWorld(
+  vehicle: CombatVehicle,
+  seat: SeatDef,
+  aimYaw = 0,
+  aimPitch = 0,
+  roof?: number,
+): { x: number; y: number; z: number } {
+  if (isWindowGunner(seat)) return vehiclePointWorld(vehicle.state, gunnerPoint(vehicle.cls, seat, aimYaw, aimPitch, 'head', roof)!);
   const offset = seat.drives ? EYE_OFFSET : HEAD_OFFSET[seat.side];
   return seatPointWorld(vehicle.state, seat, offset);
 }
 
 /** A leaning gunner's chest, out of the window (or over the roof) below their head. */
-export function chestWorld(vehicle: CombatVehicle, seat: SeatDef, aimYaw = 0, aimPitch = 0): { x: number; y: number; z: number } {
-  if (isWindowGunner(seat)) return vehiclePointWorld(vehicle.state, gunnerPoint(vehicle.cls, seat, aimYaw, aimPitch, 'chest')!);
+export function chestWorld(
+  vehicle: CombatVehicle,
+  seat: SeatDef,
+  aimYaw = 0,
+  aimPitch = 0,
+  roof?: number,
+): { x: number; y: number; z: number } {
+  if (isWindowGunner(seat)) return vehiclePointWorld(vehicle.state, gunnerPoint(vehicle.cls, seat, aimYaw, aimPitch, 'chest', roof)!);
   return seatPointWorld(vehicle.state, seat, CHEST_OFFSET[seat.side]);
 }
 
 /** Up over the roof their waist shows too; null at the window, behind the door. */
-export function waistWorld(vehicle: CombatVehicle, seat: SeatDef, aimYaw = 0, aimPitch = 0): { x: number; y: number; z: number } | null {
-  const local = isWindowGunner(seat) ? gunnerPoint(vehicle.cls, seat, aimYaw, aimPitch, 'waist') : null;
+export function waistWorld(
+  vehicle: CombatVehicle,
+  seat: SeatDef,
+  aimYaw = 0,
+  aimPitch = 0,
+  roof?: number,
+): { x: number; y: number; z: number } | null {
+  const local = isWindowGunner(seat) ? gunnerPoint(vehicle.cls, seat, aimYaw, aimPitch, 'waist', roof) : null;
   return local ? vehiclePointWorld(vehicle.state, local) : null;
 }
 
@@ -500,10 +521,11 @@ export function resolveHitscan(
     let cover = limit;
     for (const [id, distance] of hulls) if (id !== member.crew) cover = Math.min(cover, distance);
     const own = hulls.get(member.crew);
-    const waist = waistWorld(vehicle, seat, member.aimYaw, member.aimPitch);
+    const roof = member.roof === undefined ? undefined : member.roof ? 1 : 0;
+    const waist = waistWorld(vehicle, seat, member.aimYaw, member.aimPitch, roof);
     for (const [point, radius] of [
-      [headWorld(vehicle, seat, member.aimYaw, member.aimPitch), COMBAT.headRadius],
-      [chestWorld(vehicle, seat, member.aimYaw, member.aimPitch), COMBAT.chestRadius],
+      [headWorld(vehicle, seat, member.aimYaw, member.aimPitch, roof), COMBAT.headRadius],
+      [chestWorld(vehicle, seat, member.aimYaw, member.aimPitch, roof), COMBAT.chestRadius],
       ...(waist ? ([[waist, COMBAT.chestRadius]] as const) : []),
     ] as const) {
       const t = raycastSphere(ox, oy, oz, dx, dy, dz, point.x, point.y, point.z, radius, cover);

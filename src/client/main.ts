@@ -653,6 +653,10 @@ const obstacles: THREE.Object3D[] = [world.group];
 
 /** Last known alive state per crew, so a death explosion fires on the edge. */
 const wasAlive = new Map<number, boolean>();
+/** Crew members we hit, and when (ms): a gunner going down soon after is ours. */
+const recentHits = new Map<number, number>();
+/** Each crew member alive last frame, to catch them going down. */
+const memberAlive = new Map<number, boolean>();
 /** Previous hull, so a hit plays a thud exactly once. */
 let lastHull: number = COMBAT.maxHull;
 /** Camera shake amplitude, decaying. Punch, not a permanent wobble. */
@@ -807,7 +811,11 @@ function frame(now: number): void {
           }
         }
         audio.shot(o.x, o.y, o.z, true, weapon.id);
-        addShake(heavy ? 0.35 : 0.035);
+        // A window gunner's own gun kicks: the view tips up and settles.
+        if (net.windowGunner) {
+          chase.kick(heavy ? 0.05 : 0.012);
+          addShake(heavy ? 0.35 : 0.07);
+        } else addShake(heavy ? 0.35 : 0.035);
       }
       net.fire(slot, now);
     }
@@ -842,9 +850,16 @@ function frame(now: number): void {
     if (mine) {
       // Ours: already drawn from prediction. The server's event is used only as
       // confirmation, so the hitmarker means a real hit rather than a hopeful one.
-      if (shot.hitCrew !== null || shot.hitPlayer !== null) {
+      if (shot.hitPlayer !== null) {
+        // A person, not bodywork: its own marker and sound.
+        hud.flashHitmarker('person');
+        audio.personHit();
+        recentHits.set(shot.hitPlayer, now);
+      } else if (shot.hitCrew !== null) {
         hud.flashHitmarker();
         audio.hitConfirm(shotWeapon.delivery === 'projectile');
+      }
+      if (shot.hitCrew !== null || shot.hitPlayer !== null) {
         // Damage number where the round landed, projected to screen space.
         projectV.set(shot.ex, shot.ey, shot.ez).project(camera);
         if (projectV.z < 1) {
@@ -890,6 +905,18 @@ function frame(now: number): void {
   }
   weaponFx.updateRockets(net.projectiles, net.projectilesAt, now, realDt);
   weaponFx.update(realDt);
+  // An enemy gunner we hit in the last two seconds goes down: confirm it.
+  for (const m of net.members.values()) {
+    const was = memberAlive.get(m.id);
+    memberAlive.set(m.id, m.alive);
+    if (was !== true || m.alive || m.crew === net.crewId) continue;
+    const hitAt = recentHits.get(m.id);
+    if (hitAt !== undefined && now - hitAt < 2000) {
+      hud.flashHitmarker('down');
+      hud.confirmKill('GUNNER DOWN');
+      audio.knockdown();
+    }
+  }
   for (const kill of net.drainKills()) {
     hud.addKill(kill.byCrew, kill.victimCrew);
     // A kill WE scored gets its own unmistakable confirmation.
@@ -951,7 +978,7 @@ function frame(now: number): void {
       ? new Map(Object.entries(devCrew))
       : net.crewId !== null
       ? net.crewOf(net.crewId)
-      : new Map<string, CrewPose>([['seat.driver', { yaw: 0, pitch: 0, out: false, outfit: profile.look.outfit, slot: 0, gun: profile.look.gunner, reload: false, alive: true }]]),
+      : new Map<string, CrewPose>([['seat.driver', { yaw: 0, pitch: 0, out: false, roof: false, outfit: profile.look.outfit, slot: 0, gun: profile.look.gunner, reload: false, alive: true }]]),
     realDt,
   );
   // Our guns follow the crosshair, each only as far as it physically turns.
@@ -1132,7 +1159,7 @@ function frame(now: number): void {
     // leaning out (aim held) puts the view over their shoulder.
     chase.update(camera, view, inputs.lookYaw, inputs.lookPitch, realDt, obstacles);
   } else if (seat) {
-    chase.updateGunner(camera, view, seat, net.aimYaw, net.aimPitch, realDt, obstacles);
+    chase.updateGunner(camera, view, seat, net.aimYaw, net.aimPitch, net.roof, realDt, obstacles);
   }
 
   // Reticle-ray aiming, step one: ask the camera what is under the crosshair.

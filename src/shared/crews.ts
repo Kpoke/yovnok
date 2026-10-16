@@ -343,6 +343,33 @@ export function roofAmount(seat: SeatDef, aimYaw: number): number {
   return x * x * (3 - 2 * x);
 }
 
+/**
+ * Up over the roof or at the window, with hysteresis: a gunner climbs up once
+ * the aim is well across the car (120° off their own side) and comes back
+ * down only once it is clearly back (95°). Deciding by the aim alone, an aim
+ * near the line flipped them up and down several times a second — reading as
+ * ducking in and out of the car. The server keeps this per gunner and sends it.
+ */
+export function nextRoof(seat: SeatDef, aimYaw: number, wasRoof: boolean): boolean {
+  let d = Math.abs(aimYaw - outward(seat)) % (Math.PI * 2);
+  if (d > Math.PI) d = Math.PI * 2 - d;
+  return d > ((wasRoof ? 95 : 120) * Math.PI) / 180;
+}
+
+/** Once up or down, a gunner stays at least this long (ms) before moving again. */
+export const ROOF_DWELL_MS = 1000;
+
+/** `nextRoof` with the dwell: `state` is the gunner's posture and when it last changed (ms). */
+export function stepRoof(state: { roof: boolean; at: number }, seat: SeatDef, aimYaw: number, out: boolean, now: number): boolean {
+  const want = out && nextRoof(seat, aimYaw, state.roof);
+  // Ducking back in is immediate; only climbing up or down waits out the dwell.
+  if (want !== state.roof && (!out || now - state.at >= ROOF_DWELL_MS)) {
+    state.roof = want;
+    state.at = now;
+  }
+  return state.roof;
+}
+
 export type GunnerPart = 'head' | 'chest' | 'waist' | 'muzzle';
 
 /**
@@ -350,11 +377,14 @@ export type GunnerPart = 'head' | 'chest' | 'waist' | 'muzzle';
  * the bodies (scripts/prep): the door's top edge (`belt`), the side of the
  * cabin there (`side`, |x|) and the roof.
  */
-export const CABIN: Partial<Record<VehicleClassId, { belt: number; side: number; roof: number }>> = {
-  coupe: { belt: 0.2, side: 0.72, roof: 0.71 },
+type Cabin = { belt: number; side: number; roof: number; hatch?: { x: number; z: number } };
+export const CABIN: Partial<Record<VehicleClassId, Cabin>> = {
+  // The duo car's side windows are armoured louvres: its gunner stands up
+  // through a roof hatch instead (|x|, z of its centre; the mesh draws it).
+  coupe: { belt: 0.2, side: 0.72, roof: 0.71, hatch: { x: 0.24, z: 0.3 } },
   suv: { belt: 0.2, side: 0.86, roof: 0.82 },
 };
-const DEFAULT_CABIN = { belt: 0.2, side: 0.8, roof: 0.75 };
+const DEFAULT_CABIN: Cabin = { belt: 0.2, side: 0.8, roof: 0.75 };
 
 /**
  * A window gunner's body for an aim, car-local: where their hips are and which
@@ -370,10 +400,17 @@ export function gunnerBody(
   cls: VehicleClassId,
   seat: SeatDef,
   aimYaw: number,
+  roof: number = roofAmount(seat, aimYaw),
 ): { hips: [number, number, number]; spine: [number, number, number]; roof: number } {
   const c = CABIN[cls] ?? DEFAULT_CABIN;
   const s = seat.side === 'right' ? 1 : -1;
-  const roof = roofAmount(seat, aimYaw);
+  if (c.hatch) {
+    // Stood up in the hatch: upright, chest and head clear of the roof,
+    // leaning into the gun whichever way it points. No window, no climbing.
+    const v = [-Math.sin(aimYaw) * 0.2, 1, -Math.cos(aimYaw) * 0.2];
+    const n = Math.hypot(v[0], v[1], v[2]);
+    return { hips: [s * c.hatch.x, c.roof - 0.26, c.hatch.z], spine: [v[0] / n, v[1] / n, v[2] / n], roof: 0 };
+  }
   const z = seat.mount[2] + 0.05;
   const window = [s * (c.side - 0.1), c.belt + 0.12, z];
   const over = [s * (c.side - 0.02), c.roof - 0.26, z];
@@ -405,8 +442,10 @@ export function gunnerPoint(
   aimYaw: number,
   aimPitch: number,
   part: GunnerPart,
+  /** Over the roof (1) or at the window (0); by default, from the aim alone. */
+  roof?: number,
 ): [number, number, number] | null {
-  const { hips, spine } = gunnerBody(cls, seat, aimYaw);
+  const { hips, spine } = gunnerBody(cls, seat, aimYaw, roof);
   const up = (d: number): [number, number, number] => [hips[0] + spine[0] * d, hips[1] + BODY.base + spine[1] * d, hips[2] + spine[2] * d];
   if (part === 'head') return up(BODY.head);
   if (part === 'chest') return up(BODY.chest);

@@ -742,9 +742,11 @@ export class Hud {
    * from our own prediction — the feedback has to mean "you actually hit", not
    * "your client thinks you did".
    */
-  flashHitmarker(): void {
+  flashHitmarker(kind: 'hull' | 'person' | 'down' = 'hull'): void {
+    this.hitmarker.classList.remove('person', 'down');
+    if (kind !== 'hull') this.hitmarker.classList.add(kind);
     this.hitmarker.classList.add('on');
-    this.hitmarkerTimer = 0.14;
+    this.hitmarkerTimer = kind === 'down' ? 0.4 : kind === 'person' ? 0.2 : 0.14;
   }
 
   /**
