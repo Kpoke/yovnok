@@ -75,6 +75,18 @@ const GRIPS: Record<WeaponId, { grip: [number, number, number]; fore: [number, n
   lancer: { grip: [0, -0.08, 0.27], fore: [0, -0.02, 0.52], mag: [0, -0.1, 0.38] },
   swarm: { grip: [0, -0.08, 0.27], fore: [0, -0.02, 0.52], mag: [0, -0.1, 0.38] },
 };
+/** How hard each gun kicks (1 = the rifle): the recoil clip's weight and the gun's jump. */
+const KICK: Partial<Record<WeaponId, number>> = {
+  smg: 0.5,
+  rifle: 0.75,
+  burst: 0.75,
+  lmg: 0.65,
+  marksman: 1.25,
+  revolver: 1.35,
+  shotgun: 1.5,
+  launcher: 1.5,
+};
+
 /** Seconds to put one gun away and bring the other up. */
 const SWAP_SECONDS = 0.45;
 
@@ -87,6 +99,10 @@ export class FigureLibrary {
   private readonly outfits = new Map<number, Outfit>();
   /** The hand-held guns (scripts/prep/hand-guns.ts): butt at the origin, barrel -Z. */
   private readonly guns = new Map<WeaponId, THREE.Object3D>();
+  /** The crew's animation clips (scripts/blender/anims.py) and that skeleton's rest rotations. */
+  private anims: { clips: THREE.AnimationClip[]; rest: Map<string, THREE.Quaternion> } | null = null;
+  /** The clips retargeted onto each outfit's skeleton, made once per outfit. */
+  private readonly retargeted = new Map<number, Map<string, THREE.AnimationClip>>();
   private pending: Promise<void> | null = null;
 
   constructor(private readonly loader: GLTFLoader) {}
@@ -133,7 +149,17 @@ export class FigureLibrary {
             }),
           ),
         )
-        .then(() => undefined);
+        .then(async () => {
+          try {
+            const gltf = await this.loader.loadAsync('/assets/characters/anims.glb');
+            const rest = new Map<string, THREE.Quaternion>();
+            gltf.scene.traverse((o) => rest.set(o.name, o.quaternion.clone()));
+            this.anims = { clips: gltf.animations, rest };
+          } catch (error) {
+            // Without clips the figures are posed by code alone, as before.
+            console.warn('[figures] animations failed to load; posing by code', error);
+          }
+        });
     }
     return this.pending;
   }
@@ -146,7 +172,48 @@ export class FigureLibrary {
   create(outfit: number, tint: number): Figure | null {
     const source = this.outfits.get(outfit) ?? this.outfits.values().next().value;
     if (!source) return null;
-    return new Figure(cloneSkinned(source.scene), source.tintable, tint, (id) => this.guns.get(id)?.clone() ?? handGun(id));
+    const index = this.outfits.get(outfit) ? outfit : this.outfits.keys().next().value!;
+    return new Figure(
+      cloneSkinned(source.scene),
+      source.tintable,
+      tint,
+      (id) => this.guns.get(id)?.clone() ?? handGun(id),
+      this.clipsFor(index, source.scene),
+    );
+  }
+
+  /**
+   * The clips, retargeted onto one outfit's skeleton: each bone's rotation is
+   * taken relative to the animation skeleton's rest and applied on top of this
+   * skeleton's rest, so bodies of other builds play them the same way. Bone
+   * rotations only: where the hips sit is the game's to decide.
+   */
+  private clipsFor(outfit: number, scene: THREE.Object3D): Map<string, THREE.AnimationClip> | undefined {
+    if (!this.anims) return undefined;
+    const cached = this.retargeted.get(outfit);
+    if (cached) return cached;
+    const figureRest = new Map<string, THREE.Quaternion>();
+    scene.traverse((o) => {
+      if ((o as THREE.Bone).isBone) figureRest.set(o.name, o.quaternion.clone());
+    });
+    const clips = new Map<string, THREE.AnimationClip>();
+    const q = new THREE.Quaternion();
+    for (const source of this.anims.clips) {
+      const tracks: THREE.KeyframeTrack[] = [];
+      for (const track of source.tracks) {
+        const [bone, property] = track.name.split('.');
+        const restFigure = figureRest.get(bone);
+        const restClip = this.anims.rest.get(bone);
+        if (property !== 'quaternion' || !restFigure || !restClip) continue;
+        const toFigure = restFigure.clone().multiply(restClip.clone().invert());
+        const values = track.values.slice();
+        for (let i = 0; i < values.length; i += 4) q.fromArray(values, i).premultiply(toFigure).toArray(values, i);
+        tracks.push(new THREE.QuaternionKeyframeTrack(`${bone}.quaternion`, Array.from(track.times), Array.from(values)));
+      }
+      clips.set(source.name, new THREE.AnimationClip(source.name, source.duration, tracks));
+    }
+    this.retargeted.set(outfit, clips);
+    return clips;
   }
 }
 
@@ -296,12 +363,22 @@ export class Figure {
   private readonly lastVel = new THREE.Vector3();
   private moving = 0;
   private readonly tinted: THREE.Material[] = [];
+  /**
+   * The animation layer (null: posed by code alone). Base states blend by
+   * weight (seated, ready, out, reload, down); the climb is scrubbed by how far
+   * out the gunner is; recoil plays on top, additively.
+   */
+  private readonly mixer: THREE.AnimationMixer | null = null;
+  private readonly actions = new Map<string, THREE.AnimationAction>();
+  private recoilAction: THREE.AnimationAction | null = null;
+  private downTime = 0;
 
   constructor(
     model: THREE.Object3D,
     tintable: Set<string>,
     tint: number,
     private readonly makeGun: (id: WeaponId) => THREE.Object3D = handGun,
+    clips?: Map<string, THREE.AnimationClip>,
   ) {
     this.root.name = 'figure';
     // Larger than life, so they read from the chase camera (crews.FIGURE_SCALE);
@@ -310,6 +387,25 @@ export class Figure {
     // The gun is larger again (HAND_GUN_SCALE overall).
     this.gunHolder.scale.setScalar(HAND_GUN_SCALE / FIGURE_SCALE);
     this.root.add(model, this.gunHolder);
+    if (clips) {
+      this.mixer = new THREE.AnimationMixer(model);
+      for (const [name, clip] of clips) {
+        if (name === 'recoil') continue;
+        const action = this.mixer.clipAction(clip);
+        action.setEffectiveWeight(0).play();
+        // Scrubbed rather than run: the climb follows the lean, the reload its
+        // own clock, the knock-down holds its last frame.
+        if (name.startsWith('climb') || name === 'reload' || name === 'down') action.paused = true;
+        this.actions.set(name, action);
+      }
+      const recoil = clips.get('recoil');
+      if (recoil) {
+        const additive = THREE.AnimationUtils.makeClipAdditive(recoil.clone());
+        this.recoilAction = this.mixer.clipAction(additive);
+        this.recoilAction.blendMode = THREE.AdditiveAnimationBlendMode;
+        this.recoilAction.setLoop(THREE.LoopOnce, 1);
+      }
+    }
     // The team kit is modelled light, so it takes the paint colour as it is.
     const paint = new THREE.Color(tint).multiplyScalar(1.15);
     const materials = new Map<THREE.Material, THREE.Material>();
@@ -437,6 +533,44 @@ export class Figure {
     this.g.lerp(acc, 1 - Math.exp(-dt * 5));
   }
 
+  /**
+   * Blend the clips for this frame: seated (a driver), ready (a gunner tucked
+   * in), out (up in the window), the climb between those two scrubbed by how
+   * far out they are, a reload over the out pose, and the knock-down.
+   * Returns false when there is nothing to play.
+   */
+  private animate(p: FigurePose, dt: number): boolean {
+    const mixer = this.mixer;
+    if (!mixer) return false;
+    const weights = new Map<string, number>();
+    if (!p.alive) {
+      this.downTime += dt;
+      weights.set('down', 1);
+    } else {
+      this.downTime = 0;
+      if (p.role === 'driver') weights.set('seated', 1);
+      else {
+        const t = this.lean;
+        const climb = Math.sin(Math.PI * t);
+        const reloading = p.reload && t > 0.5 ? Math.min(1, this.reloadPhase * 4) : 0;
+        weights.set('ready', (1 - t) * (1 - climb));
+        weights.set('out', t * (1 - climb) * (1 - reloading));
+        weights.set('reload', t * (1 - climb) * reloading);
+        weights.set(p.side === 'right' ? 'climb_right' : 'climb_left', climb);
+      }
+    }
+    for (const [name, action] of this.actions) {
+      action.setEffectiveWeight(weights.get(name) ?? 0);
+      const clip = action.getClip();
+      if (name.startsWith('climb')) action.time = this.lean * clip.duration;
+      else if (name === 'reload') action.time = this.reloadPhase % clip.duration;
+      else if (name === 'down') action.time = Math.min(this.downTime, clip.duration);
+    }
+    mixer.update(dt);
+    this.root.updateMatrixWorld(true);
+    return true;
+  }
+
   /** Pose for this frame. The figure must be a child of the car's root. */
   pose(p: FigurePose, dt: number): void {
     const car = this.root.parent;
@@ -457,7 +591,12 @@ export class Figure {
     const g = this.g;
     const roof = this.roof * lean;
 
-    for (const [bone, q] of this.rest) bone.quaternion.copy(q);
+    // The body's own motion: the animation clips, blended for what the person
+    // is doing (without them, the rest pose for the code below to work from).
+    const animated = this.mixer !== null && this.animate(p, dt);
+    if (!animated) for (const [bone, q] of this.rest) bone.quaternion.copy(q);
+    // How much of the climb is under way: 0 seated or settled out, 1 mid-climb.
+    const climbing = animated && p.alive ? Math.sin(Math.PI * this.lean) : 0;
     // The hips: on the seat, or out in the window (gunnerBody). Climbing out,
     // they rise and swing out together; the body settles with the car's heave.
     const hip = p.seat.clone().lerp(this.outHips, lean);
@@ -501,6 +640,12 @@ export class Figure {
       const upright = p.hatch ? p.seat.clone().add(new THREE.Vector3(sx * 0.14, -0.08, 0.02)) : knelt.lerp(stood, this.roof);
       const foot = toWorld(seated.lerp(upright, lean));
       const pole = new THREE.Vector3(0, 0.4, -1).lerp(new THREE.Vector3(-side * (0.8 * this.roof), -0.3, -1 + 0.6 * this.roof), lean);
+      // Animated, the clip places the legs when seated; out of the window the
+      // feet go where this car's seat is, eased from wherever the clip had them.
+      if (animated) {
+        if (lean <= 0.001 || !p.alive) continue;
+        foot.lerp(limb.end.getWorldPosition(new THREE.Vector3()), 1 - lean);
+      }
       this.reach(limb, foot, pole.transformDirection(car.matrixWorld));
     }
 
@@ -517,11 +662,30 @@ export class Figure {
       spineDir.addScaledVector(aimWorld, -this.recoil * 0.07 * lean);
     }
     spineDir.normalize();
-    for (let i = 0; i < SPINE.length - 1; i++) aimBone(this.bone(SPINE[i]), this.bone(SPINE[i + 1]), spineDir);
+    if (animated) {
+      // The clip's spine (its curve, breathing, the climb's dip) turned as a
+      // whole toward where this body leans in this car: out, along the
+      // window's lean; in the seat, only the car's sway.
+      if (p.alive) {
+        const base = this.bone('Spine').getWorldPosition(new THREE.Vector3());
+        const top = this.bone('Neck').getWorldPosition(new THREE.Vector3());
+        const now = top.clone().sub(base).normalize();
+        const wanted = now.clone().lerp(spineDir, lean * (1 - climbing * 0.7)).normalize();
+        wanted.add(toWorldDir(-g.x * 0.01 * (1 - lean), 0, -g.z * 0.01 * (1 - lean))).normalize();
+        aimBoneAt(this.bone('Spine'), top, wanted);
+      }
+    } else for (let i = 0; i < SPINE.length - 1; i++) aimBone(this.bone(SPINE[i]), this.bone(SPINE[i + 1]), spineDir);
     if (p.alive && lean > 0) {
+      // Turned about the spine's ACTUAL axis (with clips it is not exactly
+      // spineDir): twisting a large angle about any other axis tips the whole
+      // torso over sideways.
+      const axis = this.bone('Neck')
+        .getWorldPosition(new THREE.Vector3())
+        .sub(this.bone('Spine').getWorldPosition(new THREE.Vector3()))
+        .normalize();
       const twist = wrapAngle(p.yaw - this.pelvis) * lean;
-      twistBone(this.bone('Spine1'), spineDir, twist * 0.45);
-      twistBone(this.bone('Spine2'), spineDir, twist * 0.55);
+      twistBone(this.bone('Spine1'), axis, twist * 0.45);
+      twistBone(this.bone('Spine2'), axis, twist * 0.55);
     }
 
     // The head, held level whatever the body does. Out: square to the aim,
@@ -546,15 +710,29 @@ export class Figure {
           .lerpVectors(carUp, aimWorld, 0.18 * lean)
           .add(toWorldDir(-g.x * 0.006, 0, -g.z * 0.006))
           .normalize();
-    aimBone(this.bone('Neck'), this.bone('Head'), headDir);
-    if (p.alive) twistBone(this.bone('Head'), carUp, this.headYaw);
+    if (animated) {
+      if (p.alive) {
+        // Out: the head levels and looks down the gun; seated it keeps the clip's
+        // own looking about, with only the turn below added.
+        const head = this.bone('Head').getWorldPosition(new THREE.Vector3());
+        const neckAt = this.bone('Neck').getWorldPosition(new THREE.Vector3());
+        const now = head.clone().sub(neckAt).normalize();
+        aimBoneAt(this.bone('Neck'), head, now.lerp(headDir, lean * (1 - climbing)).normalize());
+        twistBone(this.bone('Head'), carUp, this.headYaw * (p.role === 'driver' ? 1 : lean > 0.5 ? 1 : 0.6));
+      }
+    } else {
+      aimBone(this.bone('Neck'), this.bone('Head'), headDir);
+      if (p.alive) twistBone(this.bone('Head'), carUp, this.headYaw);
+    }
 
     // Arms and the gun.
     const shoulder = this.arms.right.root.getWorldPosition(new THREE.Vector3());
     this.setGun(p.gun);
     if (!p.alive) {
-      this.reach(this.arms.left, toWorld(p.seat.clone().add(new THREE.Vector3(-0.22, 0.05, -0.28))), toWorldDir(-1, 0, 0.3));
-      this.reach(this.arms.right, toWorld(p.seat.clone().add(new THREE.Vector3(0.22, 0.05, -0.28))), toWorldDir(1, 0, 0.3));
+      if (!animated) {
+        this.reach(this.arms.left, toWorld(p.seat.clone().add(new THREE.Vector3(-0.22, 0.05, -0.28))), toWorldDir(-1, 0, 0.3));
+        this.reach(this.arms.right, toWorld(p.seat.clone().add(new THREE.Vector3(0.22, 0.05, -0.28))), toWorldDir(1, 0, 0.3));
+      }
       this.gunHolder.visible = false;
       return;
     }
@@ -621,6 +799,12 @@ export class Figure {
     // Elbows: the trigger arm out to the side and a little down; the support
     // arm tucked under the gun.
     this.reach(this.arms.right, grip, gunRight.clone().multiplyScalar(0.8).addScaledVector(carUp, -0.6));
+    // Mid-climb the support hand lets go and follows the clip (up to the
+    // window frame), coming back to the gun as they settle.
+    if (climbing > 0.05) {
+      const palm = this.arms.left.endLocal ? this.arms.left.mid.localToWorld(this.arms.left.endLocal.clone()) : this.arms.left.end.getWorldPosition(new THREE.Vector3());
+      fore.lerp(palm, climbing * 0.85);
+    }
     this.reach(this.arms.left, fore, gunRight.clone().multiplyScalar(-0.3).addScaledVector(carUp, -1));
 
     // Place the gun: butt at `butt`, barrel along `gunDir`.
@@ -636,7 +820,10 @@ export class Figure {
 
   /** A shot was fired from this seat: the gun kicks back into the shoulder. */
   kick(): void {
-    this.recoil = Math.min(1.4, this.recoil + 1);
+    // Each gun kicks its own way: a light, quick SMG; a heavy shotgun or revolver.
+    const strength = KICK[this.gunId ?? 'rifle'] ?? 1;
+    this.recoil = Math.min(1.6, this.recoil + strength);
+    this.recoilAction?.reset().setEffectiveWeight(strength).play();
   }
 
   /** Change gun: the first one goes straight in; later ones swap (down, then up). */

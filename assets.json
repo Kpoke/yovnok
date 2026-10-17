@@ -951,6 +951,18 @@
       "source": "https://opengameart.org/content/the-free-firearm-sound-library",
       "license": "CC0-1.0",
       "changes": "Single shots cut from the AR-15, AK-47, Savage 10 .300 Blackout, Nova, Carl Gustav M45, 1917 and Ruger Single Six recordings by scripts/prep/gunshots.py: trimmed, faded, normalised, mono Ogg Vorbis; the LMG takes are AK-47 shots pitched lower."
+    },
+    {
+      "files": [
+        "public/assets/characters/anims.glb"
+      ],
+      "kind": "model",
+      "title": "YOVNOK crew animations",
+      "author": "YOVNOK contributors",
+      "authorUrl": "https://github.com/Kpoke/yovnok",
+      "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/anims.py",
+      "license": "GPL-3.0-or-later",
+      "changes": "Original keyframed animation clips (seated, ready, climbing out of each side's window, out and aiming, recoil, reload, knocked down) authored in scripts/blender/anims.py on the crew's skeleton (MPFB, from MakeHuman's CC0 assets) and baked to bone rotations."
     }
   ]
 }
