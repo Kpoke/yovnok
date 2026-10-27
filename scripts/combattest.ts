@@ -306,19 +306,14 @@ try {
       const cabin = CABIN[cls]!;
       for (const seat of seatsFor(cls)) {
         if (!seat.arc) continue; // the driver has no window camera
-        // Out of their own side, they sit in the window: chest and head out
+        // Out of their own side, they lean out of the window: chest and head out
         // past the cabin's side, the head above the door's edge.
         const outward = seat.side === 'right' ? -Math.PI / 2 : Math.PI / 2;
         const head = gunnerPoint(cls, seat, outward, 0, 'head')!;
         const chest = gunnerPoint(cls, seat, outward, 0, 'chest')!;
-        if (cabin.hatch) {
-          // Stood up through a roof hatch: head and chest clear of the roof.
-          check(`${cls} ${seat.id}: up through the hatch, head and chest above the roof`, head[1] > cabin.roof + 0.25 && chest[1] > cabin.roof, `head y ${head[1].toFixed(2)}, chest y ${chest[1].toFixed(2)}, roof ${cabin.roof}`);
-          continue;
-        }
         check(
           `${cls} ${seat.id}: the head is out of the window`,
-          Math.abs(head[0]) > cabin.side && head[1] > cabin.belt + 0.5,
+          Math.abs(head[0]) > cabin.side + 0.1 && head[1] > cabin.belt + 0.35,
           `head x ${head[0].toFixed(2)} y ${head[1].toFixed(2)}`,
         );
         check(

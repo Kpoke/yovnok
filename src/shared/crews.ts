@@ -375,26 +375,30 @@ export type GunnerPart = 'head' | 'chest' | 'waist' | 'muzzle';
 /**
  * The window opening of each car a gunner rides in, car-local, measured from
  * the bodies (scripts/prep): the door's top edge (`belt`), the side of the
- * cabin there (`side`, |x|) and the roof.
+ * cabin there (`side`, |x|) and the roof. And how a gunner leans out of it to
+ * aim: the hips slide `slide` toward the door from the seat and sit up to
+ * `hips` high, and the spine tips out of the window by `tilt` (sideways, per
+ * metre up).
  */
-type Cabin = { belt: number; side: number; roof: number; hatch?: { x: number; z: number } };
+type Cabin = { belt: number; side: number; roof: number; lean: { slide: number; hips: number; tilt: number } };
 export const CABIN: Partial<Record<VehicleClassId, Cabin>> = {
-  // The duo car's side windows are armoured louvres: its gunner stands up
-  // through a roof hatch instead (|x|, z of its centre; the mesh draws it).
-  coupe: { belt: 0.2, side: 0.72, roof: 0.71, hatch: { x: 0.24, z: 0.3 } },
-  suv: { belt: 0.2, side: 0.86, roof: 0.82 },
+  // The duo car's passenger louvres are cut away (scripts/prep/brawler-plain.ts).
+  // Its roof is low: the gunner stays lower and tips further out, under its edge.
+  coupe: { belt: 0.2, side: 0.72, roof: 0.71, lean: { slide: 0.24, hips: 0, tilt: 0.59 } },
+  suv: { belt: 0.2, side: 0.86, roof: 0.82, lean: { slide: 0.22, hips: 0.12, tilt: 0.34 } },
 };
-const DEFAULT_CABIN: Cabin = { belt: 0.2, side: 0.8, roof: 0.75 };
+const DEFAULT_CABIN: Cabin = { belt: 0.2, side: 0.8, roof: 0.75, lean: { slide: 0.22, hips: 0.1, tilt: 0.4 } };
 
 /**
  * A window gunner's body for an aim, car-local: where their hips are and which
  * way their spine runs. ONE description for the drawn figure (vehicle/figures.ts
  * poses its skeleton along it) and for what a shot has to find (`gunnerPoint`).
  *
- * At the window they sit in the opening on the door's edge, upright and
- * leaning a little out, the chest and head clear of the car — the way the
- * people in Fortnite's cars ride. Aiming across the car they sit up on the
- * frame, turned to face over the roof, leaning in over it.
+ * At the window they are still in the car: slid to the door and sat up on the
+ * seat, the upper body tipped out of the opening, chest and head clear of the
+ * car — the way a passenger leans out of a car window to shoot. Aiming across
+ * the car they climb up onto the frame, turned to face over the roof, leaning
+ * in over it.
  */
 export function gunnerBody(
   cls: VehicleClassId,
@@ -404,23 +408,13 @@ export function gunnerBody(
 ): { hips: [number, number, number]; spine: [number, number, number]; roof: number } {
   const c = CABIN[cls] ?? DEFAULT_CABIN;
   const s = seat.side === 'right' ? 1 : -1;
-  if (c.hatch) {
-    // Stood up in the hatch: upright, chest and head clear of the roof,
-    // leaning into the gun whichever way it points. No window, no climbing.
-    const v = [-Math.sin(aimYaw) * 0.2, 1, -Math.cos(aimYaw) * 0.2];
-    const n = Math.hypot(v[0], v[1], v[2]);
-    return { hips: [s * c.hatch.x, c.roof - 0.26, c.hatch.z], spine: [v[0] / n, v[1] / n, v[2] / n], roof: 0 };
-  }
-  const z = seat.mount[2] + 0.05;
-  // Sat up on the door frame, the whole torso above the roofline (legs inside),
-  // so they read from every side, from behind most of all; over the roof, a
-  // little further in, leaning across it.
-  const window = [s * c.side, c.roof - 0.18, z];
-  const over = [s * (c.side - 0.06), c.roof - 0.12, z];
+  const z = seat.mount[2];
+  const window = [s * (Math.abs(seat.mount[0]) + c.lean.slide), c.lean.hips, z];
+  const over = [s * (c.side - 0.06), c.roof - 0.12, z + 0.05];
   const hips = [0, 1, 2].map((k) => window[k] + (over[k] - window[k]) * roof) as [number, number, number];
-  // Leaning a little out at the window, in over the roof up there, and into
-  // the gun either way (a shooter's weight goes forward onto it).
-  const out = s * (0.25 - 0.6 * roof);
+  // Tipped out at the window, in over the roof up there, and into the gun
+  // either way (a shooter's weight goes forward onto it).
+  const out = s * (c.lean.tilt - (c.lean.tilt + 0.35) * roof);
   const v = [out - Math.sin(aimYaw) * 0.18, 1, -Math.cos(aimYaw) * 0.18];
   const n = Math.hypot(v[0], v[1], v[2]);
   return { hips, spine: [v[0] / n, v[1] / n, v[2] / n], roof };

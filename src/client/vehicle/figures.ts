@@ -3,14 +3,19 @@
  * gunners who sit tucked in and LEAN OUT of their window to aim.
  *
  * Each outfit is a skinned model on the same (Mixamo) skeleton, prepared by
- * scripts/prep/characters.ts. Nothing is animated from clips: every frame the
- * skeleton is posed from what the person is doing — seated, hands on the
- * wheel; holding their gun in their lap; out of the window from the waist up,
- * twisted to their aim with the gun at the shoulder; slumped when knocked down.
+ * scripts/prep/characters.ts. The body's motion comes from animation clips,
+ * blended for what the person is doing: the driver from YOVNOK's own
+ * (scripts/blender/anims.py), seated with hands on the wheel; a gunner from
+ * Quaternius' CC0 library (scripts/blender/ual.py) — sat in the seat with the
+ * gun in their lap, or leaning out of the window to aim (pistol aim poses,
+ * blended by pitch), reloading and firing. On top, code puts the body where
+ * this car's seat and window put it (crews.gunnerBody, the same body a shot is
+ * tested against), turns it to the aim, lines the barrel up with it exactly
+ * and puts the support hand on the gun.
  *
- * Posing is by direction, so it does not care how a model's bones are oriented
- * locally: each limb is turned (shortest arc, in world space) to point where it
- * should, and arms and legs reach their targets with a two-bone IK.
+ * Code posing is by direction, so it does not care how a model's bones are
+ * oriented locally: each limb is turned (shortest arc, in world space) to point
+ * where it should, and arms and legs reach their targets with a two-bone IK.
  * Car frame throughout: x right, y up, -z forward.
  */
 
@@ -37,8 +42,6 @@ export type FigurePose = {
   hips: THREE.Vector3;
   spine: THREE.Vector3;
   roof: number;
-  /** Stood up through a roof hatch (crews.CABIN.hatch) rather than at a window. */
-  hatch: boolean;
   /** Aim relative to the car's nose (+ = left) and pitch (+ = up), radians. */
   yaw: number;
   pitch: number;
@@ -87,6 +90,9 @@ const KICK: Partial<Record<WeaponId, number>> = {
   launcher: 1.5,
 };
 
+/** Held out in the hand, as the library's pistol poses hold it; every other gun is shouldered. */
+const PISTOLS = new Set<WeaponId>(['revolver']);
+
 /** Seconds to put one gun away and bring the other up. */
 const SWAP_SECONDS = 0.45;
 
@@ -99,8 +105,11 @@ export class FigureLibrary {
   private readonly outfits = new Map<number, Outfit>();
   /** The hand-held guns (scripts/prep/hand-guns.ts): butt at the origin, barrel -Z. */
   private readonly guns = new Map<WeaponId, THREE.Object3D>();
-  /** The crew's animation clips (scripts/blender/anims.py) and that skeleton's rest rotations. */
-  private anims: { clips: THREE.AnimationClip[]; rest: Map<string, THREE.Quaternion> } | null = null;
+  /**
+   * The crew's animation clips — YOVNOK's own (scripts/blender/anims.py) and
+   * the CC0 library's (scripts/blender/ual.py) — each with its skeleton's rest rotations.
+   */
+  private readonly anims: { clips: THREE.AnimationClip[]; rest: Map<string, THREE.Quaternion> }[] = [];
   /** The clips retargeted onto each outfit's skeleton, made once per outfit. */
   private readonly retargeted = new Map<number, Map<string, THREE.AnimationClip>>();
   private pending: Promise<void> | null = null;
@@ -149,17 +158,22 @@ export class FigureLibrary {
             }),
           ),
         )
-        .then(async () => {
-          try {
-            const gltf = await this.loader.loadAsync('/assets/characters/anims.glb');
-            const rest = new Map<string, THREE.Quaternion>();
-            gltf.scene.traverse((o) => rest.set(o.name, o.quaternion.clone()));
-            this.anims = { clips: gltf.animations, rest };
-          } catch (error) {
-            // Without clips the figures are posed by code alone, as before.
-            console.warn('[figures] animations failed to load; posing by code', error);
-          }
-        });
+        .then(() =>
+          Promise.all(
+            ['anims', 'ual'].map(async (file) => {
+              try {
+                const gltf = await this.loader.loadAsync(`/assets/characters/${file}.glb`);
+                const rest = new Map<string, THREE.Quaternion>();
+                gltf.scene.traverse((o) => rest.set(o.name, o.quaternion.clone()));
+                this.anims.push({ clips: gltf.animations, rest });
+              } catch (error) {
+                // Without clips the figures are posed by code alone.
+                console.warn(`[figures] the ${file} animations failed to load; posing by code`, error);
+              }
+            }),
+          ),
+        )
+        .then(() => undefined);
     }
     return this.pending;
   }
@@ -189,7 +203,7 @@ export class FigureLibrary {
    * rotations only: where the hips sit is the game's to decide.
    */
   private clipsFor(outfit: number, scene: THREE.Object3D): Map<string, THREE.AnimationClip> | undefined {
-    if (!this.anims) return undefined;
+    if (this.anims.length === 0) return undefined;
     const cached = this.retargeted.get(outfit);
     if (cached) return cached;
     const figureRest = new Map<string, THREE.Quaternion>();
@@ -198,19 +212,23 @@ export class FigureLibrary {
     });
     const clips = new Map<string, THREE.AnimationClip>();
     const q = new THREE.Quaternion();
-    for (const source of this.anims.clips) {
-      const tracks: THREE.KeyframeTrack[] = [];
-      for (const track of source.tracks) {
-        const [bone, property] = track.name.split('.');
-        const restFigure = figureRest.get(bone);
-        const restClip = this.anims.rest.get(bone);
-        if (property !== 'quaternion' || !restFigure || !restClip) continue;
-        const toFigure = restFigure.clone().multiply(restClip.clone().invert());
-        const values = track.values.slice();
-        for (let i = 0; i < values.length; i += 4) q.fromArray(values, i).premultiply(toFigure).toArray(values, i);
-        tracks.push(new THREE.QuaternionKeyframeTrack(`${bone}.quaternion`, Array.from(track.times), Array.from(values)));
+    for (const anims of this.anims) {
+      for (const source of anims.clips) {
+        const tracks: THREE.KeyframeTrack[] = [];
+        for (const track of source.tracks) {
+          const [bone, property] = track.name.split('.');
+          const restFigure = figureRest.get(bone);
+          const restClip = anims.rest.get(bone);
+          if (property !== 'quaternion' || !restFigure || !restClip) continue;
+          const toFigure = restFigure.clone().multiply(restClip.clone().invert());
+          const values = track.values.slice();
+          for (let i = 0; i < values.length; i += 4) q.fromArray(values, i).premultiply(toFigure).toArray(values, i);
+          tracks.push(new THREE.QuaternionKeyframeTrack(`${bone}.quaternion`, Array.from(track.times), Array.from(values)));
+        }
+        // Blender's exporter may suffix a clip's name (".001").
+        const name = source.name.replace(/\.\d+$/, '');
+        clips.set(name, new THREE.AnimationClip(name, source.duration, tracks));
       }
-      clips.set(source.name, new THREE.AnimationClip(source.name, source.duration, tracks));
     }
     this.retargeted.set(outfit, clips);
     return clips;
@@ -297,6 +315,33 @@ function twistBone(bone: THREE.Object3D, axisWorld: THREE.Vector3, angle: number
   bone.updateMatrixWorld(true);
 }
 
+/** Turn `bone` in world space by `rot` (premultiplied). */
+function rotateBone(bone: THREE.Object3D, rot: THREE.Quaternion): void {
+  bone.getWorldQuaternion(_w);
+  _w.premultiply(rot);
+  bone.parent!.getWorldQuaternion(_p);
+  bone.quaternion.copy(_p.invert().multiply(_w));
+  bone.updateMatrixWorld(true);
+}
+
+/** The legs and hips: what a clip's lower half moves. */
+const LOWER = /^(Hips|(Left|Right)(UpLeg|Leg|Foot|ToeBase))\./;
+
+/** A clip's rotations, upper body only or lower body only. */
+function half(clip: THREE.AnimationClip, upper: boolean, name = clip.name): THREE.AnimationClip {
+  return new THREE.AnimationClip(name, clip.duration, clip.tracks.filter((t) => t.name.endsWith('.quaternion') && LOWER.test(t.name) !== upper));
+}
+
+/** The CC0 library's layers a gunner is blended from (client/vehicle/figures.ts header). */
+type GunnerActions = {
+  sitLower: THREE.AnimationAction;
+  sitUpper: THREE.AnimationAction;
+  aim: Record<'up' | 'mid' | 'down', THREE.AnimationAction>;
+  idle: THREE.AnimationAction;
+  reload: THREE.AnimationAction;
+  shoot: THREE.AnimationAction;
+};
+
 /**
  * Two bones to a reach point: the end joint (a foot), or a point held in the
  * middle bone's frame (a palm — where the hand is DRAWN, which in these
@@ -312,6 +357,9 @@ type Limb = {
 };
 
 const SPINE = ['Spine', 'Spine1', 'Spine2', 'Neck'] as const;
+
+/** YOVNOK's own clips (scripts/blender/anims.py), played by name; the CC0 library's are layered (`GunnerActions`). */
+const OWN_CLIPS = new Set(['seated', 'ready', 'climb_left', 'climb_right', 'out', 'reload', 'down']);
 
 /** An angle brought into -π … π. */
 function wrapAngle(a: number): number {
@@ -372,6 +420,16 @@ export class Figure {
   private readonly actions = new Map<string, THREE.AnimationAction>();
   private recoilAction: THREE.AnimationAction | null = null;
   private downTime = 0;
+  /** A gunner's layers from the CC0 library (null: without them, posed the older way). */
+  private readonly gunner: GunnerActions | null = null;
+  /** The mixer's own output last frame (see `mix`). */
+  private clean: Map<THREE.Bone, THREE.Quaternion> | null = null;
+  /** The gun in the right hand: where it sits in the hand's frame, and its muzzle (gun frame, -Z). */
+  private hold: { inHand: THREE.Matrix4; muzzleZ: number } | null = null;
+  /** The pitch each aim pose holds the gun at, measured for the gun in hand. */
+  private readonly posePitch = { up: 1.4, mid: 0.25, down: -1.35 };
+  /** Which way the head looks at rest (the figure's forward, -Z), in the head's own frame. */
+  private readonly headFwd = new THREE.Vector3(0, 0, -1);
 
   constructor(
     model: THREE.Object3D,
@@ -390,7 +448,7 @@ export class Figure {
     if (clips) {
       this.mixer = new THREE.AnimationMixer(model);
       for (const [name, clip] of clips) {
-        if (name === 'recoil') continue;
+        if (name === 'recoil' || !OWN_CLIPS.has(name)) continue;
         const action = this.mixer.clipAction(clip);
         action.setEffectiveWeight(0).play();
         // Scrubbed rather than run: the climb follows the lean, the reload its
@@ -483,6 +541,86 @@ export class Figure {
       left: limb('LeftUpLeg', 'LeftLeg', 'LeftFoot'),
       right: limb('RightUpLeg', 'RightLeg', 'RightFoot'),
     };
+    this.headFwd.applyQuaternion(this.bone('Head').getWorldQuaternion(new THREE.Quaternion()).invert());
+    if (clips) this.gunner = this.gunnerActions(clips);
+  }
+
+  /** The gunner's layers, from the CC0 library's clips; null when they did not load. */
+  private gunnerActions(clips: Map<string, THREE.AnimationClip>): GunnerActions | null {
+    const mixer = this.mixer;
+    const need = ['Sitting_Idle_Loop', 'Pistol_Aim_Up', 'Pistol_Aim_Neutral', 'Pistol_Aim_Down', 'Pistol_Idle_Loop', 'Pistol_Reload', 'Pistol_Shoot'];
+    if (!mixer || need.some((name) => !clips.has(name))) return null;
+    const clip = (name: string): THREE.AnimationClip => clips.get(name)!;
+    const play = (c: THREE.AnimationClip): THREE.AnimationAction => {
+      const action = mixer.clipAction(c);
+      action.setEffectiveWeight(0).play();
+      this.actions.set(c.name, action);
+      return action;
+    };
+    const reload = play(half(clip('Pistol_Reload'), true, 'gunner.reload'));
+    reload.paused = true; // scrubbed by the reload's own clock
+    const shoot = mixer.clipAction(THREE.AnimationUtils.makeClipAdditive(half(clip('Pistol_Shoot'), true, 'gunner.shoot')));
+    shoot.blendMode = THREE.AdditiveAnimationBlendMode;
+    shoot.setLoop(THREE.LoopOnce, 1);
+    return {
+      sitLower: play(this.facingForward(half(clip('Sitting_Idle_Loop'), false, 'gunner.sitLower'))),
+      sitUpper: play(half(clip('Sitting_Idle_Loop'), true, 'gunner.sitUpper')),
+      aim: {
+        up: play(half(clip('Pistol_Aim_Up'), true, 'gunner.aimUp')),
+        mid: play(half(clip('Pistol_Aim_Neutral'), true, 'gunner.aimMid')),
+        down: play(half(clip('Pistol_Aim_Down'), true, 'gunner.aimDown')),
+      },
+      idle: play(half(clip('Pistol_Idle_Loop'), true, 'gunner.idle')),
+      reload,
+      shoot,
+    };
+  }
+
+  /**
+   * The library's sitting clip faces the other way from its other clips: turn
+   * its hips about the vertical so the knees point forward (-Z), the way the seat faces.
+   */
+  private facingForward(clip: THREE.AnimationClip): THREE.AnimationClip {
+    const model = this.root.children[0];
+    const m = new THREE.AnimationMixer(model);
+    m.clipAction(clip).play();
+    m.update(0);
+    this.root.updateMatrixWorld(true);
+    const hips = this.bone('Hips').getWorldPosition(new THREE.Vector3());
+    const knees = this.bone('LeftLeg').getWorldPosition(new THREE.Vector3()).add(this.bone('RightLeg').getWorldPosition(new THREE.Vector3())).multiplyScalar(0.5);
+    const d = knees.sub(hips);
+    m.stopAllAction();
+    m.uncacheRoot(model);
+    for (const [bone, q] of this.rest) bone.quaternion.copy(q);
+    this.root.updateMatrixWorld(true);
+    const parent = this.bone('Hips').parent!.getWorldQuaternion(new THREE.Quaternion());
+    const turn = parent.clone().invert().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI - Math.atan2(d.x, d.z))).multiply(parent);
+    const out = clip.clone();
+    const q = new THREE.Quaternion();
+    for (const track of out.tracks) {
+      if (track.name !== 'Hips.quaternion') continue;
+      for (let i = 0; i < track.values.length; i += 4) q.fromArray(track.values, i).premultiply(turn).toArray(track.values, i);
+    }
+    return out;
+  }
+
+  /**
+   * Run the mixer. It only writes a bone whose animated value has changed, so
+   * the code's corrections from the last frame would stay and pile up: each
+   * frame starts from the mixer's own last output instead.
+   */
+  private mix(dt: number): void {
+    const mixer = this.mixer!;
+    if (this.clean) for (const [bone, q] of this.clean) bone.quaternion.copy(q);
+    mixer.update(dt);
+    this.clean ??= new Map([...this.bones.values()].map((bone) => [bone, new THREE.Quaternion()]));
+    for (const [bone, q] of this.clean) q.copy(bone.quaternion);
+    this.root.updateMatrixWorld(true);
+  }
+
+  /** Where a hand is drawn (its palm), world. */
+  private palm(limb: Limb): THREE.Vector3 {
+    return limb.endLocal ? limb.mid.localToWorld(limb.endLocal.clone()) : limb.end.getWorldPosition(new THREE.Vector3());
   }
 
   private bone(name: string): THREE.Bone {
@@ -566,8 +704,7 @@ export class Figure {
       else if (name === 'reload') action.time = this.reloadPhase % clip.duration;
       else if (name === 'down') action.time = Math.min(this.downTime, clip.duration);
     }
-    mixer.update(dt);
-    this.root.updateMatrixWorld(true);
+    this.mix(dt);
     return true;
   }
 
@@ -588,6 +725,14 @@ export class Figure {
     this.posed = true;
     this.time += dt;
     this.sense(car, dt);
+    if (this.time > this.glanceAt) {
+      this.glanceAt = this.time + 2 + Math.random() * 4;
+      this.glance = Math.random() < 0.5 ? 0 : (Math.random() - 0.5) * 1.2;
+    }
+    if (p.role === 'gunner' && p.alive && this.gunner) {
+      this.poseGunner(this.gunner, p, dt, lean, car);
+      return;
+    }
     const g = this.g;
     const roof = this.roof * lean;
 
@@ -621,8 +766,7 @@ export class Figure {
     // The chest turns the rest of the way, so it is square to the gun.
     const outward = side > 0 ? -Math.PI / 2 : Math.PI / 2;
     const toward = (base: number): number => base + THREE.MathUtils.clamp(wrapAngle(p.yaw - base), -1.2, 1.2) * 0.45;
-    // In a hatch there is no window to face: the hips turn most of the way to the aim.
-    const pelvisOut = p.hatch ? p.yaw * 0.6 : lerpAngle(toward(outward), toward(-outward), this.roof);
+    const pelvisOut = lerpAngle(toward(outward), toward(-outward), this.roof);
     this.pelvis = lerpAngle(this.pelvis, p.alive ? lerpAngle(0, pelvisOut, lean) : 0, ease);
     twistBone(this.bone('Hips'), carUp, this.pelvis);
 
@@ -637,7 +781,7 @@ export class Figure {
       const seated = p.seat.clone().add(new THREE.Vector3(sx * 0.16, -0.3, -0.62));
       const knelt = p.seat.clone().add(new THREE.Vector3(-side * 0.3 + sx * 0.12, -0.05, 0.3));
       const stood = p.seat.clone().add(new THREE.Vector3(-side * 0.15 + sx * 0.14, -0.02, 0.05));
-      const upright = p.hatch ? p.seat.clone().add(new THREE.Vector3(sx * 0.14, -0.08, 0.02)) : knelt.lerp(stood, this.roof);
+      const upright = knelt.lerp(stood, this.roof);
       const foot = toWorld(seated.lerp(upright, lean));
       const pole = new THREE.Vector3(0, 0.4, -1).lerp(new THREE.Vector3(-side * (0.8 * this.roof), -0.3, -1 + 0.6 * this.roof), lean);
       // Animated, the clip places the legs when seated; out of the window the
@@ -692,10 +836,6 @@ export class Figure {
     // tipped toward the sights. In: the
     // gunner looks the way they are aiming; the driver into the turn, with
     // the odd glance about.
-    if (this.time > this.glanceAt) {
-      this.glanceAt = this.time + 2 + Math.random() * 4;
-      this.glance = Math.random() < 0.5 ? 0 : (Math.random() - 0.5) * 1.2;
-    }
     const chestYaw = this.pelvis + (p.alive && lean > 0 ? wrapAngle(p.yaw - this.pelvis) * lean : 0);
     const lookYaw =
       p.role === 'driver'
@@ -747,18 +887,68 @@ export class Figure {
       this.gunHolder.visible = false;
       return;
     }
-    // A gunner. Out of the window (or over the roof) the gun is shouldered
-    // along the aim: butt in the shoulder pocket, rear hand on the grip, front
-    // hand on the handguard. Tucked in, it is held at low ready across the
-    // body, muzzle up. On top: idle sway and breathing, the kick of each shot,
-    // a reload (gun canted, hand to the magazine) and a swap (gun lowered out
-    // of view, the other raised).
+    // A gunner: the gun at the shoulder out of the window, at low ready tucked in.
     this.recoil = Math.max(0, this.recoil - dt * 9);
-    const grips = GRIPS[this.gunId ?? 'rifle'];
     // Swap: the gun goes down and the new one comes up (`setGun` starts it).
     this.swap = Math.max(0, this.swap - dt / SWAP_SECONDS);
-    const swapDip = Math.sin(this.swap * Math.PI) * 1.1;
     this.reloadPhase = p.reload ? this.reloadPhase + dt : 0;
+    this.shoulderGun(p, lean, climbing, toWorld(p.seat.clone().add(new THREE.Vector3(0.18, 0.18, -0.2))), aimWorld, shoulder);
+    // Halfway through a swap, out of sight: the new gun goes in.
+    if (this.pendingGun !== undefined && this.swap <= 0.5) this.putGun(this.pendingGun);
+  }
+
+  /**
+   * Close a hand round the gun: turned so its palm faces `palm` with the
+   * fingers along `fingers` (world), then each finger curled in by `curl`
+   * per joint. The palm is told from the hand's own bones (at rest the palms
+   * face down), so it works for either hand however the model rolls them.
+   */
+  private grip(side: 'Left' | 'Right', palm: THREE.Vector3, fingers: THREE.Vector3, curl: number): void {
+    const hand = this.bone(`${side}Hand`);
+    const at = (name: string): THREE.Vector3 => this.bone(name).getWorldPosition(new THREE.Vector3());
+    const frame = (): { f: THREE.Vector3; n: THREE.Vector3 } => {
+      const wrist = hand.getWorldPosition(new THREE.Vector3());
+      const f = at(`${side}HandMiddle1`).sub(wrist).normalize();
+      const across = at(`${side}HandIndex1`).sub(at(`${side}HandPinky1`)).normalize();
+      const n = new THREE.Vector3().crossVectors(across, f).normalize();
+      return { f, n: side === 'Left' ? n.negate() : n };
+    };
+    const basis = (f: THREE.Vector3, n: THREE.Vector3): THREE.Quaternion => {
+      const x = new THREE.Vector3().crossVectors(f, n).normalize();
+      const y = new THREE.Vector3().crossVectors(x, f).normalize();
+      return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, f));
+    };
+    const now = frame();
+    const want = fingers.clone().normalize();
+    const wantPalm = palm.clone().projectOnPlane(want).normalize();
+    rotateBone(hand, basis(want, wantPalm).multiply(basis(now.f, now.n).invert()));
+    const { n } = frame();
+    for (const finger of ['Index', 'Middle', 'Ring', 'Pinky']) {
+      for (const k of [1, 2, 3]) {
+        const bone = this.bones.get(`${side}Hand${finger}${k}`);
+        const next = this.bones.get(`${side}Hand${finger}${k + 1}`) ?? bone?.children[0];
+        if (!bone || !next) continue;
+        // About the axis that swings the finger toward the palm.
+        const dir = next.getWorldPosition(new THREE.Vector3()).sub(bone.getWorldPosition(new THREE.Vector3())).normalize();
+        twistBone(bone, new THREE.Vector3().crossVectors(dir, n).normalize(), curl);
+      }
+    }
+  }
+
+  /**
+   * A long gun, both hands on it: out of the window (`lean` 1) shouldered along
+   * the aim — butt in the shoulder pocket, rear hand on the grip, front hand on
+   * the handguard — and tucked in (0) at low ready across the body, muzzle up.
+   * On top: idle sway and breathing, the kick of each shot, a reload (gun
+   * canted, hand to the magazine) and a swap (gun lowered out of view).
+   */
+  private shoulderGun(p: FigurePose, lean: number, climbing: number, lowReady: THREE.Vector3, aimWorld: THREE.Vector3, shoulder: THREE.Vector3): void {
+    const car = this.root.parent!;
+    const toWorldDir = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, y, z).transformDirection(car.matrixWorld);
+    const carUp = toWorldDir(0, 1, 0);
+    const side = p.side === 'right' ? 1 : -1;
+    const grips = GRIPS[this.gunId ?? 'rifle'];
+    const swapDip = Math.sin(this.swap * Math.PI) * 1.1;
     const reloadAmount = p.reload ? Math.min(1, this.reloadPhase * 4) : 0;
     const sway = (1 - 0.6 * lean) * 0.03 + 0.008;
     const breathe = Math.sin(this.time * 1.6 + this.phase) * sway;
@@ -784,7 +974,6 @@ export class Figure {
       .addScaledVector(gunRight, -0.06)
       .addScaledVector(gunUp, -0.04)
       .addScaledVector(gunDir, -0.02 - this.recoil * 0.06);
-    const lowReady = toWorld(p.seat.clone().add(new THREE.Vector3(0.18, 0.18, -0.2)));
     const butt = new THREE.Vector3().lerpVectors(lowReady, pocket, lean);
     const onGun = (local: readonly [number, number, number]): THREE.Vector3 =>
       butt
@@ -796,6 +985,11 @@ export class Figure {
     // Reloading, the front hand goes down to the magazine and back.
     const reach = reloadAmount * (0.5 - 0.5 * Math.cos(this.reloadPhase * 5));
     const fore = onGun(grips.fore).lerp(onGun(grips.mag).addScaledVector(gunUp, -0.12), reach);
+    // Out of the support arm's reach (a long handguard, a short arm), the
+    // hand slides back along the gun rather than letting go of it.
+    const support = this.arms.left.root.getWorldPosition(new THREE.Vector3());
+    const span = (this.arms.left.a + this.arms.left.b) * 0.97;
+    for (let i = 0; i < 20 && fore.distanceTo(support) > span; i++) fore.addScaledVector(gunDir, -0.02);
     // Elbows: the trigger arm out to the side and a little down; the support
     // arm tucked under the gun.
     this.reach(this.arms.right, grip, gunRight.clone().multiplyScalar(0.8).addScaledVector(carUp, -0.6));
@@ -806,6 +1000,8 @@ export class Figure {
       fore.lerp(palm, climbing * 0.85);
     }
     this.reach(this.arms.left, fore, gunRight.clone().multiplyScalar(-0.3).addScaledVector(carUp, -1));
+    // The support hand under the handguard, palm up, fingers round its far side.
+    if (this.gunner && lean > 0.01) this.grip('Left', gunUp, gunRight.clone().addScaledVector(gunDir, 0.3), 0.8 * lean * (1 - reach));
 
     // Place the gun: butt at `butt`, barrel along `gunDir`.
     this.gunHolder.visible = this.gunId !== null;
@@ -814,8 +1010,216 @@ export class Figure {
     this.root.getWorldQuaternion(_p);
     this.gunHolder.quaternion.copy(_p.invert().multiply(world));
     this.gunHolder.position.copy(this.root.worldToLocal(butt.clone()));
-    // Halfway through a swap, out of sight: the new gun goes in.
+  }
+
+  /**
+   * A gunner, from the CC0 library's clips. Sat in the seat (its sitting
+   * clip), the gun in their lap. Out of the window to aim: slid to the door
+   * and sat up, the upper body tipped out along the window's lean
+   * (gunnerBody), the pistol aim poses blended to the aim's pitch and turned
+   * to its yaw — hips a little, the spine the rest. A pistol stays in the hand
+   * the pose holds it in, its barrel laid exactly on the aim; a long gun is
+   * shouldered along the aim with both hands on it. Aiming across the
+   * car, up over the roof, the same, stood on the seat. Reloading, they duck
+   * back in a little; each shot plays the library's recoil on top.
+   */
+  private poseGunner(g: GunnerActions, p: FigurePose, dt: number, lean: number, car: THREE.Object3D): void {
+    const side = p.side === 'right' ? 1 : -1;
+    const ease = 1 - Math.exp(-dt * 10);
+    const toWorldDir = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, y, z).transformDirection(car.matrixWorld);
+    const toWorld = (v: THREE.Vector3): THREE.Vector3 => v.clone().applyMatrix4(car.matrixWorld);
+    car.updateMatrixWorld();
+    const carUp = toWorldDir(0, 1, 0);
+
+    // A gun change: the gun dips out of the window and the new one comes up.
+    this.setGun(p.gun);
+    this.swap = Math.max(0, this.swap - dt / SWAP_SECONDS);
     if (this.pendingGun !== undefined && this.swap <= 0.5) this.putGun(this.pendingGun);
+    if (this.gunId && PISTOLS.has(this.gunId) && !this.hold) this.holdGun(g);
+    this.recoil = Math.max(0, this.recoil - dt * 9);
+    const A = lean * (1 - 0.85 * Math.sin(this.swap * Math.PI));
+    this.reloadPhase = p.reload ? this.reloadPhase + dt : 0;
+    const reloadW = p.reload ? Math.min(1, this.reloadPhase * 6) : 0;
+
+    // The clips: sat, or the aim poses (by pitch, between the pitches they hold
+    // the gun at), the reload over either.
+    const P = this.posePitch;
+    const pitch = THREE.MathUtils.clamp(p.pitch, P.down, P.up);
+    const up = pitch >= P.mid ? (pitch - P.mid) / Math.max(1e-3, P.up - P.mid) : 0;
+    const down = pitch < P.mid ? (P.mid - pitch) / Math.max(1e-3, P.mid - P.down) : 0;
+    const aimW = (1 - reloadW) * 0.92 * A;
+    for (const action of this.actions.values()) action.setEffectiveWeight(0);
+    g.sitLower.setEffectiveWeight(1);
+    g.sitUpper.setEffectiveWeight((1 - reloadW) * (1 - A));
+    g.aim.up.setEffectiveWeight(up * aimW);
+    g.aim.mid.setEffectiveWeight((1 - up - down) * aimW);
+    g.aim.down.setEffectiveWeight(down * aimW);
+    g.idle.setEffectiveWeight((1 - reloadW) * 0.08 * A);
+    g.reload.setEffectiveWeight(reloadW);
+    g.reload.time = this.reloadPhase % g.reload.getClip().duration;
+    this.mix(dt);
+
+    // The hips: on the seat, or where this window puts them leaning out
+    // (gunnerBody); they settle with the car's heave.
+    const roof = this.roof * lean;
+    const hip = p.seat.clone().lerp(this.outHips, lean * (1 - 0.35 * reloadW));
+    hip.y += THREE.MathUtils.clamp(-this.g.y * 0.004, -0.04, 0.04);
+    this.root.position.copy(hip).addScaledVector(this.hipsRest, -FIGURE_SCALE);
+    this.root.updateMatrixWorld(true);
+    if (import.meta.env.DEV && (window as unknown as { __figureRest?: boolean }).__figureRest) return;
+
+    // Which way the body faces: sat, the road ahead; out, the aim; reloading,
+    // in toward the front with the gun. The hips turn a little (they are sat);
+    // up over the roof they face across it.
+    const outward = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+    const faced = lerpAngle(lerpAngle(-side * 0.12, p.yaw, A), -side * 0.35, reloadW);
+    const atWindow = THREE.MathUtils.clamp(wrapAngle(faced) * 0.12, -0.25, 0.25);
+    const overRoof = -outward + THREE.MathUtils.clamp(wrapAngle(p.yaw + outward), -1.2, 1.2) * 0.45;
+    this.pelvis = lerpAngle(this.pelvis, lerpAngle(atWindow, overRoof, roof), ease);
+    twistBone(this.bone('Hips'), carUp, this.pelvis);
+
+    // Legs: feet on the floor ahead of the seat, knees up (the seats are low
+    // for these tall bodies); up over the roof, stood on the seat.
+    for (const [limb, sx] of [
+      [this.legs.left, -1],
+      [this.legs.right, 1],
+    ] as const) {
+      const floor = p.seat.clone().add(new THREE.Vector3(-side * 0.06 + sx * 0.13, -0.2, -0.5));
+      const stood = p.seat.clone().add(new THREE.Vector3(-side * 0.15 + sx * 0.14, -0.02, 0.05));
+      const pole = new THREE.Vector3(0, 0.6, -1).lerp(new THREE.Vector3(-side * 0.8, -0.3, -0.4), roof);
+      this.reach(limb, toWorld(floor.lerp(stood, roof)), pole.transformDirection(car.matrixWorld));
+    }
+
+    // The spine: the clip's own curve, turned as a whole along this window's
+    // lean; it sways against the car's acceleration.
+    const base = this.bone('Spine').getWorldPosition(new THREE.Vector3());
+    const top = this.bone('Neck').getWorldPosition(new THREE.Vector3());
+    const give = 0.012 * (1 - 0.4 * lean);
+    const spine = top
+      .clone()
+      .sub(base)
+      .normalize()
+      .lerp(this.outSpine.clone().transformDirection(car.matrixWorld), lean * (1 - 0.5 * reloadW))
+      .add(toWorldDir(-this.g.x * give, 0, -this.g.z * give))
+      .normalize();
+    aimBoneAt(this.bone('Spine'), top, spine);
+    // Turned the rest of the way to the aim about the spine's ACTUAL axis:
+    // twisting a large angle about any other axis tips the torso over sideways.
+    const axis = this.bone('Neck').getWorldPosition(new THREE.Vector3()).sub(this.bone('Spine').getWorldPosition(new THREE.Vector3())).normalize();
+    const rest = wrapAngle(faced - this.pelvis);
+    twistBone(this.bone('Spine'), axis, rest * 0.3);
+    twistBone(this.bone('Spine1'), axis, rest * 0.35);
+    twistBone(this.bone('Spine2'), axis, rest * 0.35);
+
+    // The barrel exactly on the aim: the chest turns the last of the way (a
+    // little; the pose has it nearly right), then rolls the gun upright.
+    const cosP = Math.cos(p.pitch);
+    const aimWorld = toWorldDir(-Math.sin(p.yaw) * cosP, Math.sin(p.pitch), -Math.cos(p.yaw) * cosP);
+    const settle = (1 - Math.min(1, reloadW * 2)) * A;
+    if (this.hold && settle > 0) {
+      this.placeGun();
+      const fix = new THREE.Quaternion().setFromUnitVectors(this.barrel(), aimWorld);
+      const angle = 2 * Math.acos(THREE.MathUtils.clamp(fix.w, -1, 1));
+      rotateBone(this.bone('Spine2'), new THREE.Quaternion().slerp(fix, Math.min(1, 0.7 / Math.max(angle, 1e-4)) * settle));
+      this.placeGun();
+      const dir = this.barrel();
+      const gunUp = new THREE.Vector3(0, 1, 0).transformDirection(this.gunHolder.matrixWorld).projectOnPlane(dir).normalize();
+      const wantUp = carUp.clone().projectOnPlane(dir).normalize();
+      twistBone(this.bone('Spine2'), dir, Math.atan2(_a.crossVectors(gunUp, wantUp).dot(dir), gunUp.dot(wantUp)) * 0.85 * settle);
+    }
+
+    // A pistol: the support hand round the grip too; back in the lap sat in
+    // the seat, and on the gun as the reload clip has it. A long gun: shouldered
+    // along the aim, both hands placed on it.
+    this.placeGun();
+    if (this.hold && reloadW < 0.99 && A > 0.01) {
+      const fore = GRIPS[this.gunId ?? 'rifle'].fore;
+      const target = new THREE.Vector3(fore[0], fore[1], -fore[2]).applyMatrix4(this.gunHolder.matrixWorld);
+      target.lerp(this.palm(this.arms.left), Math.max(reloadW, 1 - A));
+      this.reach(this.arms.left, target, toWorldDir(-side * 0.3, -1, 0));
+      // Cupped round the gun hand: palm toward it, fingers over its knuckles.
+      const m = this.gunHolder.matrixWorld;
+      const gunRight = new THREE.Vector3(1, 0, 0).transformDirection(m);
+      const gunDown = new THREE.Vector3(0, -1, 0).transformDirection(m);
+      this.grip('Left', gunRight, gunDown.addScaledVector(this.barrel(), 0.4), 0.6 * A * (1 - reloadW));
+    } else if (!this.hold && this.gunId) {
+      // Bladed to the gun: the chest turns a little further, the support
+      // shoulder forward toward the handguard.
+      twistBone(this.bone('Spine2'), axis, -0.3 * lean);
+      const shoulder = this.arms.right.root.getWorldPosition(new THREE.Vector3());
+      this.shoulderGun(p, lean, 0, toWorld(p.seat.clone().add(new THREE.Vector3(0.18, 0.18, -0.2))), aimWorld, shoulder);
+    }
+
+    // The head: down the sights out of the window, at the gun reloading; sat
+    // in the seat, roughly the way they are aiming, with the odd glance about.
+    const head = this.bone('Head');
+    const lookYaw = THREE.MathUtils.clamp(wrapAngle(p.yaw), -1.1, 1.1) * 0.8 + this.glance * 0.3;
+    const sat = toWorldDir(-Math.sin(lookYaw), -0.1, -Math.cos(lookYaw)).normalize();
+    const aimLook = reloadW > 0.3 && this.hold ? this.barrel().lerp(carUp.clone().negate(), 0.4).normalize() : aimWorld.clone().addScaledVector(carUp, -0.08).normalize();
+    const look = sat.lerp(aimLook, Math.max(A, reloadW)).normalize();
+    const facing = this.headFwd.clone().applyQuaternion(head.getWorldQuaternion(_w));
+    rotateBone(head, new THREE.Quaternion().slerp(new THREE.Quaternion().setFromUnitVectors(facing, look), 0.75));
+
+    this.placeGun();
+    this.gunHolder.visible = this.gunId !== null;
+  }
+
+  /**
+   * Put the gun in the right hand, as the level aim pose holds it: the grip in
+   * the palm, the barrel on along the forearm, upright. Then measure the pitch
+   * each aim pose holds it at, so the poses can be blended to an aim.
+   */
+  private holdGun(g: GunnerActions): void {
+    const gun = this.gunHolder.children[0];
+    if (!gun || !this.gunId) return;
+    const only = (pose: THREE.AnimationAction): void => {
+      for (const action of this.actions.values()) action.setEffectiveWeight(0);
+      g.sitLower.setEffectiveWeight(1);
+      pose.setEffectiveWeight(1);
+      this.mix(0);
+    };
+    only(g.aim.mid);
+    const hand = this.arms.right.end;
+    const palm = this.palm(this.arms.right);
+    const dir = palm.clone().sub(this.arms.right.mid.getWorldPosition(new THREE.Vector3())).normalize();
+    const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0).transformDirection(this.root.matrixWorld)).normalize();
+    const up = new THREE.Vector3().crossVectors(right, dir).normalize();
+    const grip = GRIPS[this.gunId].grip;
+    const S = HAND_GUN_SCALE;
+    const butt = palm
+      .addScaledVector(right, -grip[0] * S)
+      .addScaledVector(up, -grip[1] * S)
+      .addScaledVector(dir, -grip[2] * S);
+    const rotation = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, dir.clone().negate()));
+    const world = new THREE.Matrix4().compose(butt, rotation, new THREE.Vector3(S, S, S));
+    const bounds = new THREE.Box3().setFromObject(gun.clone());
+    this.hold = { inHand: hand.matrixWorld.clone().invert().multiply(world), muzzleZ: Math.min(-0.2, bounds.min.z) };
+    const toFigure = this.root.matrixWorld.clone().invert();
+    for (const k of ['up', 'mid', 'down'] as const) {
+      only(g.aim[k]);
+      this.placeGun();
+      const d = this.barrel().transformDirection(toFigure);
+      this.posePitch[k] = Math.asin(THREE.MathUtils.clamp(d.y, -1, 1));
+    }
+  }
+
+  /** The gun where the right hand holds it. */
+  private placeGun(): void {
+    if (!this.hold) return;
+    const world = this.arms.right.end.matrixWorld.clone().multiply(this.hold.inHand);
+    this.root.matrixWorld
+      .clone()
+      .invert()
+      .multiply(world)
+      .decompose(this.gunHolder.position, this.gunHolder.quaternion, this.gunHolder.scale);
+    this.gunHolder.updateMatrixWorld(true);
+  }
+
+  /** Which way the barrel points, world (butt to muzzle). */
+  private barrel(): THREE.Vector3 {
+    const m = this.gunHolder.matrixWorld;
+    const butt = new THREE.Vector3().setFromMatrixPosition(m);
+    return new THREE.Vector3(0, 0, this.hold?.muzzleZ ?? -0.6).applyMatrix4(m).sub(butt).normalize();
   }
 
   /** A shot was fired from this seat: the gun kicks back into the shoulder. */
@@ -823,7 +1227,8 @@ export class Figure {
     // Each gun kicks its own way: a light, quick SMG; a heavy shotgun or revolver.
     const strength = KICK[this.gunId ?? 'rifle'] ?? 1;
     this.recoil = Math.min(1.6, this.recoil + strength);
-    this.recoilAction?.reset().setEffectiveWeight(strength).play();
+    if (this.gunner) this.gunner.shoot.reset().setEffectiveWeight(Math.min(1.4, strength)).play();
+    else this.recoilAction?.reset().setEffectiveWeight(strength).play();
   }
 
   /** Change gun: the first one goes straight in; later ones swap (down, then up). */
@@ -840,6 +1245,7 @@ export class Figure {
   private putGun(id: WeaponId | null): void {
     this.pendingGun = undefined;
     this.gunId = id;
+    this.hold = null; // held afresh (`holdGun`)
     for (const child of [...this.gunHolder.children]) this.gunHolder.remove(child);
     if (id) this.gunHolder.add(this.makeGun(id));
   }

@@ -185,6 +185,18 @@
       "licenseUrl": "https://www.gnu.org/licenses/gpl-3.0.html"
     },
     {
+      "heading": "3D MODELS",
+      "items": [
+        {
+          "title": "Universal Animation Library (Standard)",
+          "source": "https://opengameart.org/content/universal-animation-library"
+        }
+      ],
+      "attribution": "Quaternius (quaternius.com)",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
       "heading": "TEXTURES",
       "items": [
         {

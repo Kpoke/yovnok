@@ -1418,8 +1418,13 @@ function frame(now: number): void {
 
   perf.mark('hud');
   perf.gpuBegin();
-  // Development only: a fixed camera for scenery screenshots (window.__shotCam).
+  // Development only: a fixed camera for scenery screenshots (window.__shotCam);
+  // a window gunner's view of the title car (window.__gunnerCam, its crew posed
+  // with __crew to match: aim yaw, camera pitch, up over the roof).
   if (import.meta.env.DEV) {
+    const gunner = (window as unknown as { __gunnerCam?: { seat: string; yaw: number; pitch: number; roof?: boolean } }).__gunnerCam;
+    const gunnerSeat = gunner ? seatById(local.spec.id, gunner.seat) : undefined;
+    if (gunner && gunnerSeat) chase.updateGunner(camera, local, gunnerSeat, gunner.yaw, gunner.pitch, gunner.roof ?? false, realDt, obstacles);
     const shot = (window as unknown as { __shotCam?: { p: number[]; t: number[] } }).__shotCam;
     if (shot) {
       camera.position.set(shot.p[0], shot.p[1], shot.p[2]);

@@ -38,7 +38,7 @@ import {
 } from '../../shared/cosmetics';
 import { buildGun } from './guns';
 import { buildBodyKit, buildDecals } from './bodyKits';
-import { CABIN, gunnerBody, seatsFor } from '../../shared/crews';
+import { gunnerBody, seatsFor } from '../../shared/crews';
 import { componentIntegrity, type ComponentId } from '../../shared/components';
 import type { VehicleInput, VehicleState } from '../../shared/vehicle';
 import { createMaterials, disposeMaterials, type SeatSide, type VehicleMaterials } from './parts';
@@ -421,27 +421,6 @@ export function buildVehicle(
   /** The steering of the last `update`, for the driver's hands. */
   let steer = 0;
   const seatDefs = new Map(seatsFor(spec.id).map((seat) => [seat.id as string, seat]));
-  // A car whose gunner stands up through the roof gets the hatch: a rim
-  // round them. (No lid: propped open behind them it hid the gunner from the
-  // chase camera.)
-  const hatch = CABIN[spec.id]?.hatch;
-  if (hatch && figures) {
-    const metal = new THREE.MeshStandardMaterial({ color: 0x2a2f35, roughness: 0.55, metalness: 0.6 });
-    const roofY = CABIN[spec.id]!.roof;
-    for (const seat of seatDefs.values()) {
-      if (seat.drives || !seat.arc) continue;
-      const s = seat.side === 'right' ? 1 : -1;
-      const group = new THREE.Group();
-      group.name = 'hatch';
-      group.position.set(s * hatch.x, roofY - 0.01, hatch.z);
-      const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.33, 0.07, 20, 1, true), metal);
-      rim.position.y = 0.02;
-      const hole = new THREE.Mesh(new THREE.CircleGeometry(0.31, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x07090b }));
-      hole.position.y = 0.012;
-      group.add(rim, hole);
-      root.add(group);
-    }
-  }
   const setCrew = (crew: ReadonlyMap<string, CrewPose>, dt: number): void => {
     for (const [seatId, entry] of seated) {
       const pose = crew.get(seatId);
@@ -473,7 +452,6 @@ export function buildVehicle(
           hips: new THREE.Vector3(...body.hips),
           spine: new THREE.Vector3(...body.spine),
           roof: driver ? 0 : body.roof,
-          hatch: !driver && !!hatch,
           yaw: pose.yaw,
           // The aim carries the CAMERA pitch (positive looks down).
           pitch: -pose.pitch,

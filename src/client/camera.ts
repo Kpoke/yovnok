@@ -22,7 +22,7 @@ import * as THREE from 'three';
 import { CAMERA, FEEL, VEHICLE } from '../shared/config';
 import { clamp, damp, wrapAngle } from '../shared/math';
 import { vehiclePointWorld } from '../shared/combat';
-import { gunnerPoint, type SeatDef } from '../shared/crews';
+import { CABIN, gunnerPoint, type SeatDef } from '../shared/crews';
 import type { VehicleState } from '../shared/vehicle';
 
 export class CameraRig {
@@ -129,8 +129,8 @@ export class CameraRig {
     obstacles: THREE.Object3D[],
   ): void {
     // Over the shoulder (the gunner leaning out of the window, as in a
-    // third-person shooter): behind and above the head along the aim, a little
-    // to the outside, so you see yourself, your side of the car and the target.
+    // third-person shooter): close behind the head along the aim, so you see
+    // your own head and shoulder, the gun and the target.
     // Rigid, not damped: a lagging camera is a crosshair that lies.
     // From the gunner's own head — at the window or up over the roof — shared
     // with the hit test and the drawn figure.
@@ -143,18 +143,34 @@ export class CameraRig {
     const cosPitch = Math.cos(aimPitch);
     const fx = -Math.sin(yaw) * cosPitch;
     const fz = -Math.cos(yaw) * cosPitch;
-    // Outward on the gunner's own side of the car (its local ±x), so the
-    // camera is beside the vehicle rather than over its roof, whichever way
-    // the gun points.
+    // Behind the head and over the window-side shoulder (a right-hand gunner's
+    // right shoulder, a left-hand gunner's left), so the head is at the edge of
+    // the frame and the gun and the target fill it.
     const side = seat.side === 'right' ? 1 : -1;
-    const ox = Math.cos(state.yaw) * side;
-    const oz = -Math.sin(state.yaw) * side;
+    const flat = Math.hypot(fx, fz) || 1;
+    const rx = (-fz / flat) * side;
+    const rz = (fx / flat) * side;
     const back = CAMERA.gunnerDistance;
     this.desired.set(
-      head.x - fx * back + ox * CAMERA.gunnerShoulder,
+      head.x - fx * back + rx * CAMERA.gunnerShoulder,
       head.y + CAMERA.gunnerHeight + Math.sin(aimPitch) * back * 0.5,
-      head.z - fz * back + oz * CAMERA.gunnerShoulder,
+      head.z - fz * back + rz * CAMERA.gunnerShoulder,
     );
+    // Aiming square out of the window, behind the head is inside the car:
+    // there the camera rises over the roof and looks across it, down at the
+    // gunner a little. How far inside: the car-local x against the cabin's side.
+    const cabin = CABIN[state.spec.id];
+    let over = 0;
+    if (cabin) {
+      const dx = this.desired.x - state.pos.x;
+      const dz = this.desired.z - state.pos.z;
+      const localX = dx * Math.cos(state.yaw) - dz * Math.sin(state.yaw);
+      over = clamp((cabin.side + 0.15 - side * localX) / 0.5, 0, 1) * (1 - roof);
+      this.desired.x -= fx * CAMERA.gunnerOverBack * over;
+      this.desired.z -= fz * CAMERA.gunnerOverBack * over;
+      const above = state.pos.y + cabin.roof + CAMERA.gunnerOverHeight;
+      this.desired.y += (Math.max(this.desired.y, above) - this.desired.y) * over;
+    }
 
     // Pressed against a wall: pull the view in toward the head rather than
     // rendering the inside of the wall.
@@ -175,7 +191,7 @@ export class CameraRig {
     this.recoil *= Math.exp(-dt * 14);
     this.look.set(
       this.desired.x - Math.sin(yaw) * cosPitch,
-      this.desired.y - Math.sin(aimPitch) + this.recoil,
+      this.desired.y - Math.sin(aimPitch) + this.recoil - CAMERA.gunnerOverDip * 0.1 * over,
       this.desired.z - Math.cos(yaw) * cosPitch,
     );
     camera.lookAt(this.look);

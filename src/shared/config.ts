@@ -690,10 +690,15 @@ export const CAMERA = {
   // that the car fills the lower third of the frame.
   soloDistance: 5.4,
   /** Window gunner, over the shoulder: distance behind the head, height, and
-   * how far to the side of the line of sight. */
-  gunnerDistance: 1.5,
-  gunnerHeight: 0.3,
-  gunnerShoulder: 0.7,
+   * how far to the window side of the line of sight. */
+  gunnerDistance: 0.8,
+  gunnerHeight: 0.16,
+  gunnerShoulder: 0.38,
+  /** Aiming square out of the window, the camera over the roof instead: a
+   * little further back, this high over the roof, looking down (×0.1 rad). */
+  gunnerOverBack: 0.1,
+  gunnerOverHeight: 0.42,
+  gunnerOverDip: 1.4,
   soloHeight: 1.75,
   /** How far ahead the camera looks. Larger flattens the aim feel. */
   soloLookAhead: 26,
