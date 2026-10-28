@@ -428,6 +428,10 @@ export class Figure {
   private hold: { inHand: THREE.Matrix4; muzzleZ: number } | null = null;
   /** The pitch each aim pose holds the gun at, measured for the gun in hand. */
   private readonly posePitch = { up: 1.4, mid: 0.25, down: -1.35 };
+  /** A gunner's aim, eased a little (other players' arrives in network steps); and whether set yet. */
+  private aimYaw = 0;
+  private aimPitch = 0;
+  private aimed = false;
   /** Which way the head looks at rest (the figure's forward, -Z), in the head's own frame. */
   private readonly headFwd = new THREE.Vector3(0, 0, -1);
 
@@ -718,9 +722,11 @@ export class Figure {
     const lean = this.lean * this.lean * (3 - 2 * this.lean); // eased
     const side = p.side === 'right' ? 1 : -1;
     const ease = this.posed ? 1 - Math.exp(-dt * 10) : 1;
-    this.outHips.lerp(p.hips, ease);
+    // Climbing up over the roof or back down to the window reads as a climb.
+    const climb = this.posed ? 1 - Math.exp(-dt * 4) : 1;
+    this.outHips.lerp(p.hips, climb);
     this.outSpine.lerp(p.spine, ease).normalize();
-    this.roof += (p.roof - this.roof) * ease;
+    this.roof += (p.roof - this.roof) * climb;
     this.steer += (p.steer - this.steer) * ease;
     this.posed = true;
     this.time += dt;
@@ -1030,6 +1036,11 @@ export class Figure {
     const toWorld = (v: THREE.Vector3): THREE.Vector3 => v.clone().applyMatrix4(car.matrixWorld);
     car.updateMatrixWorld();
     const carUp = toWorldDir(0, 1, 0);
+    const follow = this.aimed ? 1 - Math.exp(-dt * 18) : 1;
+    this.aimYaw = lerpAngle(this.aimYaw, p.yaw, follow);
+    this.aimPitch += (p.pitch - this.aimPitch) * follow;
+    this.aimed = true;
+    const yaw = this.aimYaw;
 
     // A gun change: the gun dips out of the window and the new one comes up.
     this.setGun(p.gun);
@@ -1044,7 +1055,7 @@ export class Figure {
     // The clips: sat, or the aim poses (by pitch, between the pitches they hold
     // the gun at), the reload over either.
     const P = this.posePitch;
-    const pitch = THREE.MathUtils.clamp(p.pitch, P.down, P.up);
+    const pitch = THREE.MathUtils.clamp(this.aimPitch, P.down, P.up);
     const up = pitch >= P.mid ? (pitch - P.mid) / Math.max(1e-3, P.up - P.mid) : 0;
     const down = pitch < P.mid ? (P.mid - pitch) / Math.max(1e-3, P.mid - P.down) : 0;
     const aimW = (1 - reloadW) * 0.92 * A;
@@ -1069,12 +1080,16 @@ export class Figure {
     if (import.meta.env.DEV && (window as unknown as { __figureRest?: boolean }).__figureRest) return;
 
     // Which way the body faces: sat, the road ahead; out, the aim; reloading,
-    // in toward the front with the gun. The hips turn a little (they are sat);
-    // up over the roof they face across it.
+    // in toward the front with the gun. Measured from the window, so an aim
+    // swept past straight behind does not wrap round through the nose (the
+    // wrap is across the car, over the roof). The hips stay forward on the seat
+    // for an aim ahead and turn with it as it goes round toward the back, where
+    // no chest can twist that far alone; up over the roof they face across it.
     const outward = side > 0 ? -Math.PI / 2 : Math.PI / 2;
-    const faced = lerpAngle(lerpAngle(-side * 0.12, p.yaw, A), -side * 0.35, reloadW);
-    const atWindow = THREE.MathUtils.clamp(wrapAngle(faced) * 0.12, -0.25, 0.25);
-    const overRoof = -outward + THREE.MathUtils.clamp(wrapAngle(p.yaw + outward), -1.2, 1.2) * 0.45;
+    const aimFaced = outward + wrapAngle(yaw - outward);
+    const faced = THREE.MathUtils.lerp(THREE.MathUtils.lerp(-side * 0.12, aimFaced, A), -side * 0.35, reloadW);
+    const atWindow = Math.sign(faced) * Math.max(0, Math.abs(faced) - 0.6) * 0.6;
+    const overRoof = -outward + THREE.MathUtils.clamp(wrapAngle(yaw + outward), -1.2, 1.2) * 0.45;
     this.pelvis = lerpAngle(this.pelvis, lerpAngle(atWindow, overRoof, roof), ease);
     twistBone(this.bone('Hips'), carUp, this.pelvis);
 
@@ -1113,8 +1128,8 @@ export class Figure {
 
     // The barrel exactly on the aim: the chest turns the last of the way (a
     // little; the pose has it nearly right), then rolls the gun upright.
-    const cosP = Math.cos(p.pitch);
-    const aimWorld = toWorldDir(-Math.sin(p.yaw) * cosP, Math.sin(p.pitch), -Math.cos(p.yaw) * cosP);
+    const cosP = Math.cos(this.aimPitch);
+    const aimWorld = toWorldDir(-Math.sin(yaw) * cosP, Math.sin(this.aimPitch), -Math.cos(yaw) * cosP);
     const settle = (1 - Math.min(1, reloadW * 2)) * A;
     if (this.hold && settle > 0) {
       this.placeGun();
@@ -1153,7 +1168,7 @@ export class Figure {
     // The head: down the sights out of the window, at the gun reloading; sat
     // in the seat, roughly the way they are aiming, with the odd glance about.
     const head = this.bone('Head');
-    const lookYaw = THREE.MathUtils.clamp(wrapAngle(p.yaw), -1.1, 1.1) * 0.8 + this.glance * 0.3;
+    const lookYaw = THREE.MathUtils.clamp(wrapAngle(yaw), -1.1, 1.1) * 0.8 + this.glance * 0.3;
     const sat = toWorldDir(-Math.sin(lookYaw), -0.1, -Math.cos(lookYaw)).normalize();
     const aimLook = reloadW > 0.3 && this.hold ? this.barrel().lerp(carUp.clone().negate(), 0.4).normalize() : aimWorld.clone().addScaledVector(carUp, -0.08).normalize();
     const look = sat.lerp(aimLook, Math.max(A, reloadW)).normalize();

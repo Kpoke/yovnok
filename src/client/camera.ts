@@ -30,6 +30,11 @@ export class CameraRig {
   private ready = false;
   /** The window gunner over the roof (0 … 1), eased. */
   private roof = 0;
+  /** The window gunner's camera, car-local and eased; for which seat, and when last placed (ms). */
+  private readonly gunnerAt = new THREE.Vector3();
+  private readonly gunnerTo = new THREE.Vector3();
+  private gunnerSeat: string | null = null;
+  private gunnerLast = 0;
   /** Recoil: the view tips up with each shot and settles back (radians). */
   private recoil = 0;
 
@@ -134,8 +139,9 @@ export class CameraRig {
     // Rigid, not damped: a lagging camera is a crosshair that lies.
     // From the gunner's own head — at the window or up over the roof — shared
     // with the hit test and the drawn figure.
-    // Eased, so climbing up or down glides rather than cuts.
-    this.roof += ((overRoof ? 1 : 0) - this.roof) * Math.min(1, dt * 8);
+    // Eased, so climbing up or down glides rather than cuts (as long as the
+    // figure takes to climb).
+    this.roof += ((overRoof ? 1 : 0) - this.roof) * (1 - Math.exp(-dt * 4));
     const roof = this.roof;
     const head = vehiclePointWorld(state, gunnerPoint(state.spec.id, seat, aimYaw, 0, 'head', roof)!);
     head.y += 0.15 * roof;
@@ -172,6 +178,25 @@ export class CameraRig {
       this.desired.z -= fz * CAMERA.gunnerOverBack * over;
       const above = state.pos.y + cabin.roof + CAMERA.gunnerOverHeight;
       this.desired.y += (Math.max(this.desired.y, above) - this.desired.y) * over;
+    }
+
+    // Eased in the car's own frame, so the camera glides round the head as the
+    // aim sweeps instead of swinging with every flick of the mouse, while the
+    // car's own motion is not lagged. Only the position: the look below is
+    // exactly along the aim, so the crosshair never trails.
+    {
+      const c = Math.cos(state.yaw);
+      const s = Math.sin(state.yaw);
+      const dx = this.desired.x - state.pos.x;
+      const dz = this.desired.z - state.pos.z;
+      this.gunnerTo.set(dx * c - dz * s, this.desired.y - state.pos.y, dx * s + dz * c);
+      const now = performance.now();
+      if (this.gunnerSeat !== seat.id || now - this.gunnerLast > 500) this.gunnerAt.copy(this.gunnerTo);
+      else this.gunnerAt.lerp(this.gunnerTo, 1 - Math.exp(-dt * CAMERA.gunnerFollow));
+      this.gunnerSeat = seat.id;
+      this.gunnerLast = now;
+      const a = this.gunnerAt;
+      this.desired.set(state.pos.x + a.x * c + a.z * s, state.pos.y + a.y, state.pos.z - a.x * s + a.z * c);
     }
 
     // Pressed against a wall: pull the view in toward the head rather than

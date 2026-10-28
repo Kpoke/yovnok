@@ -506,6 +506,9 @@ function aimAssist(dt: number): void {
 }
 
 const chase = new CameraRig();
+/** A window gunner's view: 0 the chase camera (tucked in) … 1 over the shoulder (leaning out), eased both ways. */
+let gunnerView = 0;
+const chaseView = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
 
 // Repair crates: positions come from the shared arena, state from snapshots.
 const crates = buildCrates();
@@ -1164,12 +1167,25 @@ function frame(now: number): void {
     });
   } else if (net.isDriver) {
     chase.update(camera, view, viewYaw, viewPitch, realDt, obstacles);
-  } else if (seat && net.leanAmount < 0.5) {
-    // A gunner tucked inside sees the car from behind, looking about freely;
-    // leaning out (aim held) puts the view over their shoulder.
-    chase.update(camera, view, inputs.lookYaw, inputs.lookPitch, realDt, obstacles);
   } else if (seat) {
-    chase.updateGunner(camera, view, seat, net.aimYaw, net.aimPitch, net.roof, realDt, obstacles);
+    // A gunner tucked inside sees the car from behind, looking about freely;
+    // leaning out (aim held) moves the view in over their shoulder, blended
+    // over the lean both ways rather than cut.
+    gunnerView = clamp(gunnerView + (net.leaning ? realDt : -realDt) / COMBAT.leanSeconds, 0, 1);
+    chase.update(camera, view, inputs.lookYaw, inputs.lookPitch, realDt, obstacles);
+    if (gunnerView > 0) {
+      const t = gunnerView * gunnerView * (3 - 2 * gunnerView);
+      chaseView.position.copy(camera.position);
+      chaseView.quaternion.copy(camera.quaternion);
+      const fov = camera.fov;
+      chase.updateGunner(camera, view, seat, net.aimYaw, net.aimPitch, net.roof, realDt, obstacles);
+      if (t < 1) {
+        camera.position.lerpVectors(chaseView.position, camera.position, t);
+        camera.quaternion.slerpQuaternions(chaseView.quaternion, camera.quaternion, t);
+        camera.fov = fov + (camera.fov - fov) * t;
+        camera.updateProjectionMatrix();
+      }
+    }
   }
 
   // Reticle-ray aiming, step one: ask the camera what is under the crosshair.

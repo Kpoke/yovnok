@@ -698,6 +698,8 @@ export const CAMERA = {
    * little further back, and this high over the roof. */
   gunnerOverBack: 0.1,
   gunnerOverHeight: 0.3,
+  /** How quickly the gunner's camera follows round the head as the aim sweeps (1/s). */
+  gunnerFollow: 12,
   soloHeight: 1.75,
   /** How far ahead the camera looks. Larger flattens the aim feel. */
   soloLookAhead: 26,
