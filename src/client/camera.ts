@@ -157,8 +157,10 @@ export class CameraRig {
       head.z - fz * back + rz * CAMERA.gunnerShoulder,
     );
     // Aiming square out of the window, behind the head is inside the car:
-    // there the camera rises over the roof and looks across it, down at the
-    // gunner a little. How far inside: the car-local x against the cabin's side.
+    // there the camera rises over the roof and looks across it. Only its
+    // position changes — the view still looks exactly along the aim, or a
+    // sideways sweep would tip the crosshair. How far inside: the car-local x
+    // against the cabin's side.
     const cabin = CABIN[state.spec.id];
     let over = 0;
     if (cabin) {
@@ -191,7 +193,7 @@ export class CameraRig {
     this.recoil *= Math.exp(-dt * 14);
     this.look.set(
       this.desired.x - Math.sin(yaw) * cosPitch,
-      this.desired.y - Math.sin(aimPitch) + this.recoil - CAMERA.gunnerOverDip * 0.1 * over,
+      this.desired.y - Math.sin(aimPitch) + this.recoil,
       this.desired.z - Math.cos(yaw) * cosPitch,
     );
     camera.lookAt(this.look);

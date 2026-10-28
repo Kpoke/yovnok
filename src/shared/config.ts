@@ -695,10 +695,9 @@ export const CAMERA = {
   gunnerHeight: 0.16,
   gunnerShoulder: 0.38,
   /** Aiming square out of the window, the camera over the roof instead: a
-   * little further back, this high over the roof, looking down (×0.1 rad). */
+   * little further back, and this high over the roof. */
   gunnerOverBack: 0.1,
-  gunnerOverHeight: 0.42,
-  gunnerOverDip: 1.4,
+  gunnerOverHeight: 0.3,
   soloHeight: 1.75,
   /** How far ahead the camera looks. Larger flattens the aim feel. */
   soloLookAhead: 26,
