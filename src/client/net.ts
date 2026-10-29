@@ -139,6 +139,8 @@ export type CrewPose = {
   /** Reloading the weapon in hand. */
   reload: boolean;
   alive: boolean;
+  /** Ours: the figure follows our aim at once (others' arrives in network steps). */
+  self?: boolean;
 };
 
 export class NetClient {
@@ -1097,6 +1099,7 @@ export class NetClient {
         gun: m.gun,
         reload: (mine ? this.self.reload : m.reload) > 0,
         alive: m.alive,
+        self: mine,
       });
     }
     return out;

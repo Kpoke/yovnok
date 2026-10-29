@@ -19,10 +19,10 @@ import { DEFAULT_MAP, isMapId, type MapId } from '../shared/mapIds';
 import { FORMATS, type FormatId } from '../shared/formats';
 import { World } from './world';
 import { THEMES } from './maps/themes';
-import { localToWorld, NEUTRAL_INPUT, stepVehicle, type VehicleInput } from '../shared/vehicle';
+import { localToWorld, NEUTRAL_INPUT, stepVehicle, type VehicleInput, type VehicleState } from '../shared/vehicle';
 import { relativeAim, vehiclePointWorld } from '../shared/combat';
 import { WS_PATH } from '../shared/protocol';
-import { clampToArc, seatById, seatsFor } from '../shared/crews';
+import { clampToArc, seatById, seatsFor, type SeatDef } from '../shared/crews';
 import { clamp, wrapAngle } from '../shared/math';
 import { WEAPONS } from '../shared/weapons';
 import { outsideZone } from '../shared/zone';
@@ -509,6 +509,38 @@ const chase = new CameraRig();
 /** A window gunner's view: 0 the chase camera (tucked in) … 1 over the shoulder (leaning out), eased both ways. */
 let gunnerView = 0;
 const chaseView = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
+/**
+ * A window gunner's camera. Tucked inside they see the car from behind,
+ * looking about freely; leaning out (aim held) moves the view in over their
+ * shoulder, ahead of the body so it is ready as the gun comes up, and back
+ * out quicker still when they let go.
+ */
+function gunnerCamera(
+  view: VehicleState,
+  seat: SeatDef,
+  aimYaw: number,
+  aimPitch: number,
+  roof: boolean,
+  leaning: boolean,
+  lookYaw: number,
+  lookPitch: number,
+  dt: number,
+): void {
+  gunnerView = clamp(gunnerView + (leaning ? dt / CAMERA.gunnerInSeconds : -dt / CAMERA.gunnerOutSeconds), 0, 1);
+  chase.update(camera, view, lookYaw, lookPitch, dt, obstacles);
+  if (gunnerView <= 0) return;
+  const t = gunnerView * gunnerView * (3 - 2 * gunnerView);
+  chaseView.position.copy(camera.position);
+  chaseView.quaternion.copy(camera.quaternion);
+  const fov = camera.fov;
+  chase.updateGunner(camera, view, seat, aimYaw, aimPitch, roof, dt, obstacles);
+  if (t < 1) {
+    camera.position.lerpVectors(chaseView.position, camera.position, t);
+    camera.quaternion.slerpQuaternions(chaseView.quaternion, camera.quaternion, t);
+    camera.fov = fov + (camera.fov - fov) * t;
+    camera.updateProjectionMatrix();
+  }
+}
 
 // Repair crates: positions come from the shared arena, state from snapshots.
 const crates = buildCrates();
@@ -1208,24 +1240,7 @@ function frame(now: number): void {
   } else if (net.isDriver) {
     chase.update(camera, view, viewYaw, viewPitch, realDt, obstacles);
   } else if (seat) {
-    // A gunner tucked inside sees the car from behind, looking about freely;
-    // leaning out (aim held) moves the view in over their shoulder, blended
-    // over the lean both ways rather than cut.
-    gunnerView = clamp(gunnerView + (net.leaning ? realDt : -realDt) / COMBAT.leanSeconds, 0, 1);
-    chase.update(camera, view, inputs.lookYaw, inputs.lookPitch, realDt, obstacles);
-    if (gunnerView > 0) {
-      const t = gunnerView * gunnerView * (3 - 2 * gunnerView);
-      chaseView.position.copy(camera.position);
-      chaseView.quaternion.copy(camera.quaternion);
-      const fov = camera.fov;
-      chase.updateGunner(camera, view, seat, net.aimYaw, net.aimPitch, net.roof, realDt, obstacles);
-      if (t < 1) {
-        camera.position.lerpVectors(chaseView.position, camera.position, t);
-        camera.quaternion.slerpQuaternions(chaseView.quaternion, camera.quaternion, t);
-        camera.fov = fov + (camera.fov - fov) * t;
-        camera.updateProjectionMatrix();
-      }
-    }
+    gunnerCamera(view, seat, net.aimYaw, net.aimPitch, net.roof, net.leaning, inputs.lookYaw, inputs.lookPitch, realDt);
   }
 
   // Reticle-ray aiming, step one: ask the camera what is under the crosshair.
@@ -1478,9 +1493,9 @@ function frame(now: number): void {
   // a window gunner's view of the title car (window.__gunnerCam, its crew posed
   // with __crew to match: aim yaw, camera pitch, up over the roof).
   if (import.meta.env.DEV) {
-    const gunner = (window as unknown as { __gunnerCam?: { seat: string; yaw: number; pitch: number; roof?: boolean } }).__gunnerCam;
+    const gunner = (window as unknown as { __gunnerCam?: { seat: string; yaw: number; pitch: number; roof?: boolean; out?: boolean } }).__gunnerCam;
     const gunnerSeat = gunner ? seatById(local.spec.id, gunner.seat) : undefined;
-    if (gunner && gunnerSeat) chase.updateGunner(camera, local, gunnerSeat, gunner.yaw, gunner.pitch, gunner.roof ?? false, realDt, obstacles);
+    if (gunner && gunnerSeat) gunnerCamera(local, gunnerSeat, gunner.yaw, gunner.pitch, gunner.roof ?? false, gunner.out ?? true, 0, 0, realDt);
     const shot = (window as unknown as { __shotCam?: { p: number[]; t: number[] } }).__shotCam;
     if (shot) {
       camera.position.set(shot.p[0], shot.p[1], shot.p[2]);

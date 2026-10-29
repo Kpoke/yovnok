@@ -456,6 +456,8 @@ export function buildVehicle(
           hips: new THREE.Vector3(...body.hips),
           spine: new THREE.Vector3(...body.spine),
           roof: driver ? 0 : body.roof,
+          bodyAt: (roof) => gunnerBody(spec.id, seat, pose.yaw, roof),
+          aimFollow: pose.self ? 45 : 18,
           yaw: pose.yaw,
           // The aim carries the CAMERA pitch (positive looks down).
           pitch: -pose.pitch,

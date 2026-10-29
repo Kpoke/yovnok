@@ -35,6 +35,8 @@ export const COMBAT = {
   chestRadius: 0.27,
   /** Seconds to lean out of the window before the first shot can leave. */
   leanSeconds: 0.25,
+  /** Seconds a window gunner takes to climb up over the roof, or back down to the window. */
+  roofClimbSeconds: 0.4,
   /** How long a downed crew member waits before returning to their seat. */
   crewRespawnSeconds: 8,
   minFireInterval: 0.03,
@@ -698,8 +700,13 @@ export const CAMERA = {
    * little further back, and this high over the roof. */
   gunnerOverBack: 0.1,
   gunnerOverHeight: 0.3,
-  /** How quickly the gunner's camera follows round the head as the aim sweeps (1/s). */
-  gunnerFollow: 12,
+  /**
+   * Seconds the view takes to move in over a gunner's shoulder as they aim, and
+   * back out to the chase view: in ahead of the lean (the view is ready as the
+   * gun comes up), out quicker still.
+   */
+  gunnerInSeconds: 0.14,
+  gunnerOutSeconds: 0.1,
   soloHeight: 1.75,
   /** How far ahead the camera looks. Larger flattens the aim feel. */
   soloLookAhead: 26,

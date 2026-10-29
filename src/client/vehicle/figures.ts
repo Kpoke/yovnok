@@ -42,6 +42,10 @@ export type FigurePose = {
   hips: THREE.Vector3;
   spine: THREE.Vector3;
   roof: number;
+  /** The same body for any amount of the way over the roof (0 … 1), for the climb between. */
+  bodyAt?: (roof: number) => { hips: readonly number[]; spine: readonly number[] };
+  /** How quickly the figure follows the aim (1/s): ours at once, others' smoothed over network steps. */
+  aimFollow?: number;
   /** Aim relative to the car's nose (+ = left) and pitch (+ = up), radians. */
   yaw: number;
   pitch: number;
@@ -384,6 +388,9 @@ function wrapAngle(a: number): number {
 }
 
 /** From angle `a` toward `b` by `t`, the short way round. */
+/** The fastest a gunner's body turns to follow the aim (rad/s, about 700°/s). */
+const AIM_TURN_RATE = 12;
+
 function lerpAngle(a: number, b: number, t: number): number {
   return a + wrapAngle(b - a) * t;
 }
@@ -408,6 +415,9 @@ export class Figure {
   private hurtHead = false;
   private readonly hurtDir = new THREE.Vector3();
   private reloadPhase = 0;
+  /** 0 … 1 into a reload: eased in as it starts and back out after, its clip held where it ended. */
+  private reloadW = 0;
+  private reloading = false;
   private time = 0;
   /** Each person sways out of step with the others. */
   private readonly phase = Math.random() * Math.PI * 2;
@@ -415,6 +425,8 @@ export class Figure {
   private lean = 0;
   /** 0 at the window … 1 up on the sill over the roof, eased toward the aim's. */
   private roof = 0;
+  /** The climb's own clock, 0 … 1 at a steady rate; `roof` is it eased at both ends. */
+  private roofT = 0;
   /** Out of the window: the hips and spine, eased toward the aim's. */
   private readonly outHips = new THREE.Vector3();
   private readonly outSpine = new THREE.Vector3(0, 1, 0);
@@ -753,11 +765,20 @@ export class Figure {
     const lean = this.lean * this.lean * (3 - 2 * this.lean); // eased
     const side = p.side === 'right' ? 1 : -1;
     const ease = this.posed ? 1 - Math.exp(-dt * 10) : 1;
-    // Climbing up over the roof or back down to the window reads as a climb.
-    const climb = this.posed ? 1 - Math.exp(-dt * 4) : 1;
-    this.outHips.lerp(p.hips, climb);
-    this.outSpine.lerp(p.spine, ease).normalize();
-    this.roof += (p.roof - this.roof) * climb;
+    // Climbing up over the roof or back down to the window reads as a climb:
+    // a steady clock eased at both ends, so it starts as gently as it lands.
+    const climbStep = this.posed ? dt / COMBAT.roofClimbSeconds : 1;
+    this.roofT = p.roof > this.roofT ? Math.min(p.roof, this.roofT + climbStep) : Math.max(p.roof, this.roofT - climbStep);
+    this.roof = this.roofT * this.roofT * (3 - 2 * this.roofT);
+    const body = p.bodyAt?.(this.roof);
+    this.outHips.lerp(body ? _a.set(body.hips[0], body.hips[1], body.hips[2]) : p.hips, ease);
+    this.outSpine.lerp(body ? _b.set(body.spine[0], body.spine[1], body.spine[2]).normalize() : p.spine, ease).normalize();
+    // A reload eases in, and back out when it is done: the gun returns to the
+    // shoulder rather than jumping there, its clip held where it ended.
+    if (p.reload && !this.reloading) this.reloadPhase = 0;
+    if (p.reload) this.reloadPhase += dt;
+    this.reloadW = p.reload ? Math.min(1, this.reloadW + dt * 6) : Math.max(0, this.reloadW - dt * 5);
+    this.reloading = p.reload;
     this.steer += (p.steer - this.steer) * ease;
     this.posed = true;
     this.time += dt;
@@ -929,7 +950,6 @@ export class Figure {
     this.recoil = Math.max(0, this.recoil - dt * 9);
     // Swap: the gun goes down and the new one comes up (`setGun` starts it).
     this.swap = Math.max(0, this.swap - dt / SWAP_SECONDS);
-    this.reloadPhase = p.reload ? this.reloadPhase + dt : 0;
     this.shoulderGun(p, lean, climbing, toWorld(p.seat.clone().add(new THREE.Vector3(0.18, 0.18, -0.2))), aimWorld, shoulder);
     // Halfway through a swap, out of sight: the new gun goes in.
     if (this.pendingGun !== undefined && this.swap <= 0.5) this.putGun(this.pendingGun);
@@ -987,7 +1007,7 @@ export class Figure {
     const side = p.side === 'right' ? 1 : -1;
     const grips = GRIPS[this.gunId ?? 'rifle'];
     const swapDip = Math.sin(this.swap * Math.PI) * 1.1;
-    const reloadAmount = p.reload ? Math.min(1, this.reloadPhase * 4) : 0;
+    const reloadAmount = this.reloadW * this.reloadW * (3 - 2 * this.reloadW);
     const sway = (1 - 0.6 * lean) * 0.03 + 0.008;
     const breathe = Math.sin(this.time * 1.6 + this.phase) * sway;
     const drift = Math.sin(this.time * 0.9 + this.phase * 2.3) * sway;
@@ -996,6 +1016,8 @@ export class Figure {
     const low = toWorldDir(0.25 * side, 0.75, -0.6).normalize();
     const gunDir = new THREE.Vector3()
       .lerpVectors(low, aimWorld, lean)
+      // Between the lap and the aim the muzzle swings low, not up past the face.
+      .addScaledVector(carUp, -0.9 * Math.sin(Math.PI * lean))
       .addScaledVector(carUp, breathe + this.recoil * 0.15 - swapDip * 0.8 - reloadAmount * 0.35)
       .addScaledVector(right0, drift)
       .normalize();
@@ -1068,9 +1090,13 @@ export class Figure {
     const toWorld = (v: THREE.Vector3): THREE.Vector3 => v.clone().applyMatrix4(car.matrixWorld);
     car.updateMatrixWorld();
     const carUp = toWorldDir(0, 1, 0);
-    const follow = this.aimed ? 1 - Math.exp(-dt * 18) : 1;
-    this.aimYaw = lerpAngle(this.aimYaw, p.yaw, follow);
-    this.aimPitch += (p.pitch - this.aimPitch) * follow;
+    // The body follows the aim (ours closely, others' over network steps), no
+    // faster than a person can turn: a big flick is a quick turn, not a jump.
+    const follow = this.aimed ? 1 - Math.exp(-dt * (p.aimFollow ?? 18)) : 1;
+    const turn = this.aimed ? AIM_TURN_RATE * dt : Infinity;
+    const clampTurn = (v: number): number => THREE.MathUtils.clamp(v, -turn, turn);
+    this.aimYaw = wrapAngle(this.aimYaw + clampTurn(wrapAngle(p.yaw - this.aimYaw) * follow));
+    this.aimPitch += clampTurn((p.pitch - this.aimPitch) * follow);
     this.aimed = true;
     const yaw = this.aimYaw;
 
@@ -1080,9 +1106,13 @@ export class Figure {
     if (this.pendingGun !== undefined && this.swap <= 0.5) this.putGun(this.pendingGun);
     if (this.gunId && PISTOLS.has(this.gunId) && !this.hold) this.holdGun(g);
     this.recoil = Math.max(0, this.recoil - dt * 9);
-    const A = lean * (1 - 0.85 * Math.sin(this.swap * Math.PI));
-    this.reloadPhase = p.reload ? this.reloadPhase + dt : 0;
-    const reloadW = p.reload ? Math.min(1, this.reloadPhase * 6) : 0;
+    // Staged: the body comes out first (`lean`), then turns to the aim with
+    // the gun coming up (`raise`, the last two thirds of the lean); going
+    // back in, the gun comes down first.
+    const r = THREE.MathUtils.clamp((this.lean - 0.35) / 0.65, 0, 1);
+    const raise = r * r * (3 - 2 * r);
+    const A = raise * (1 - 0.85 * Math.sin(this.swap * Math.PI));
+    const reloadW = this.reloadW * this.reloadW * (3 - 2 * this.reloadW);
 
     // The clips: sat, or the aim poses (by pitch, between the pitches they hold
     // the gun at), the reload over either.
@@ -1192,14 +1222,24 @@ export class Figure {
     } else if (!this.hold && this.gunId) {
       // Bladed to the gun: the chest turns a little further, the support
       // shoulder forward toward the handguard.
-      twistBone(this.bone('Spine2'), axis, -0.3 * lean);
+      twistBone(this.bone('Spine2'), axis, -0.3 * raise);
       const shoulder = this.arms.right.root.getWorldPosition(new THREE.Vector3());
-      this.shoulderGun(p, lean, 0, toWorld(p.seat.clone().add(new THREE.Vector3(0.18, 0.18, -0.2))), aimWorld, shoulder);
+      this.shoulderGun(p, raise, 0, toWorld(p.seat.clone().add(new THREE.Vector3(0.18, 0.18, -0.2))), aimWorld, shoulder);
     }
 
     // The head: down the sights out of the window, at the gun reloading; sat
     // in the seat, roughly the way they are aiming, with the odd glance about.
     const head = this.bone('Head');
+    // Aiming, the neck carries the head up above the chest, upright behind the
+    // sights (the library's aim pose slumps it forward onto the stock, which
+    // reads as a hunch from the side).
+    if (A > 0.01) {
+      const neck = this.bone('Neck');
+      const neckAt = neck.getWorldPosition(new THREE.Vector3());
+      const headAt = head.getWorldPosition(new THREE.Vector3());
+      const upright = axis.clone().lerp(carUp, 0.5).addScaledVector(aimWorld, 0.12).normalize();
+      aimBoneAt(neck, headAt, headAt.clone().sub(neckAt).normalize().lerp(upright, A * (1 - reloadW)).normalize());
+    }
     const lookYaw = THREE.MathUtils.clamp(wrapAngle(yaw), -1.1, 1.1) * 0.8 + this.glance * 0.3;
     const sat = toWorldDir(-Math.sin(lookYaw), -0.1, -Math.cos(lookYaw)).normalize();
     const aimLook = reloadW > 0.3 && this.hold ? this.barrel().lerp(carUp.clone().negate(), 0.4).normalize() : aimWorld.clone().addScaledVector(carUp, -0.08).normalize();
