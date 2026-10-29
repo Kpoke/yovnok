@@ -278,6 +278,21 @@ function handGun(weapon: WeaponId): THREE.Group {
   return g;
 }
 
+/** The end of a gun's barrel (along -Z): the middle of its frontmost vertices, in the gun's frame. */
+function barrelTip(gun: THREE.Object3D): THREE.Vector3 | null {
+  gun.updateMatrixWorld(true);
+  const points: THREE.Vector3[] = [];
+  gun.traverse((object) => {
+    const position = (object as THREE.Mesh).geometry?.getAttribute('position');
+    if (!position) return;
+    for (let i = 0; i < position.count; i++) points.push(new THREE.Vector3().fromBufferAttribute(position, i).applyMatrix4(object.matrixWorld));
+  });
+  if (!points.length) return null;
+  const front = points.reduce((z, v) => Math.min(z, v.z), Infinity);
+  const ends = points.filter((v) => v.z < front + 0.01);
+  return ends.reduce((sum, v) => sum.add(v), new THREE.Vector3()).divideScalar(ends.length);
+}
+
 // ------------------------------------------------------------------ figure
 
 const _a = new THREE.Vector3();
@@ -424,6 +439,10 @@ export class Figure {
   private readonly gunner: GunnerActions | null = null;
   /** The mixer's own output last frame (see `mix`). */
   private clean: Map<THREE.Bone, THREE.Quaternion> | null = null;
+  /** The end of the gun's barrel, in the gun's frame (`barrelTip`). */
+  private tip: THREE.Vector3 | null = null;
+  /** Posed this frame as a window gunner (the gun out, `muzzle` is the drawn one). */
+  private gunnerPosed = false;
   /** The gun in the right hand: where it sits in the hand's frame, and its muzzle (gun frame, -Z). */
   private hold: { inHand: THREE.Matrix4; muzzleZ: number } | null = null;
   /** The pitch each aim pose holds the gun at, measured for the gun in hand. */
@@ -735,6 +754,7 @@ export class Figure {
       this.glanceAt = this.time + 2 + Math.random() * 4;
       this.glance = Math.random() < 0.5 ? 0 : (Math.random() - 0.5) * 1.2;
     }
+    this.gunnerPosed = p.role === 'gunner' && p.alive && this.gunner !== null;
     if (p.role === 'gunner' && p.alive && this.gunner) {
       this.poseGunner(this.gunner, p, dt, lean, car);
       return;
@@ -1237,6 +1257,16 @@ export class Figure {
     return new THREE.Vector3(0, 0, this.hold?.muzzleZ ?? -0.6).applyMatrix4(m).sub(butt).normalize();
   }
 
+  /**
+   * Where the drawn gun's barrel ends, world: what a shot's flash and tracer
+   * start from. Null unless a window gunner is out with their gun up.
+   */
+  muzzle(): THREE.Vector3 | null {
+    if (!this.gunnerPosed || !this.tip || !this.gunHolder.visible || this.lean < 0.5) return null;
+    this.gunHolder.updateWorldMatrix(true, false);
+    return this.tip.clone().applyMatrix4(this.gunHolder.matrixWorld);
+  }
+
   /** A shot was fired from this seat: the gun kicks back into the shoulder. */
   kick(): void {
     // Each gun kicks its own way: a light, quick SMG; a heavy shotgun or revolver.
@@ -1262,7 +1292,11 @@ export class Figure {
     this.gunId = id;
     this.hold = null; // held afresh (`holdGun`)
     for (const child of [...this.gunHolder.children]) this.gunHolder.remove(child);
-    if (id) this.gunHolder.add(this.makeGun(id));
+    this.tip = null;
+    if (!id) return;
+    const gun = this.makeGun(id);
+    this.tip = barrelTip(gun);
+    this.gunHolder.add(gun);
   }
 
   dispose(): void {

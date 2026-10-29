@@ -542,6 +542,13 @@ scene.add(damageFx.object);
 // Muzzle flashes, impacts and rockets in flight: what makes a shot read.
 const weaponFx = new WeaponFx();
 scene.add(weaponFx.object);
+type Point = { x: number; y: number; z: number };
+/**
+ * A window gunner's shot, drawn from the gun in their hands once the cars are
+ * placed this frame (`origin`, the shared muzzle point the shot itself leaves
+ * from, when no gun is drawn there).
+ */
+const fromGun: Array<{ rig: VehicleRig | undefined; seat: string; origin: Point; draw: (from: Point) => void }> = [];
 /** A class's car-mounted weapons (from its first armed seat), or null. */
 const seatsForRig = (cls: Parameters<typeof seatsFor>[0]) =>
   seatsFor(cls).find((seat) => seat.mounted)?.mounted ?? null;
@@ -805,13 +812,13 @@ function frame(now: number): void {
       const predicted = net.predictShot(slot);
       if (predicted && net.seat) localCar.kick(net.seat);
       if (predicted) {
-        const o = predicted.origin;
         const e = predicted.end;
-        const length = Math.hypot(e.x - o.x, e.y - o.y, e.z - o.z) || 1;
-        const dir = { x: (e.x - o.x) / length, y: (e.y - o.y) / length, z: (e.z - o.z) / length };
         const heavy = weapon.delivery === 'projectile';
-        weaponFx.muzzle(o, dir, heavy);
-        if (!heavy) {
+        const draw = (o: Point): void => {
+          const length = Math.hypot(e.x - o.x, e.y - o.y, e.z - o.z) || 1;
+          const dir = { x: (e.x - o.x) / length, y: (e.y - o.y) / length, z: (e.z - o.z) / length };
+          weaponFx.muzzle(o, dir, heavy);
+          if (heavy) return;
           tracers.add(o, e);
           // Where a predicted round would land; the server's verdict follows.
           if (length < weapon.range - 0.5) weaponFx.impact(e, o, predicted.hitCrew !== null);
@@ -822,7 +829,10 @@ function frame(now: number): void {
             const reach = Math.min(length, weapon.range);
             tracers.add(o, { x: o.x + (dir.x + j()) * reach, y: o.y + (dir.y + j()) * reach, z: o.z + (dir.z + j()) * reach });
           }
-        }
+        };
+        if (net.windowGunner && net.seat) fromGun.push({ rig: localCar, seat: net.seat, origin: predicted.origin, draw });
+        else draw(predicted.origin);
+        const o = predicted.origin;
         audio.shot(o.x, o.y, o.z, true, weapon.id);
         // A window gunner's own gun kicks: the view tips up and settles.
         if (net.windowGunner) {
@@ -884,12 +894,19 @@ function frame(now: number): void {
         }
       }
     } else if (shotWeapon.delivery === 'hitscan') {
-      const from = { x: shot.ox, y: shot.oy, z: shot.oz };
       const to = { x: shot.ex, y: shot.ey, z: shot.ez };
-      tracers.add(from, to);
-      const length = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z) || 1;
-      weaponFx.muzzle(from, { x: (to.x - from.x) / length, y: (to.y - from.y) / length, z: (to.z - from.z) / length });
-      if (length < shotWeapon.range - 0.5) weaponFx.impact(to, from, shot.hitCrew !== null);
+      const shooter = net.members.get(shot.by);
+      fromGun.push({
+        rig: shooter ? remoteCars.get(shooter.crew) : undefined,
+        seat: shooter?.seat ?? '',
+        origin: { x: shot.ox, y: shot.oy, z: shot.oz },
+        draw: (from) => {
+          tracers.add(from, to);
+          const length = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z) || 1;
+          weaponFx.muzzle(from, { x: (to.x - from.x) / length, y: (to.y - from.y) / length, z: (to.z - from.z) / length });
+          if (length < shotWeapon.range - 0.5) weaponFx.impact(to, from, shot.hitCrew !== null);
+        },
+      });
     }
 
     // Incoming: an arrow points at whoever hit our car, relative to the view.
@@ -899,8 +916,6 @@ function frame(now: number): void {
       hud.flashDamage(wrapAngle(sourceYaw - (me.yaw + viewYaw)));
     }
   }
-  tracers.update(realDt, camera);
-
   // Rockets in flight. A projectile id we have not seen is a fresh launch: give
   // other players' rockets a launch flash and sound (our own fired at the trigger).
   for (const p of net.projectiles) {
@@ -908,7 +923,14 @@ function frame(now: number): void {
     seenProjectiles.add(p.id);
     if (p.by !== net.playerId) {
       const len = Math.hypot(p.x - p.px, p.y - p.py, p.z - p.pz) || 1;
-      weaponFx.muzzle({ x: p.px, y: p.py, z: p.pz }, { x: (p.x - p.px) / len, y: (p.y - p.py) / len, z: (p.z - p.pz) / len }, true);
+      const dir = { x: (p.x - p.px) / len, y: (p.y - p.py) / len, z: (p.z - p.pz) / len };
+      const shooter = net.members.get(p.by);
+      fromGun.push({
+        rig: shooter ? remoteCars.get(shooter.crew) : undefined,
+        seat: shooter?.seat ?? '',
+        origin: { x: p.px, y: p.py, z: p.pz },
+        draw: (from) => weaponFx.muzzle(from, dir, true),
+      });
       audio.shot(p.px, p.py, p.pz, false, p.weapon);
     }
   }
@@ -917,7 +939,6 @@ function frame(now: number): void {
     for (const id of seenProjectiles) if (!live.has(id)) seenProjectiles.delete(id);
   }
   weaponFx.updateRockets(net.projectiles, net.projectilesAt, now, realDt);
-  weaponFx.update(realDt);
   // An enemy gunner we hit in the last two seconds goes down: confirm it.
   for (const m of net.members.values()) {
     const was = memberAlive.get(m.id);
@@ -1049,6 +1070,12 @@ function frame(now: number): void {
       remoteLookKeys.delete(id);
     }
   }
+
+  // Shots from window gunners, now their guns are where this frame draws them.
+  for (const shot of fromGun) shot.draw(shot.rig?.muzzle(shot.seat) ?? shot.origin);
+  fromGun.length = 0;
+  tracers.update(realDt, camera);
+  weaponFx.update(realDt);
 
   perf.mark('world');
 

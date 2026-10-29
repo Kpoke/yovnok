@@ -79,6 +79,8 @@ export type VehicleRig = {
   setCrew: (crew: ReadonlyMap<string, CrewPose>, dt: number) => void;
   /** A shot left this seat: its person's gun kicks. */
   kick: (seatId: string) => void;
+  /** Where the gun drawn in this seat ends, world; null when none is out (a window gunner's only). */
+  muzzle: (seatId: string) => THREE.Vector3 | null;
   /**
    * Turn the car-mounted guns: one aim per mounted weapon (slot order), relative
    * to the car's nose, already clamped to that weapon's limits. Every gun of a
@@ -486,6 +488,7 @@ export function buildVehicle(
     update,
     setCrew,
     kick: (seatId) => seated.get(seatId)?.figure.kick(),
+    muzzle: (seatId) => seated.get(seatId)?.figure.muzzle() ?? null,
     setWeaponAims,
     setShadowDetail,
     damageAnchors,
