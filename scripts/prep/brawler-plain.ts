@@ -1,8 +1,8 @@
 /**
  * The DUOS car: the brawler's body with its bonnet gun bracket removed (the
  * guns were already cut; in duos the car carries no weapons at all), and its
- * passenger window opened: the armoured louvres cut away so the gunner can
- * lean out of it.
+ * side windows opened: the armoured louvres cut away so the gunner can lean
+ * out of the passenger's, and the driver's matches it.
  *
  *   npx tsx scripts/prep/brawler-plain.ts     # then: npm run assetbuild
  *
@@ -14,7 +14,7 @@
  * skin around them is one big island and stays.
  *
  * The louvres are part of the body's own island, so for them it is every
- * TRIANGLE lying wholly inside LOUVRES: the slats go, the door and roof edges
+ * TRIANGLE lying wholly inside a LOUVRES box: the slats go, the door and roof edges
  * around the opening (which reach outside the box) stay.
  */
 
@@ -23,8 +23,11 @@ import type { Primitive } from '@gltf-transform/core';
 import { io, ROOT } from './lib';
 
 const BRACKET = { min: [-0.25, 0.05, -1.3], max: [0.7, 0.42, -0.85] };
-/** The passenger (right) window opening; must agree with shared/crews.ts CABIN.coupe. */
-const LOUVRES = { min: [0.5, 0.17, -0.35], max: [0.95, 0.6, 0.8] };
+/** The passenger (right) window opening, which must agree with shared/crews.ts CABIN.coupe; and the driver's, mirrored. */
+const LOUVRES = [
+  { min: [0.5, 0.17, -0.35], max: [0.95, 0.6, 0.8] },
+  { min: [-0.95, 0.17, -0.35], max: [-0.5, 0.6, 0.8] },
+];
 
 /** The primitive's vertices in game space, through its node's world matrix. */
 function worldPositions(prim: Primitive, m: readonly number[]): Float32Array {
@@ -116,8 +119,8 @@ for (const node of doc.getRoot().listNodes()) {
   const world = node.getWorldMatrix();
   for (const prim of node.getMesh()?.listPrimitives() ?? []) {
     removed += cut(prim, world);
-    louvres += cutTriangles(prim, world, LOUVRES);
+    for (const box of LOUVRES) louvres += cutTriangles(prim, world, box);
   }
 }
 await io.write(join(DIR, 'chassis-plain.glb'), doc);
-console.log(`chassis-plain.glb: bonnet bracket removed (${removed} triangles), passenger window opened (${louvres} triangles)`);
+console.log(`chassis-plain.glb: bonnet bracket removed (${removed} triangles), side windows opened (${louvres} triangles)`);
