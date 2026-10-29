@@ -549,6 +549,8 @@ type Point = { x: number; y: number; z: number };
  * from, when no gun is drawn there).
  */
 const fromGun: Array<{ rig: VehicleRig | undefined; seat: string; origin: Point; draw: (from: Point) => void }> = [];
+/** People shot this frame: they flinch once their cars are posed. */
+const hits: Array<() => void> = [];
 /** A class's car-mounted weapons (from its first armed seat), or null. */
 const seatsForRig = (cls: Parameters<typeof seatsFor>[0]) =>
   seatsFor(cls).find((seat) => seat.mounted)?.mounted ?? null;
@@ -909,6 +911,15 @@ function frame(now: number): void {
       });
     }
 
+    // A person shot leaning out of a window flinches, once their car is posed.
+    const victim = shot.hitPlayer !== null && shotWeapon.delivery === 'hitscan' ? net.members.get(shot.hitPlayer) : undefined;
+    if (victim) {
+      const rig = victim.crew === net.crewId ? localCar : remoteCars.get(victim.crew);
+      const at = new THREE.Vector3(shot.ex, shot.ey, shot.ez);
+      const dir = at.clone().sub(new THREE.Vector3(shot.ox, shot.oy, shot.oz));
+      hits.push(() => rig?.hit(victim.seat, at, dir));
+    }
+
     // Incoming: an arrow points at whoever hit our car, relative to the view.
     if (shot.hitCrew === net.crewId && shot.by !== net.playerId) {
       const me = net.renderState;
@@ -1074,6 +1085,8 @@ function frame(now: number): void {
   // Shots from window gunners, now their guns are where this frame draws them.
   for (const shot of fromGun) shot.draw(shot.rig?.muzzle(shot.seat) ?? shot.origin);
   fromGun.length = 0;
+  for (const hit of hits) hit();
+  hits.length = 0;
   tracers.update(realDt, camera);
   weaponFx.update(realDt);
 

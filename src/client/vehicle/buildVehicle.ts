@@ -79,6 +79,8 @@ export type VehicleRig = {
   setCrew: (crew: ReadonlyMap<string, CrewPose>, dt: number) => void;
   /** A shot left this seat: its person's gun kicks. */
   kick: (seatId: string) => void;
+  /** The person in this seat was shot: struck at `at`, the round travelling along `dir` (world). */
+  hit: (seatId: string, at: THREE.Vector3, dir: THREE.Vector3) => void;
   /** Where the gun drawn in this seat ends, world; null when none is out (a window gunner's only). */
   muzzle: (seatId: string) => THREE.Vector3 | null;
   /**
@@ -488,6 +490,7 @@ export function buildVehicle(
     update,
     setCrew,
     kick: (seatId) => seated.get(seatId)?.figure.kick(),
+    hit: (seatId, at, dir) => seated.get(seatId)?.figure.hit(at, dir),
     muzzle: (seatId) => seated.get(seatId)?.figure.muzzle() ?? null,
     setWeaponAims,
     setShadowDetail,

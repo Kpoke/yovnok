@@ -355,6 +355,8 @@ type GunnerActions = {
   idle: THREE.AnimationAction;
   reload: THREE.AnimationAction;
   shoot: THREE.AnimationAction;
+  /** Flinches, played over the rest when they are shot (null: not in the library). */
+  hit: Record<'head' | 'chest', THREE.AnimationAction> | null;
 };
 
 /**
@@ -401,6 +403,10 @@ export class Figure {
   private swap = 0;
   /** The kick of recent shots, decaying. */
   private recoil = 0;
+  /** 1 just shot … 0 recovered; and which way the round was travelling (world). */
+  private hurt = 0;
+  private hurtHead = false;
+  private readonly hurtDir = new THREE.Vector3();
   private reloadPhase = 0;
   private time = 0;
   /** Each person sways out of step with the others. */
@@ -582,9 +588,14 @@ export class Figure {
     };
     const reload = play(half(clip('Pistol_Reload'), true, 'gunner.reload'));
     reload.paused = true; // scrubbed by the reload's own clock
-    const shoot = mixer.clipAction(THREE.AnimationUtils.makeClipAdditive(half(clip('Pistol_Shoot'), true, 'gunner.shoot')));
-    shoot.blendMode = THREE.AdditiveAnimationBlendMode;
-    shoot.setLoop(THREE.LoopOnce, 1);
+    const additive = (name: string, as: string): THREE.AnimationAction => {
+      const action = mixer.clipAction(THREE.AnimationUtils.makeClipAdditive(half(clip(name), true, as)));
+      action.blendMode = THREE.AdditiveAnimationBlendMode;
+      action.setLoop(THREE.LoopOnce, 1);
+      return action;
+    };
+    const shoot = additive('Pistol_Shoot', 'gunner.shoot');
+    const hit = clips.has('Hit_Head') && clips.has('Hit_Chest') ? { head: additive('Hit_Head', 'gunner.hitHead'), chest: additive('Hit_Chest', 'gunner.hitChest') } : null;
     return {
       sitLower: play(this.facingForward(half(clip('Sitting_Idle_Loop'), false, 'gunner.sitLower'))),
       sitUpper: play(half(clip('Sitting_Idle_Loop'), true, 'gunner.sitUpper')),
@@ -596,6 +607,7 @@ export class Figure {
       idle: play(half(clip('Pistol_Idle_Loop'), true, 'gunner.idle')),
       reload,
       shoot,
+      hit,
     };
   }
 
@@ -1194,6 +1206,12 @@ export class Figure {
     const look = sat.lerp(aimLook, Math.max(A, reloadW)).normalize();
     const facing = this.headFwd.clone().applyQuaternion(head.getWorldQuaternion(_w));
     rotateBone(head, new THREE.Quaternion().slerp(new THREE.Quaternion().setFromUnitVectors(facing, look), 0.75));
+    // Shot: the head snaps along the round (hard for a head hit) and comes back.
+    this.hurt = Math.max(0, this.hurt - dt * 2);
+    if (this.hurt > 0) {
+      const axis = new THREE.Vector3().crossVectors(carUp, this.hurtDir);
+      if (axis.lengthSq() > 1e-6) twistBone(head, axis.normalize(), (this.hurtHead ? 0.6 : 0.25) * this.hurt * this.hurt);
+    }
 
     this.placeGun();
     this.gunHolder.visible = this.gunId !== null;
@@ -1265,6 +1283,23 @@ export class Figure {
     if (!this.gunnerPosed || !this.tip || !this.gunHolder.visible || this.lean < 0.5) return null;
     this.gunHolder.updateWorldMatrix(true, false);
     return this.tip.clone().applyMatrix4(this.gunHolder.matrixWorld);
+  }
+
+  /**
+   * Shot (a window gunner, out): `at` where the round struck, `dir` the way it
+   * was travelling (world). Head or chest, whichever drawn one is nearer: the
+   * library's flinch plays over the pose, the gun is knocked off the aim and
+   * the head snaps along the round, recovering over half a second.
+   */
+  hit(at: THREE.Vector3, dir: THREE.Vector3): void {
+    if (!this.gunner || this.lean < 0.5) return;
+    const head = this.bone('Head').getWorldPosition(new THREE.Vector3());
+    const chest = this.bone('Spine2').getWorldPosition(new THREE.Vector3());
+    this.hurtHead = at.distanceTo(head) < at.distanceTo(chest);
+    this.hurt = 1;
+    this.hurtDir.copy(dir).normalize();
+    this.recoil = Math.min(1.6, this.recoil + 1.2);
+    this.gunner.hit?.[this.hurtHead ? 'head' : 'chest'].reset().setEffectiveWeight(1).play();
   }
 
   /** A shot was fired from this seat: the gun kicks back into the shoulder. */
