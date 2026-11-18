@@ -844,9 +844,14 @@ export class Figure {
       const pole = new THREE.Vector3(0, 0.4, -1).lerp(new THREE.Vector3(-side * (0.8 * this.roof), -0.3, -1 + 0.6 * this.roof), lean);
       // Animated, the clip places the legs when seated; out of the window the
       // feet go where this car's seat is, eased from wherever the clip had them.
+      // A driver's feet go on the floor at the pedals (the clip's legs hang lower than
+      // a low car's floor: the scaled-up figures' feet showed under the coupe).
       if (animated) {
-        if (lean <= 0.001 || !p.alive) continue;
-        foot.lerp(limb.end.getWorldPosition(new THREE.Vector3()), 1 - lean);
+        if (!p.alive) continue;
+        if (p.role !== 'driver') {
+          if (lean <= 0.001) continue;
+          foot.lerp(limb.end.getWorldPosition(new THREE.Vector3()), 1 - lean);
+        }
       }
       this.reach(limb, foot, pole.transformDirection(car.matrixWorld));
     }
