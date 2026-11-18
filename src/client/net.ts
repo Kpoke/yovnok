@@ -368,9 +368,18 @@ export class NetClient {
   leaning = false;
   private leanedAt = 0;
 
-  /** Lean out (aim held) or back in; tells the server at once on a change. */
+  private wantedLeanAt = 0;
+
+  /**
+   * Lean out (aim held) or back in; tells the server at once on a change. Let
+   * go of the aim, a gunner stays out `leanHoldSeconds` before going back in
+   * (unless they can no longer lean: dead, or out of a gunner's seat).
+   */
   setLean(out: boolean): void {
-    const want = out && this.windowGunner && !this.localDead && this.self.alive;
+    const able = this.windowGunner && !this.localDead && this.self.alive;
+    const now = performance.now();
+    if (out && able) this.wantedLeanAt = now;
+    const want = able && (out || (this.leaning && now - this.wantedLeanAt < COMBAT.leanHoldSeconds * 1000));
     if (want === this.leaning) return;
     this.leaning = want;
     if (want) this.leanedAt = performance.now();

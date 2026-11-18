@@ -760,8 +760,7 @@ export class Figure {
     const car = this.root.parent;
     if (!car) return;
     const want = p.role === 'gunner' && p.alive && p.out ? 1 : 0;
-    const step = dt / COMBAT.leanSeconds;
-    this.lean = want > this.lean ? Math.min(want, this.lean + step) : Math.max(want, this.lean - step * 1.5);
+    this.lean = want > this.lean ? Math.min(want, this.lean + dt / COMBAT.leanSeconds) : Math.max(want, this.lean - dt / COMBAT.leanInSeconds);
     const lean = this.lean * this.lean * (3 - 2 * this.lean); // eased
     const side = p.side === 'right' ? 1 : -1;
     const ease = this.posed ? 1 - Math.exp(-dt * 10) : 1;
@@ -1016,8 +1015,10 @@ export class Figure {
     const low = toWorldDir(0.25 * side, 0.75, -0.6).normalize();
     const gunDir = new THREE.Vector3()
       .lerpVectors(low, aimWorld, lean)
-      // Between the lap and the aim the muzzle swings low, not up past the face.
-      .addScaledVector(carUp, -0.9 * Math.sin(Math.PI * lean))
+      // Between the lap and the aim the muzzle stays a little up (it starts up, at
+      // low ready) and comes down onto the aim: it used to dip steeply here to keep
+      // clear of the face, which read as the gun pointed at the ground mid-lean.
+      .addScaledVector(carUp, 0.15 * Math.sin(Math.PI * lean))
       .addScaledVector(carUp, breathe + this.recoil * 0.15 - swapDip * 0.8 - reloadAmount * 0.35)
       .addScaledVector(right0, drift)
       .normalize();
@@ -1109,7 +1110,9 @@ export class Figure {
     // Staged: the body comes out first (`lean`), then turns to the aim with
     // the gun coming up (`raise`, the last two thirds of the lean); going
     // back in, the gun comes down first.
-    const r = THREE.MathUtils.clamp((this.lean - 0.35) / 0.65, 0, 1);
+    // (The gun starts up early, over 85% of the lean: rising only in its last two thirds,
+    // ~0.16 s, the hands whipped up at ~10 m/s and read as a pop.)
+    const r = THREE.MathUtils.clamp((this.lean - 0.15) / 0.85, 0, 1);
     const raise = r * r * (3 - 2 * r);
     const A = raise * (1 - 0.85 * Math.sin(this.swap * Math.PI));
     const reloadW = this.reloadW * this.reloadW * (3 - 2 * this.reloadW);
@@ -1233,12 +1236,15 @@ export class Figure {
     // Aiming, the neck carries the head up above the chest, upright behind the
     // sights (the library's aim pose slumps it forward onto the stock, which
     // reads as a hunch from the side).
-    if (A > 0.01) {
+    // From the start of the lean, not only once the gun is up: otherwise the seated clip's
+    // bowed head shows while the body comes out, a duck that read as "head down".
+    const holdUp = Math.max(A, lean * 0.85);
+    if (holdUp > 0.01) {
       const neck = this.bone('Neck');
       const neckAt = neck.getWorldPosition(new THREE.Vector3());
       const headAt = head.getWorldPosition(new THREE.Vector3());
       const upright = axis.clone().lerp(carUp, 0.5).addScaledVector(aimWorld, 0.12).normalize();
-      aimBoneAt(neck, headAt, headAt.clone().sub(neckAt).normalize().lerp(upright, A * (1 - reloadW)).normalize());
+      aimBoneAt(neck, headAt, headAt.clone().sub(neckAt).normalize().lerp(upright, holdUp * (1 - reloadW)).normalize());
     }
     const lookYaw = THREE.MathUtils.clamp(wrapAngle(yaw), -1.1, 1.1) * 0.8 + this.glance * 0.3;
     const sat = toWorldDir(-Math.sin(lookYaw), -0.1, -Math.cos(lookYaw)).normalize();

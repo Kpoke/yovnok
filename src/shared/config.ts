@@ -35,6 +35,13 @@ export const COMBAT = {
   chestRadius: 0.27,
   /** Seconds to lean out of the window before the first shot can leave. */
   leanSeconds: 0.25,
+  /**
+   * Once out, a gunner stays out this long after the aim is let go, and then
+   * takes `leanInSeconds` to settle back in: a tap of the aim was a flick in and
+   * out of the window, which read as popping. Out longer is also more exposed.
+   */
+  leanHoldSeconds: 0.6,
+  leanInSeconds: 0.35,
   /** Seconds a window gunner takes to climb up over the roof, or back down to the window. */
   roofClimbSeconds: 0.4,
   /** How long a downed crew member waits before returning to their seat. */
