@@ -400,7 +400,9 @@ def build(design, m, game=False):
     if game:
         # The cabin tub: deep where the crew sit, narrower beside the rear wheel wells, and a
         # raised luggage floor over the rear axle.
-        seat_floor = c["ride"] + d["seat_y"] - 0.14
+        # (A design can set the cabin floor itself: in the coupe the seated figures' feet hang
+        # below seat height - 0.14 and showed under the car.)
+        seat_floor = d.get("tub_floor", c["ride"] + d["seat_y"] - 0.14)
         dash_y, rear_well = d["cowl"] - 0.22, axle_r + wheel_r + d.get("arch_gap", 0.075) + 0.04
         tub_w = half_w * 1.6
         for y0, y1, width, z0 in ((dash_y, rear_well, tub_w, seat_floor),
@@ -527,6 +529,15 @@ def build(design, m, game=False):
             line = [(s * (p[0] + 0.004), p[1], p[2]) for p in ring[2:6]]
             for a, b in zip(line, line[1:]):
                 tube(a, b, 0.006, m["trim"], sides=6)
+    # ---- the solo car's weapon mounts: a bracket on each front fender under its gun, and a
+    # ring on the roof under the launcher station (the guns themselves are separate parts).
+    if d.get("solo_mounts"):
+        for gx, gy, gz in d["solo_mounts"]["guns"]:           # game coordinates of each gun pivot
+            bx, by, bz = gx, -gz, c["ride"] + gy
+            box((0.16, 0.22, max(0.04, bz - surf_at(by) + 0.02)), (bx, by, (bz + surf_at(by)) / 2 - 0.01), m["bodyDark"], 0.012)
+        tx, ty, tz = d["solo_mounts"]["turret"]
+        bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.38, depth=0.06, location=(tx, -tz, c["ride"] + ty - 0.02))
+        _add(bpy.context.object, m["bodyDark"], 0.01)
     # ---- the inside: seats, dash, steering wheel
     if game:
         for sx, sy, sz in d["seats"]:                       # game coordinates: x right, y up, z back
@@ -564,7 +575,7 @@ DESIGNS = {
               (-2.45, 0.94)],
         rocker=[(2.45, 0.1), (2.2, 0.02), (1.9, 0.0), (-1.9, 0.0), (-2.2, 0.03), (-2.45, 0.12)],
         top_w=[(2.45, 0.9), (0.0, 0.92), (-2.45, 0.9)],
-        cowl=0.55, deck=-1.62,
+        cowl=0.55, deck=-1.62, floor_lift=-0.05, tub_floor=0.16,   # underside 0.13 m; feet (~0.18) stay inside
         belt=[(2.45, 0.8), (2.2, 0.83), (0.55, 0.87), (-0.5, 0.88), (-1.1, 0.93), (-1.6, 0.955), (-2.45, 0.94)],
         surface=[(2.45, 0.8), (2.2, 0.84), (0.55, 0.88), (-1.62, 0.94), (-1.9, 0.955), (-2.45, 0.945)],
         cabin=dict(header=-0.08, pillars=(-0.9, -1.16), tumble=0.82, tail_in=0.0, open=(2,),
@@ -655,6 +666,95 @@ def join(parts, name):
     return obj
 
 
+# The solo brawler: the muscle coupe with its windows shut (the driver stays inside) and mounts
+# for its guns. Positions are the game's (src/shared/crews.ts SOLO_MG_PIVOT_L/R, SOLO_TURRET_PIVOT).
+DESIGNS["coupe-solo"] = dict(
+    DESIGNS["coupe-muscle"], label="Muscle coupe, armed",
+    cabin=dict(DESIGNS["coupe-muscle"]["cabin"], open=()),
+    seats=[(-0.38, -0.3, 0.2)], stripes=True, bullbar=True,
+    solo_mounts=dict(guns=[(-0.62, 0.07, -1.92), (0.62, 0.07, -1.92)], turret=(0, 0.59, 0.35)),
+)
+
+# ---------------------------------------------------------------- the solo car's guns
+# Authored at the game's UNSCALED part size (manifest scales: gun 0.85, turret 0.62; crews.ts
+# SOLO_GUN_SCALE / SOLO_TURRET_SCALE), origin at the pivot, barrel along +Y here (-Z in game),
+# with the muzzle exactly where the game fires from: gun (0.021, 0.132, -0.757), launcher
+# (0.07, 0.42, -1.38), game axes. Original designs, no real weapon copied.
+GUN_MUZZLE = (0.021, 0.757, 0.132)        # Blender axes (x, -z_game, y_game)
+LAUNCHER_MUZZLE = (0.07, 1.38, 0.42)
+
+
+def kit_gun(m):
+    """A fender machine gun: a post, a receiver with a feed cover, a ventilated jacket, a
+    slim barrel and a flash hider ending at the muzzle, a side ammo box and rear handles."""
+    x, ym, z = GUN_MUZZLE
+    tube((0, 0, 0), (0, 0, z - 0.05), 0.032, m["bodyDark"], sides=12)          # post
+    box((0.11, 0.4, 0.12), (x, -0.06, z), m["bodyDark"], 0.012)                  # receiver
+    box((0.1, 0.18, 0.03), (x, -0.02, z + 0.07), m["trim"], 0.006)               # feed cover
+    disc_y(0.036, 0.36, (x, 0.32, z), m["trim"], sides=14)                       # jacket
+    for k in range(5):                                                            # cooling rings
+        disc_y(0.04, 0.012, (x, 0.18 + k * 0.065, z), m["metal"], sides=14)
+    disc_y(0.015, 0.26, (x, 0.6, z), m["metal"], sides=10)                       # barrel
+    disc_y(0.023, 0.05, (x, ym - 0.025, z), m["bodyDark"], sides=10)             # flash hider
+    box((0.08, 0.15, 0.11), (x - 0.1, -0.02, z - 0.03), m["accent"], 0.01)       # ammo box (team-free)
+    for sx in (-1, 1):                                                            # rear handles
+        tube((x + sx * 0.04, -0.27, z - 0.02), (x + sx * 0.04, -0.33, z + 0.05), 0.012, m["trim"], sides=8)
+    return list(PARTS)
+
+
+def kit_turret(m):
+    """The roof launcher station: a turning ring, a pedestal, an angled shield in the car's
+    paint, and a launcher tube with a flared back blast, a sight and a cradle."""
+    x, ym, z = LAUNCHER_MUZZLE
+    bpy.ops.mesh.primitive_cylinder_add(vertices=40, radius=0.55, depth=0.1, location=(0, 0, 0.05))
+    _add(bpy.context.object, m["bodyDark"], 0.015)
+    tube((0, 0, 0.1), (0, 0, z - 0.1), 0.08, m["trim"], sides=14)                # pedestal
+    box((0.22, 0.4, 0.08), (x, -0.1, z - 0.12), m["bodyDark"], 0.012)            # cradle
+    # Shield: two plates angled back from the centre, in the body paint.
+    for sx in (-1, 1):
+        box((0.5, 0.05, 0.5), (sx * 0.27, 0.42, 0.42), m["body"], 0.015, rot=(math.radians(-12), 0, math.radians(sx * 18)))
+    box((0.16, 0.05, 0.22), (0, 0.46, 0.31), m["body"], 0.012, rot=(math.radians(-12), 0, 0))
+    disc_y(0.085, ym + 0.9, (x, (ym - 0.9) / 2, z), m["trim"], sides=18)        # tube
+    disc_y(0.105, 0.08, (x, ym - 0.04, z), m["bodyDark"], sides=18)             # muzzle ring
+    bpy.ops.mesh.primitive_cone_add(vertices=18, radius1=0.085, radius2=0.14, depth=0.22,
+                                    location=(x, -0.9 - 0.11, z), rotation=(math.radians(90), 0, 0))
+    _add(bpy.context.object, m["bodyDark"])                                      # back blast flare
+    box((0.06, 0.16, 0.08), (x - 0.13, 0.25, z + 0.04), m["bodyDark"], 0.01)    # sight
+    disc_y(0.03, 0.03, (x - 0.13, 0.34, z + 0.04), m["glass"], sides=10)
+    tube((x + 0.02, -0.1, z - 0.09), (x + 0.02, -0.1, z - 0.28), 0.02, m["trim"], sides=8)   # grip
+    return list(PARTS)
+
+
+def export_kit(out):
+    """<out>/solo-kit/gun.glb and turret.glb, at the game's unscaled part size."""
+    folder = os.path.join(out, "solo-kit")
+    os.makedirs(folder, exist_ok=True)
+    for name, fn in (("gun", kit_gun), ("turret", kit_turret)):
+        clear()
+        m = mats((0.32, 0.32, 0.32))
+        obj = join(fn(m), name)
+        tris = sum(len(p.vertices) - 2 for p in obj.data.polygons)
+        bpy.ops.export_scene.gltf(filepath=os.path.join(folder, f"{name}.glb"), use_selection=True, export_apply=True)
+        print(f"solo-kit/{name}: {tris} triangles -> {folder}")
+
+
+def place_kit(design, m):
+    """For renders: the solo car's guns on their mounts, at the game's scales."""
+    c = CLASSES[design["class"]]
+    for (gx, gy, gz) in design["solo_mounts"]["guns"]:
+        before = len(PARTS)
+        kit_gun(m)
+        for o in PARTS[before:]:
+            o.scale = (0.85, 0.85, 0.85)
+            o.location = Vector(o.location) * 0.85 + Vector((gx, -gz, c["ride"] + gy))
+    tx, ty, tz = design["solo_mounts"]["turret"]
+    before = len(PARTS)
+    kit_turret(m)
+    for o in PARTS[before:]:
+        o.scale = (0.62, 0.62, 0.62)
+        o.location = Vector(o.location) * 0.62 + Vector((tx, -tz, c["ride"] + ty))
+
+
 def export_game(out, name):
     """<out>/<name>/chassis.glb and wheel.glb in the game's convention."""
     design = DESIGNS[name]
@@ -680,6 +780,9 @@ def export_game(out, name):
 
 def main():
     args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    if "--kit" in args:
+        export_kit([a for a in args if not a.startswith("--")][0])
+        return
     if "--game" in args:
         args = [a for a in args if not a.startswith("--")]
         for name in args[1:]:
@@ -693,7 +796,10 @@ def main():
     for name in names:
         design = DESIGNS[name]
         clear()
-        build(design, mats(design["paint"]))
+        m = mats(design["paint"])
+        build(design, m)
+        if design.get("solo_mounts"):
+            place_kit(design, m)
         tris = sum(len(o.data.polygons) for o in PARTS)
         print(f"{name}: {len(PARTS)} parts, about {tris * 2} triangles")
         bpy.ops.object.select_all(action="DESELECT")

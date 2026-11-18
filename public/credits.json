@@ -186,6 +186,14 @@
         {
           "title": "YOVNOK car: muscle coupe (duos)",
           "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/cars.py"
+        },
+        {
+          "title": "YOVNOK car: armed muscle coupe (solo)",
+          "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/cars.py"
+        },
+        {
+          "title": "YOVNOK car guns: solo fender machine gun and roof launcher station",
+          "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/cars.py"
         }
       ],
       "attribution": "YOVNOK contributors (github.com/Kpoke/yovnok)",

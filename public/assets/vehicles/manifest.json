@@ -2,28 +2,25 @@
   "version": 1,
   "parts": {
     "solo/chassis": {
-      "file": "brawler/chassis.glb",
+      "file": "coupe-solo/chassis.glb",
       "paint": [
-        "Car01"
+        "body"
       ],
-      "paintStrength": 0.85
+      "paintStrength": 1
     },
     "solo/wheel": {
-      "file": "brawler/wheel.glb"
+      "file": "coupe-solo/wheel.glb"
     },
     "solo/turret": {
-      "file": "armored/turret.glb",
+      "file": "solo-kit/turret.glb",
       "scale": 0.62,
-      "baseTint": {
-        "mtl_vehicle_matv": "#5a5a5a"
-      },
       "paint": [
-        "mtl_vehicle_matv"
+        "body"
       ],
-      "paintStrength": 0.6
+      "paintStrength": 1
     },
     "solo/gun": {
-      "file": "armored/gun.glb",
+      "file": "solo-kit/gun.glb",
       "scale": 0.85
     },
     "coupe/chassis": {

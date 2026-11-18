@@ -1007,6 +1007,36 @@
       "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/cars.py",
       "license": "GPL-3.0-or-later",
       "changes": "Original design modelled by scripts/blender/cars.py (lofted body and cabin from station curves, details from simple shapes; no real-world model copied), exported with a hollow cabin and open gunner windows (--game coupe-muscle); LODs and recompression by scripts/assetbuild.ts. Tinted with the player's livery colour in game."
+    },
+    {
+      "files": [
+        "assets-src/vehicles/coupe-solo/chassis.glb",
+        "assets-src/vehicles/coupe-solo/wheel.glb",
+        "public/assets/vehicles/coupe-solo/chassis.glb",
+        "public/assets/vehicles/coupe-solo/wheel.glb"
+      ],
+      "kind": "model",
+      "title": "YOVNOK car: armed muscle coupe (solo)",
+      "author": "YOVNOK contributors",
+      "authorUrl": "https://github.com/Kpoke/yovnok",
+      "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/cars.py",
+      "license": "GPL-3.0-or-later",
+      "changes": "Original design modelled by scripts/blender/cars.py (lofted body and cabin from station curves, details from simple shapes; no real-world model copied), exported with a hollow cabin and closed windows, fender gun brackets and a roof ring (--game coupe-solo); LODs and recompression by scripts/assetbuild.ts. Tinted with the player's livery colour in game."
+    },
+    {
+      "files": [
+        "assets-src/vehicles/solo-kit/gun.glb",
+        "assets-src/vehicles/solo-kit/turret.glb",
+        "public/assets/vehicles/solo-kit/gun.glb",
+        "public/assets/vehicles/solo-kit/turret.glb"
+      ],
+      "kind": "model",
+      "title": "YOVNOK car guns: solo fender machine gun and roof launcher station",
+      "author": "YOVNOK contributors",
+      "authorUrl": "https://github.com/Kpoke/yovnok",
+      "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/cars.py",
+      "license": "GPL-3.0-or-later",
+      "changes": "Original designs modelled by scripts/blender/cars.py (--kit; no real weapon copied), muzzles placed where the game fires from; LODs and recompression by scripts/assetbuild.ts. The station's shield takes the livery colour in game."
     }
   ]
 }
