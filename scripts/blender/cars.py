@@ -567,12 +567,13 @@ DESIGNS = {
         cowl=0.55, deck=-1.62,
         belt=[(2.45, 0.8), (2.2, 0.83), (0.55, 0.87), (-0.5, 0.88), (-1.1, 0.93), (-1.6, 0.955), (-2.45, 0.94)],
         surface=[(2.45, 0.8), (2.2, 0.84), (0.55, 0.88), (-1.62, 0.94), (-1.9, 0.955), (-2.45, 0.945)],
-        cabin=dict(header=-0.08, pillars=(-0.9, -1.16), tumble=0.82, tail_in=0.0,
+        cabin=dict(header=-0.08, pillars=(-0.9, -1.16), tumble=0.82, tail_in=0.0, open=(2,),
                    drop=[(0.55, 0.04), (-0.08, 0.04), (-0.9, 0.04), (-1.16, 0.08), (-1.62, 0.34)]),
         paint=(0.62, 0.07, 0.05), grille_h=0.17, lamps=2, lamp_r=0.07, tail_lamps=3, tail_h=0.15, bumper_up=0.16,
         stripes=True, scoop=True, spoiler=True, bullbar=True, rally_lamps=0, wheels="mag", arch_gap=0.06,
         handles=(-0.55,),
-        seat_y=-0.4, seats=[(-0.42, -0.4, 0.35), (0.42, -0.4, 0.35)], doors=(0.4, -0.86),
+        # The game's coupe seats (src/shared/crews.ts COUPE_SEATS): x right, y up from the chassis centre, z back.
+        seat_y=-0.3, seats=[(-0.38, -0.3, 0.2), (0.38, -0.3, 0.2)], doors=(0.4, -0.86),
     ),
     # A 1980s 4x4: slab sides, a flat roof, an upright screen, square arches, a spare on the back.
     "suv-4x4": dict(

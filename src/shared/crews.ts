@@ -382,9 +382,9 @@ export type GunnerPart = 'head' | 'chest' | 'waist' | 'muzzle';
  */
 type Cabin = { belt: number; side: number; roof: number; lean: { slide: number; hips: number; tilt: number } };
 export const CABIN: Partial<Record<VehicleClassId, Cabin>> = {
-  // The duo car's passenger louvres are cut away (scripts/prep/brawler-plain.ts).
-  // Its roof is low: the gunner stays lower and tips further out, under its edge.
-  coupe: { belt: 0.2, side: 0.72, roof: 0.71, lean: { slide: 0.24, hips: 0, tilt: 0.59 } },
+  // The muscle coupe (scripts/blender/cars.py, coupe-muscle): a low sill, a wide body and a
+  // low roof. The gunner slides well over and tips out under the roof's edge.
+  coupe: { belt: 0.1, side: 0.86, roof: 0.56, lean: { slide: 0.3, hips: 0.02, tilt: 0.59 } },
   // The 4x4 (scripts/blender/cars.py, suv-4x4): a tall, wide cabin. The gunner slides well over
   // and tips out so chest and head clear its flat side (0.93 at the sill).
   suv: { belt: 0.17, side: 0.93, roof: 0.925, lean: { slide: 0.3, hips: 0.15, tilt: 0.5 } },

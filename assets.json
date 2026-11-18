@@ -992,6 +992,21 @@
       "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/cars.py",
       "license": "GPL-3.0-or-later",
       "changes": "Original design modelled by scripts/blender/cars.py (lofted body and cabin from station curves, details from simple shapes; no real-world model copied), exported with a hollow cabin and open gunner windows (--game suv-4x4); LODs and recompression by scripts/assetbuild.ts. Tinted with the player's livery colour in game."
+    },
+    {
+      "files": [
+        "assets-src/vehicles/coupe-muscle/chassis.glb",
+        "assets-src/vehicles/coupe-muscle/wheel.glb",
+        "public/assets/vehicles/coupe-muscle/chassis.glb",
+        "public/assets/vehicles/coupe-muscle/wheel.glb"
+      ],
+      "kind": "model",
+      "title": "YOVNOK car: muscle coupe (duos)",
+      "author": "YOVNOK contributors",
+      "authorUrl": "https://github.com/Kpoke/yovnok",
+      "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/cars.py",
+      "license": "GPL-3.0-or-later",
+      "changes": "Original design modelled by scripts/blender/cars.py (lofted body and cabin from station curves, details from simple shapes; no real-world model copied), exported with a hollow cabin and open gunner windows (--game coupe-muscle); LODs and recompression by scripts/assetbuild.ts. Tinted with the player's livery colour in game."
     }
   ]
 }

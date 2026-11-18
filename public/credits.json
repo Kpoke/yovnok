@@ -182,6 +182,10 @@
         {
           "title": "YOVNOK car: old-school 4x4 (squads)",
           "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/cars.py"
+        },
+        {
+          "title": "YOVNOK car: muscle coupe (duos)",
+          "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/cars.py"
         }
       ],
       "attribution": "YOVNOK contributors (github.com/Kpoke/yovnok)",
