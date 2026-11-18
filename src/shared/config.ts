@@ -468,8 +468,9 @@ export const VEHICLE_CLASSES: Record<VehicleClassId, VehicleSpec> = {
    * the roof cannot visually clip through geometry the collider ignores.
    */
   /**
-   * The DUOS car: the brawler's body without its guns — a driver and one gunner
-   * leaning out of the passenger window. Same size and handling as the brawler.
+   * The DUOS car: the muscle coupe (scripts/blender/cars.py, coupe-muscle) — a driver
+   * and one gunner leaning out of the passenger window. Same size and handling as the
+   * solo car, which is the same coupe, armed.
    */
   coupe: {
     id: 'coupe',
@@ -490,8 +491,8 @@ export const VEHICLE_CLASSES: Record<VehicleClassId, VehicleSpec> = {
   suv: {
     id: 'suv',
     label: 'Squad SUV',
-    // A plain SUV (scripts/prep/suv.ts), scaled to this wheelbase; its own
-    // track and wheels.
+    // The old-school 4x4 (scripts/blender/cars.py, suv-4x4), built to these
+    // sizes; its own track and wheels.
     halfWidth: 1.0,
     halfLength: 2.45,
     boxHeight: 1.85,

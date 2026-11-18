@@ -178,7 +178,7 @@ const deg = (d: number): number => (d * Math.PI) / 180;
 const ALL_ROUND: readonly [number, number] = [-Math.PI, Math.PI];
 
 const COUPE_SEATS: SeatDef[] = [
-  // The duo car is the brawler's body, without its guns: seats where its own are.
+  // The duo car is the muscle coupe, the solo car without its guns: the same seats.
   { id: 'seat.driver', drives: true, side: 'left', mount: [-0.38, -0.3, 0.2], arc: null },
   {
     id: 'seat.frontRight',
@@ -190,7 +190,7 @@ const COUPE_SEATS: SeatDef[] = [
 ];
 
 const SUV_SEATS: SeatDef[] = [
-  // Seats of the SUV body (scripts/prep/suv.ts): low enough that a seated
+  // Seats of the squads 4x4 (scripts/blender/cars.py, suv-4x4): low enough that a seated
   // head clears its roof, at its front and rear doors.
   { id: 'seat.driver', drives: true, side: 'left', mount: [-0.45, -0.52, -0.25], arc: null },
   {
@@ -226,23 +226,23 @@ const SUV_SEATS: SeatDef[] = [
  * the car's heading stop mattering.
  */
 /**
- * The brawler's weapons. The parts are the truck's M2 and RPG station, scaled
- * for a coupe in the vehicle manifest; the muzzle offsets here are the measured
- * ones (`scripts/prep/armored.ts`) times those scales, so shots leave where the
- * barrels are drawn.
+ * The solo car's weapons: YOVNOK's own fender machine gun and roof launcher
+ * station (scripts/blender/cars.py --kit), modelled with their muzzles at the
+ * offsets below (before scaling) and scaled in the vehicle manifest, so shots
+ * leave where the barrels are drawn.
  */
 /** Manifest scales for the brawler's gun and roof station parts. */
 export const SOLO_GUN_SCALE = 0.85;
 export const SOLO_TURRET_SCALE = 0.62;
 const scaled = (v: V3, k: number): V3 => [v[0] * k, v[1] * k, v[2] * k];
 /**
- * Twin M2s on the front fenders, right above the headlights — on the bumper
+ * Twin machine guns on the front fenders, right above the headlights — on the bumper
  * itself the receivers would sit inside the bodywork.
  */
 const SOLO_MG_PIVOT_L: V3 = [-0.62, 0.07, -1.92];
 const SOLO_MG_PIVOT_R: V3 = [0.62, 0.07, -1.92];
 export const SOLO_MG_MUZZLE: V3 = scaled([0.021, 0.132, -0.757], SOLO_GUN_SCALE);
-/** The roof weapon station, carrying the RPG, toward the back of the roof. */
+/** The roof weapon station, carrying the launcher, toward the back of the roof. */
 const SOLO_TURRET_PIVOT: V3 = [0, 0.59, 0.35];
 export const SOLO_RPG_MUZZLE: V3 = scaled([0.07, 0.42, -1.38], SOLO_TURRET_SCALE);
 /** Driver's seat, front left. */
