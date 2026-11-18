@@ -249,6 +249,18 @@ def shell(name, body, bones, mat, bind, offset, thickness, keep=None, smooth=12,
     bmesh.ops.delete(bm, geom=drop, context="FACES")
     loose = [v for v in bm.verts if not v.link_faces]
     bmesh.ops.delete(bm, geom=loose, context="VERTS")
+    # The cut edge follows the body's triangles, so it zigzags (a ragged vest or cuff):
+    # relax each edge vertex toward its two neighbours along the edge.
+    # Not for clothes that hide the skin under them: pulled in, their edge would bare the cut skin.
+    for _ in range(0 if hide_body else EDGE_RELAX):
+        edge_verts = [v for v in bm.verts if any(e.is_boundary for e in v.link_edges)]
+        moved = {}
+        for v in edge_verts:
+            nbrs = [e.other_vert(v) for e in v.link_edges if e.is_boundary]
+            if len(nbrs) == 2:
+                moved[v] = v.co * 0.5 + (nbrs[0].co + nbrs[1].co) * 0.25
+        for v, co in moved.items():
+            v.co = co
     bm.normal_update()
     for v in bm.verts:
         v.co += v.normal * offset
@@ -303,6 +315,7 @@ def shell(name, body, bones, mat, bind, offset, thickness, keep=None, smooth=12,
 
 
 RIG = {}
+EDGE_RELAX = 60   # passes smoothing a garment's cut edge (0 = the raw triangle zigzag)
 
 
 def bind_to(obj, bone, mat):
