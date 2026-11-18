@@ -572,8 +572,8 @@ def make_gear(kind, rig, body):
         keep = lambda c: c.z > top - skull_r * 0.8
         parts.append(shell("Cap", body, ["Head"], team(), None, 0.016, 0.01, keep, smooth=16))
         RIG["headgear"] = 0.026
-        peak = box("Peak", (skull_r * 1.25, skull_r * 1.0, 0.012), Vector((cx, cy + skull_r * 1.25, top - skull_r * 0.72)), (math.radians(-12), 0, 0))
-        parts.append(finish(peak, rig, "Head", team(), 0.004))
+        peak = box("Peak", (skull_r * 1.15, skull_r * 0.7, 0.024), Vector((cx, cy + skull_r * 1.12, top - skull_r * 0.7)), (math.radians(-16), 0, 0))
+        parts.append(finish(peak, rig, "Head", team(), 0.01))   # thick and short: a thin plate read as a blade
     elif kind == "bandana":
         brow_z = top - skull_r * 0.66
         keep = lambda c: brow_z - 0.035 < c.z < brow_z + 0.03
