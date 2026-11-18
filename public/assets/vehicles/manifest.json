@@ -37,14 +37,14 @@
       "file": "brawler/wheel.glb"
     },
     "suv/chassis": {
-      "file": "suv/chassis.glb",
+      "file": "suv-4x4/chassis.glb",
       "paint": [
-        "Body_7"
+        "body"
       ],
-      "paintStrength": 0.75
+      "paintStrength": 1
     },
     "suv/wheel": {
-      "file": "suv/wheel.glb"
+      "file": "suv-4x4/wheel.glb"
     }
   }
 }

@@ -385,7 +385,9 @@ export const CABIN: Partial<Record<VehicleClassId, Cabin>> = {
   // The duo car's passenger louvres are cut away (scripts/prep/brawler-plain.ts).
   // Its roof is low: the gunner stays lower and tips further out, under its edge.
   coupe: { belt: 0.2, side: 0.72, roof: 0.71, lean: { slide: 0.24, hips: 0, tilt: 0.59 } },
-  suv: { belt: 0.2, side: 0.86, roof: 0.82, lean: { slide: 0.22, hips: 0.12, tilt: 0.34 } },
+  // The 4x4 (scripts/blender/cars.py, suv-4x4): a tall, wide cabin. The gunner slides well over
+  // and tips out so chest and head clear its flat side (0.93 at the sill).
+  suv: { belt: 0.17, side: 0.93, roof: 0.925, lean: { slide: 0.3, hips: 0.15, tilt: 0.5 } },
 };
 const DEFAULT_CABIN: Cabin = { belt: 0.2, side: 0.8, roof: 0.75, lean: { slide: 0.22, hips: 0.1, tilt: 0.4 } };
 

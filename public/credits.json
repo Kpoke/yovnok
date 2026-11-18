@@ -160,15 +160,15 @@
       "heading": "3D MODELS",
       "items": [
         {
-          "title": "YOVNOK crew: Raider (tactical crew)",
+          "title": "YOVNOK crew: Road Warrior (1980s road crew)",
           "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/people.py"
         },
         {
-          "title": "YOVNOK crew: Drifter (t-shirt and trousers)",
+          "title": "YOVNOK crew: Mechanic (1980s road crew)",
           "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/people.py"
         },
         {
-          "title": "YOVNOK crew: Bruiser (shirtless crew)",
+          "title": "YOVNOK crew: Bruiser (1980s road crew)",
           "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/people.py"
         },
         {
@@ -178,6 +178,10 @@
         {
           "title": "YOVNOK crew animations",
           "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/anims.py"
+        },
+        {
+          "title": "YOVNOK car: old-school 4x4 (squads)",
+          "source": "https://github.com/Kpoke/yovnok/blob/main/scripts/blender/cars.py"
         }
       ],
       "attribution": "YOVNOK contributors (github.com/Kpoke/yovnok)",

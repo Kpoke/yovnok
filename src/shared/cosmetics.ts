@@ -150,8 +150,8 @@ export const GLOWS: readonly { name: string; colour: number; unlock: UnlockRule 
  * colour tints its kit.
  */
 export const OUTFITS: readonly { id: 'raider' | 'drifter' | 'bruiser'; name: string; unlock: UnlockRule }[] = [
-  { id: 'raider', name: 'Raider', unlock: { type: 'default' } },
-  { id: 'drifter', name: 'Drifter', unlock: { type: 'default' } },
+  { id: 'raider', name: 'Road Warrior', unlock: { type: 'default' } },
+  { id: 'drifter', name: 'Mechanic', unlock: { type: 'default' } },
   { id: 'bruiser', name: 'Bruiser', unlock: { type: 'matches', n: 3 } },
 ];
 export type OutfitId = (typeof OUTFITS)[number]['id'];
