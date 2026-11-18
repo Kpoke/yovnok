@@ -16,6 +16,15 @@
 	abort @notCloudflare
 	encode zstd gzip
 	reverse_proxy game:8787
+	# Every request's time and status, so a slow spell can be traced (2026-11-18: 15 slow
+	# minutes after a deploy left nothing to read). Small: three 5 MB files, then rolled.
+	log {
+		output file /data/access.log {
+			roll_size 5MiB
+			roll_keep 3
+		}
+		format json
+	}
 }
 
 {$WS_DOMAIN} {
